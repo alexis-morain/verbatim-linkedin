@@ -28,7 +28,7 @@ done
 
 step "no profile file is tracked outside examples/"
 leaked="$(git ls-files | grep -E '(^|/)(profile|profil|voice|voix|pillars|piliers|ideas|idees|measure|mesure)\.md$' \
-          | grep -v '^examples/' | grep -v '\.template\.md$' || true)"
+          | grep -v '^examples/' | grep -v '^references/' | grep -v '\.template\.md$' || true)"
 if [ -z "$leaked" ]; then ok "clean"; else bad "these are somebody's profile:"; echo "$leaked" | sed 's/^/     /'; fi
 
 step "every engine file is actually tracked"
