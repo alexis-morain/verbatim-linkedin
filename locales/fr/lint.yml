@@ -1,0 +1,150 @@
+# Pack de langue : français
+# Sources : anti-ai-writing-style.md, plus les catégories 8 et 9 ajoutées au
+# moment de l'extraction du bundle. Recoupe partiellement slopradar,
+# src/rules/text/copy.js, qui reste un projet séparé.
+
+language: fr
+reviewed: "2026-08-27"
+native_reviewed: true
+reviewed_by: "Alexis Morain"
+
+categories:
+
+  grandiose-verbs:
+    weight: 3
+    hard: false
+    terms:
+      - "révolutionner"
+      - "révolutionnaire"
+      - "propulser"
+      - "tirer parti de"
+      - "exploiter le potentiel"
+      - "booster"
+      - "décupler"
+      - "démultiplier"
+    patterns:
+      # "transformer" et "alimenter" ne sont fautifs qu'au sens figuré.
+      # On ne peut pas les lister en dur sans casser un post qui transforme
+      # vraiment un fichier.
+      - "transform\\w* (votre|ton|ta|vos|tes|le|la) (business|activité|approche|vision|mindset)"
+      - "aliment\\w* (la|le|une|un) (réflexion|croissance|dynamique)"
+
+  hollow-jargon:
+    weight: 3
+    hard: false
+    terms:
+      - "robuste"
+      - "holistique"
+      - "synergie"
+      - "synergies"
+      - "levier"
+      - "paysage"
+      - "écosystème"
+      - "paradigme"
+      - "disruption"
+      - "disruptif"
+      - "ADN"
+      - "impactant"
+      - "scalable"
+      - "mindset"
+      - "game-changer"
+      - "bienveillance"
+      - "clé en main"
+      - "sur-mesure"
+      - "nouvelle génération"
+
+  filler-crutches:
+    weight: 2
+    hard: false
+    terms:
+      - "n'hésitez pas"
+      - "n'hésite pas"
+      - "il est important de noter"
+      - "il convient de"
+      - "force est de constater"
+      - "il va sans dire"
+      - "à noter que"
+      - "en effet"
+
+  fake-hooks:
+    weight: 4
+    hard: false
+    terms:
+      - "plongeons dans"
+      - "découvrons"
+      - "explorons ensemble"
+      - "parlons de"
+      - "accrochez-vous"
+      - "spoiler"
+
+  schoolbook-transitions:
+    weight: 2
+    hard: false
+    terms:
+      - "par ailleurs"
+      - "en outre"
+      - "qui plus est"
+      - "ainsi donc"
+      - "cela étant dit"
+    patterns:
+      # "de plus" n'est une transition qu'en tête de phrase. Ailleurs c'est du
+      # français ordinaire : "rien de plus", "un jour de plus".
+      - "(^|[.!?\\n]\\s*)de plus\\b"
+
+  summarizing-closers:
+    weight: 3
+    hard: false
+    terms:
+      - "en résumé"
+      - "en fin de compte"
+      - "pour conclure"
+      - "en définitive"
+      - "au final"
+      - "pour résumer"
+
+  forced-empathy:
+    weight: 3
+    hard: false
+    terms:
+      - "je comprends votre point"
+      - "je comprends ton point"
+      - "c'est tout à fait légitime"
+      - "vous avez raison de"
+      - "tu as raison de"
+      - "excellente question"
+
+  negative-parallelism:
+    weight: 4
+    hard: false
+    terms: []
+    patterns:
+      - "ce n'est pas .{1,70}?,? c'est "
+      - "il ne s'agit pas (de|d') .{1,70}? mais (de|d') "
+      - "non pas .{1,70}? mais "
+      - "ce n'est pas (juste|seulement|que) .{1,70}?,? c'est "
+
+  dramatic-fragmentation:
+    weight: 3
+    hard: false
+    terms:
+      - "point final"
+      - "laissez ça infuser"
+      - "relisez cette phrase"
+      - "relis cette phrase"
+      - "pensez-y"
+    patterns:
+      # Trois lignes consécutives de moins de vingt caractères.
+      - "(?m)^.{1,20}$\\n^.{1,20}$\\n^.{1,20}$"
+
+  typography:
+    weight: 5
+    hard: true
+    # Only these two block a draft. The others are reported and the human
+    # decides, because a missing narrow space is not worth stopping a post.
+    hard_rules: ["em_dash", "emoji"]
+    terms: []
+    rules:
+      em_dash: forbid
+      emoji: forbid
+      nbsp_before: [":", ";", "!", "?"]
+      quotes: "«»"

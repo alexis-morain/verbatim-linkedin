@@ -1,0 +1,78 @@
+# Language pack: <language name>
+# Schema documentation. Copy, replace, delete these comments.
+#
+# Read by lib/lint.py. Deterministic: no model is involved at any point.
+# Every id below comes from references/style-taxonomy.md and must be present,
+# even when empty.
+
+language: xx                  # ISO 639-1 code, matches the directory name
+reviewed: "YYYY-MM-DD"        # date this list was last gone over
+native_reviewed: false        # true only when a native speaker has signed it
+reviewed_by: ""               # name or handle, empty while native_reviewed is false
+
+categories:
+
+  # weight   1 to 5, how much a hit matters in this language
+  # hard     true = blocks the draft, false = reported and the human decides.
+  #          Keep the hard set very small. Three entries is a lot.
+  # terms    exact strings, matched on word boundaries, accent insensitive
+  # patterns Python regular expressions, case insensitive, for shapes rather
+  #          than words. Use when a word list cannot express the tell.
+
+  grandiose-verbs:
+    weight: 3
+    hard: false
+    terms: []
+
+  hollow-jargon:
+    weight: 3
+    hard: false
+    terms: []
+
+  filler-crutches:
+    weight: 2
+    hard: false
+    terms: []
+
+  fake-hooks:
+    weight: 4
+    hard: false
+    terms: []
+
+  schoolbook-transitions:
+    weight: 2
+    hard: false
+    terms: []
+
+  summarizing-closers:
+    weight: 3
+    hard: false
+    terms: []
+
+  forced-empathy:
+    weight: 3
+    hard: false
+    terms: []
+
+  negative-parallelism:
+    weight: 4
+    hard: false
+    terms: []
+    patterns: []
+
+  dramatic-fragmentation:
+    weight: 3
+    hard: false
+    terms: []
+    patterns: []
+
+  typography:
+    weight: 5
+    hard: true
+    hard_rules: []          # subset of the rule names below that blocks a draft
+    terms: []
+    rules:
+      em_dash: forbid         # forbid | allow
+      emoji: forbid           # forbid | allow
+      nbsp_before: []         # characters that take a non breaking space before
+      quotes: ""              # "«»" or "\"\"" or "" to skip the check

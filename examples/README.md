@@ -1,0 +1,38 @@
+# Example profile
+
+**Nadia Feriel does not exist.** She is a fictional persona, invented for this
+repository so that the shape of a filled profile can be read before anyone
+fills their own. Every number, client and quote below is made up. Any
+resemblance to a real person is coincidental.
+
+She is deliberately not in the same field as the maintainer. An example that
+mirrors the author's own positioning teaches the positioning instead of the
+structure.
+
+## What to read here
+
+| File | Shows |
+|---|---|
+| `profile.md` | A filled `references/profile.template.md`, including the `Status` block set to `filled: yes`. |
+| `voice.md` | A voice file built on three posts, carrying the provisional banner because three is fewer than five. |
+| `pillars.md` | Pillars written as postures with effect labels, and a ratio derived from a stated objective. |
+| `ideas.md` | Angles with funnel labels and named material, not subjects. |
+| `corpus/` | One published post, as reference material. |
+| `posts/` | One generated post with its measurement front matter filled in at J+7. |
+
+## What to notice
+
+**Every provable fact carries a source.** Look at "What I can prove" in
+`profile.md`. That column is what makes the traceability promise enforceable:
+without it, "no invented numbers" is a wish.
+
+**The abandoned segment is written down.** Not deleted, written down, with what
+it cost to find out. That section is what stops a post being written to a
+target that was already walked away from.
+
+**The voice file quotes its evidence.** Each trait is followed by the sentence
+it was read from. A trait without a quote is a guess, and it does not belong in
+the file.
+
+**One measurement line is empty on purpose**, in `posts/`, with a note saying
+why. A record that pretends to be complete is worse than one that admits a gap.

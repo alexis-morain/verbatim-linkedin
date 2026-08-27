@@ -1,0 +1,145 @@
+# Language pack: English
+# Written against references/style-taxonomy.md, not translated from the French
+# pack. First pass, unsigned by a second native reviewer.
+
+language: en
+reviewed: "2026-08-27"
+native_reviewed: false
+reviewed_by: ""
+
+categories:
+
+  grandiose-verbs:
+    weight: 3
+    hard: false
+    terms:
+      - "revolutionize"
+      - "revolutionise"
+      - "supercharge"
+      - "turbocharge"
+      - "unlock the potential"
+      - "unleash"
+      - "empower"
+      - "elevate your"
+      - "take it to the next level"
+    patterns:
+      # "leverage" as a verb, not the finance noun.
+      - "\\bleverag(e|es|ed|ing)\\s+(your|our|their|the|this|these)\\b"
+      - "\\btransform(s|ed|ing)?\\s+(your|our|their)\\s+(business|approach|pipeline|mindset|strategy)\\b"
+
+  hollow-jargon:
+    weight: 3
+    hard: false
+    terms:
+      - "robust"
+      - "holistic"
+      - "synergy"
+      - "synergies"
+      - "landscape"
+      - "ecosystem"
+      - "paradigm"
+      - "best-in-class"
+      - "world-class"
+      - "enterprise-grade"
+      - "cutting-edge"
+      - "seamless"
+      - "frictionless"
+      - "thought leadership"
+      - "value-add"
+      - "game-changer"
+      - "game changer"
+
+  filler-crutches:
+    weight: 2
+    hard: false
+    terms:
+      - "feel free to"
+      - "it's important to note"
+      - "it is important to note"
+      - "it's worth noting"
+      - "needless to say"
+      - "that being said"
+      - "at the end of the day"
+      - "in today's fast-paced world"
+      - "in today's world"
+
+  fake-hooks:
+    weight: 4
+    hard: false
+    terms:
+      - "let's dive in"
+      - "let's dive into"
+      - "let's delve into"
+      - "let's explore"
+      - "let's talk about"
+      - "here's the thing"
+      - "buckle up"
+      - "plot twist"
+
+  schoolbook-transitions:
+    weight: 2
+    hard: false
+    terms:
+      - "furthermore"
+      - "moreover"
+      - "additionally"
+      - "in addition"
+      - "that said"
+
+  summarizing-closers:
+    weight: 3
+    hard: false
+    terms:
+      - "in summary"
+      - "in conclusion"
+      - "to sum up"
+      - "all in all"
+      - "to wrap up"
+      - "the bottom line is"
+
+  forced-empathy:
+    weight: 3
+    hard: false
+    terms:
+      - "i understand your point"
+      - "that's completely valid"
+      - "you're right to"
+      - "great question"
+      - "i hear you"
+
+  negative-parallelism:
+    weight: 5
+    hard: false
+    terms: []
+    patterns:
+      - "\\bit'?s not (just |merely |only )?.{1,70}?[,.] it'?s\\b"
+      - "\\bthis (isn'?t|is not) (just |merely |only )?.{1,70}?[,.] (it'?s|this is)\\b"
+      - "\\bnot (just |merely |only )?.{1,60}?\\. .{1,60}?\\. instead\\b"
+      - "\\bstop .{1,40}?\\. start \\b"
+
+  dramatic-fragmentation:
+    weight: 4
+    hard: false
+    terms:
+      - "let that sink in"
+      - "read that again"
+      - "think about it"
+      - "the result?"
+    patterns:
+      # Word. Word. Word. used as a drum beat.
+      - "\\b\\w+\\. \\w+\\. \\w+\\."
+      # Three consecutive very short lines.
+      - "(?m)^.{1,20}$\\n^.{1,20}$\\n^.{1,20}$"
+
+  typography:
+    weight: 5
+    hard: true
+    # Only these two block a draft. The others are reported and the human
+    # decides, because a missing narrow space is not worth stopping a post.
+    hard_rules: ["em_dash", "emoji"]
+    terms: []
+    rules:
+      em_dash: forbid
+      emoji: forbid
+      nbsp_before: []
+      quotes: ""

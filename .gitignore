@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Profile files. Everything a person writes about themselves stays local.
+# The engine ships in this repo, the profile never does.
+# The block below is deliberately blunt: it ignores the profile file names
+# anywhere in the tree, then re-allows the two places that hold engine-owned
+# copies (the empty template, and the fictional example persona).
+# ---------------------------------------------------------------------------
+profile.md
+voice.md
+pillars.md
+ideas.md
+measure.md
+corpus/
+posts/
+drafts/
+
+# French instance names, for anyone running a pre-migration profile
+profil.md
+voix.md
+piliers.md
+idees.md
+mesure.md
+
+# Engine-owned files that share those names, kept in the repo
+!references/profile.template.md
+!examples/**
+
+# The maintainer's own project state file, not a deliverable.
+# Contributor-facing conventions live in CONTRIBUTING.md instead.
+CLAUDE.md
+
+# Local configuration
+.env
+.env.bak.*
+
+# Noise
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
