@@ -31,6 +31,13 @@ leaked="$(git ls-files | grep -E '(^|/)(profile|profil|voice|voix|pillars|pilier
           | grep -v '^examples/' | grep -v '\.template\.md$' || true)"
 if [ -z "$leaked" ]; then ok "clean"; else bad "these are somebody's profile:"; echo "$leaked" | sed 's/^/     /'; fi
 
+step "every engine file is actually tracked"
+missing=""
+for f in $(find references skills locales lib -type f ! -name '*.pyc' 2>/dev/null); do
+  git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
+done
+if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi
+
 step "no .env and no key material is tracked"
 secrets="$(git ls-files | grep -E '(^|/)\.env($|\.)|\.pem$|_rsa$' | grep -v '\.env\.example$' || true)"
 if [ -z "$secrets" ]; then ok "clean"; else bad "$secrets"; fi

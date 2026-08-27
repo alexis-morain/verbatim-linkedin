@@ -21,8 +21,12 @@ piliers.md
 idees.md
 mesure.md
 
-# Engine-owned files that share those names, kept in the repo
-!references/profile.template.md
+# Engine-owned files that share those names, kept in the repo.
+# references/ is engine-owned by definition, so nothing under it is ever
+# ignored: references/measure.md was silently dropped from the first release
+# by the measure.md rule above, and check.sh now fails on that class of bug.
+!references/
+!references/**
 !examples/**
 
 # The maintainer's own project state file, not a deliverable.
