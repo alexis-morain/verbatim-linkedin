@@ -183,6 +183,15 @@ shipped is the most common way this whole system dies.
    bank poorer than it was at the start.**
 3. Publish or schedule. `lib/publish.py` handles the three tiers.
 
+   **Never hand raw text to a scheduling tool.** Run it through
+   `publish.to_scheduler_html` first. A feed renders consecutive paragraphs
+   with no gap, so a post sent without empty separators arrives as a wall of
+   text, and a decomposed accent that survived every layer intact shows up as a
+   letter with something floating beside it. Both have happened here, on the
+   same post. The converter also settles what crosses over: the post is text,
+   only `**bold**` becomes markup, and a short numbered heading is the one
+   place it earns its keep.
+
    **Check the target channel before scheduling anything.** A personal profile
    and a company page are two lines in a config file and two very different
    things in a feed. This has already gone wrong in this project's history:

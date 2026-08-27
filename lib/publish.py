@@ -18,10 +18,13 @@ Set the tier with LINKEDIN_PUBLISH. Anything that leaves this machine needs
 from __future__ import annotations
 
 import argparse
+import html as html_module
 import json
 import os
+import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 
 # LinkedIn refuses a post past this length. Mechanical, verifiable in a
@@ -109,6 +112,38 @@ def check(text: str) -> str:
     return body
 
 
+
+def to_scheduler_html(text: str) -> str:
+    """Turn a post into the HTML a scheduling tool expects.
+
+    Three things, and each one was learned from a post that came out wrong:
+
+    **Empty paragraphs between blocks.** A feed renders consecutive <p> with no
+    gap, so a post sent without separators arrives as a wall of text. The blank
+    line a reader sees is an empty paragraph, not a margin.
+
+    **NFC normalisation.** A decomposed accent, "e" followed by a combining
+    acute, survives a database and a JSON payload intact and then shows up in
+    the feed as a letter with something floating next to it. This is the
+    "accents dropped on publish" failure, and it is fixed here, once.
+
+    **Escaping.** The post is text, not markup. Only ``**bold**`` crosses over,
+    because a short heading in the middle of a post reads better in bold and
+    that is the one piece of formatting a feed reliably keeps.
+    """
+    body = check(text)
+    body = unicodedata.normalize("NFC", body)
+
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", body) if b.strip()]
+
+    out = []
+    for block in blocks:
+        block = re.sub(r"\s*\n\s*", " ", block)
+        block = html_module.escape(block, quote=False)
+        block = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", block)
+        out.append("<p>" + block + "</p>")
+    return "<p></p>".join(out)
+
 def plan(text: str, tier: Tier, when) -> str:
     """What is about to happen, in words, before anything happens."""
     body = check(text)
@@ -154,7 +189,7 @@ def dispatch(text: str, tier: Tier, when, confirmed: bool) -> Result:
     if tier.name == "postiz":
         payload = {
             "integrationId": tier.target,
-            "content": body,
+            "content": to_scheduler_html(body),
             "publishDate": when,
         }
         return Result(

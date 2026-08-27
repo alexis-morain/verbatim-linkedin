@@ -65,6 +65,26 @@ mais de `locales/fr/style.md` lu avant d'écrire. À noter quand même : la règ
 d'espace insécable n'a pas été exercée, le corps ne contient aucune ponctuation
 double. Elle reste non testée en réel.
 
+### État à la clôture
+
+Dépôt public `github.com/alexis-morain/verbatim-linkedin`, branche `main`,
+41 fichiers suivis, arbre propre, `check.sh` à zéro.
+
+| Commit | Contenu |
+|---|---|
+| `13ef82e` | Verbatim v0.1.0, moteur, packs `en` et `fr`, deux skills |
+| `bc5b26d` | `references/measure.md` livré, plus les champs `state` et `published_ref` |
+| `f021fa4` | La règle de fuite de profil ne flaggue plus le `measure.md` du moteur |
+| `07ceb35` | Ce compte rendu |
+
+Installé en local par `~/.claude/skills/verbatim`, symlink unique vers la racine
+du dépôt, qui atterrit dans `00_Skills/verbatim` puisque le dossier de skills
+est lui-même un lien. `post-linkedin` reste sur disque, `description` réécrite
+pour qu'il ne se déclenche plus.
+
+Pack `en` : `native_reviewed: false`, non relu par un anglophone. Chaque passe
+de lint l'annonce à l'utilisateur.
+
 ## 2026-08-27 (nuit). Montage du dépôt et extraction du moteur
 
 Exécution des étapes 1 à 4 de
