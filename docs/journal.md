@@ -1,5 +1,70 @@
 # Journal
 
+## 2026-08-27 (nuit). Premier vrai passage, trois bugs
+
+Le bundle a écrit un post de bout en bout sur le profil de son mainteneur,
+entretien compris. Compte rendu côté contenu dans
+[`../../linkedin/docs/journal.md`](../../linkedin/docs/journal.md). Ici, ce que
+le passage a cassé.
+
+### 1. Le `.gitignore` mangeait `references/measure.md`
+
+Les règles de profil ignorent `measure.md` partout dans l'arbre, et
+`references/measure.md` correspondait. **Le fichier n'est jamais parti dans la
+première release.** Tous les liens vers lui, depuis le README et depuis
+`linkedin-post`, étaient morts sur GitHub.
+
+Corrigé en exemptant `references/` en entier : c'est un dossier du moteur par
+définition, rien de ce qu'il contient n'a à être ignoré.
+
+### 2. `check.sh` prouvait une absence, jamais une présence
+
+C'est le vrai bug, le premier n'en est que le symptôme. Toutes les vérifications
+existantes démontraient que quelque chose de personnel **n'était pas** dans
+l'arbre. Aucune ne démontrait que le moteur **y était**. Un fichier avalé par le
+`.gitignore` passait donc au vert.
+
+Nouvelle étape : tout fichier de `references/`, `skills/`, `locales/` et `lib/`
+doit être suivi par git, sinon `check.sh` échoue.
+
+### 3. Le schéma de mesure n'avait pas d'état
+
+Un fichier de post existe dès le brouillon. Sans champ d'état, un dossier de
+brouillons et un dossier de posts publiés sont indiscernables, et tout comptage
+de piliers ment. Ajout de `state` et de `published_ref` dans
+`references/measure.md`, et la règle qui va avec : tout compte se fait sur
+`state: published` uniquement.
+
+Trouvé en enregistrant un post créé en DRAFT dans Postiz, dont le fichier n'avait
+aucun moyen de dire qu'il n'était pas publié.
+
+### Un quatrième, côté instance
+
+Le bloc signature n'était pas dans `profile.md`. L'ancien skill le codait en
+dur et la migration ne l'a pas vu. C'est un manque d'instance, pas de moteur :
+`references/profile.template.md` portait bien la section. Le gabarit était juste,
+la migration incomplète.
+
+### Ce qui a tenu
+
+**La règle qui interdit d'avancer sur une réponse abstraite.** Trois relances
+avant d'obtenir une scène. C'est elle qui sépare l'entretien d'un formulaire, et
+elle a été inconfortable exactement comme prévu.
+
+**La sortie sur les deux angles.** Les deux propositions étaient correctes et
+adossées à des citations réelles, et l'auteur a répondu à côté avec sa propre
+thèse, qui était meilleure. « Aucun des deux ne te parle ? » n'est pas une
+politesse, c'est ce qui a produit l'angle retenu.
+
+**Le plan de publication avant envoi.** Le nom du canal imprimé en clair,
+« Alexis Morain », à côté de son id. C'est ce qui rend le piège de la page
+entreprise visible au lieu d'être une chaîne de caractères parmi d'autres.
+
+**Le lint.** Clean sur le premier jet, ce qui n'est pas une victoire du linter
+mais de `locales/fr/style.md` lu avant d'écrire. À noter quand même : la règle
+d'espace insécable n'a pas été exercée, le corps ne contient aucune ponctuation
+double. Elle reste non testée en réel.
+
 ## 2026-08-27 (nuit). Montage du dépôt et extraction du moteur
 
 Exécution des étapes 1 à 4 de
