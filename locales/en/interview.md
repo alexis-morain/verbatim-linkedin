@@ -146,6 +146,44 @@ The punchline almost always comes from here.
 
 Optional. When it produces something, it makes the post hard to attack.
 
+## Set C. Page interview
+
+### reader-next-step
+
+> Somebody just read your page and it landed. What is the one thing you want
+> them to do next?
+>
+> Your answer becomes the close of your About and the promise your headline
+> makes. One action. A menu converts nobody.
+
+Affordance: options to pick from, built from what the profile says the channel
+is for. Message me about a project, book a call, follow for the posts, plus
+"or write your own".
+
+### buyer-words
+
+> When a client describes the problem to you, before you have said anything,
+> what words do they use? Give me two or three phrases you have actually
+> heard.
+>
+> These go into your headline and your skills list. People search in their own
+> words, not in yours.
+
+Affordance: memory prompts. Three italic starters recalling situations where a
+client described the problem, above a free field. Heard sentences, not
+invented ones.
+
+### proof-pick
+
+> Of everything in your "what I can prove" list, which two or three facts
+> should carry the page?
+>
+> These go above the fold in your About and into Featured. Everything else
+> stays in reserve for posts.
+
+Affordance: options to pick from, one per fact in the profile's proof list.
+The person picks; the engine does not rank their proof for them.
+
 ## Connective phrases
 
 These are the ones a pack forgets, and they are how the engine's language leaks

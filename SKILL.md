@@ -1,7 +1,7 @@
 ---
 name: verbatim
-description: "Router for Verbatim, the LinkedIn post bundle. Interviews a person to extract real material, then writes, checks and publishes a post in their own voice. Triggers: write a LinkedIn post, I have an idea for a post, set up my LinkedIn profile. Not for advertising campaigns (use an ads skill), not for outbound messaging (use an outreach tool)."
-version: 0.1.0
+description: "Router for Verbatim, the LinkedIn post bundle. Interviews a person to extract real material, then writes, checks and publishes a post in their own voice. Triggers: write a LinkedIn post, I have an idea for a post, set up my LinkedIn profile, rework my LinkedIn page. Not for advertising campaigns (use an ads skill), not for outbound messaging (use an outreach tool)."
+version: 0.2.0
 ---
 
 # Verbatim
@@ -20,6 +20,7 @@ nothing traces, nothing gets written.
 |---|---|---|
 | To write a post | `skills/linkedin-post` | A filled profile. Without one, it offers setup first. |
 | To set up, or to redo their pillars | `skills/linkedin-setup` | None. This is the entry point. |
+| To rework their public LinkedIn page | `skills/linkedin-profile` | A filled profile. The page only ever claims what the profile can prove. |
 
 Read `references/` on demand, not up front. Each skill names the files it
 needs.
@@ -87,6 +88,7 @@ A pack is never a translation of another pack. The ten categories in
 SKILL.md                    this router
 skills/linkedin-post/       interview, sheet, draft, check, publish, measure
 skills/linkedin-setup/      onboarding, pillars, idea bank
+skills/linkedin-profile/    the public page, nine sections, audit then rewrite
 references/                 mechanism, shared across languages
 locales/<lang>/             wording, style lists, market rules
 lib/lint.py                 deterministic style pass, no model

@@ -21,8 +21,9 @@ and writes second. **It never invents material.**
 2. Read `profile.md`, `voice.md`, `pillars.md`, `ideas.md`.
 3. Read `locales/<interface_language>/style.md` and `interview.md`. If the pack
    does not exist, fall back to `locales/en`, and say so.
-4. Count the pillars of the last eight files in `posts/`. Announce the balance
-   in one line and name the pillar that is behind.
+4. Count the pillars of the last eight `state: published` files in `posts/`,
+   drafts do not count. Announce the balance in one line and name the pillar
+   that is behind.
 5. Find posts published more than seven days ago whose measurement fields are
    still empty. Ask for the numbers. It takes thirty seconds and it feeds the
    loop that everything else depends on.

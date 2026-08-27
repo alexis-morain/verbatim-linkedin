@@ -7,6 +7,8 @@ hook: |
   I spent four months selling to agencies. Eleven conversations, two proposals,
   nothing signed.
 chars: 1622
+state: published
+published_ref: ""
 measured:
 inbound_connections:
 inbound_dms:

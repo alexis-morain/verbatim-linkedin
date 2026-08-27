@@ -1,5 +1,36 @@
 # Journal
 
+## 2026-08-27 (nuit). V2 grillée, contrat d'instance, troisième skill
+
+Le plan V2 (l'application locale) a été grillé et acté côté instance de
+référence, détail dans
+[`../../linkedin/plans/2026-08-27-v2-application-locale.md`](../../linkedin/plans/2026-08-27-v2-application-locale.md).
+Ce qui touche ce dépôt : tout MIT, multi-fournisseurs (Anthropic natif + tout
+endpoint compatible OpenAI, donc l'inférence locale incluse), une seule boucle
+d'agent maison au lieu du Claude Agent SDK, monorepo (`app/` viendra ici), nom
+de paquet PyPI `verbatim-linkedin` (`verbatim` est pris), et un gate : rien
+d'applicatif avant 5 posts publiés via le flux complet.
+
+Exécuté ce soir, les deux étapes non gatées :
+
+**`references/instance.md`.** Le contrat de l'instance, écrit pour ses deux
+consommateurs, les skills d'aujourd'hui et l'app de demain. La règle centrale :
+un besoin d'état nouveau étend le contrat, jamais une base à côté. La checklist
+de conformité en fin de fichier est celle qui aurait attrapé le bloc signature
+perdu à la migration.
+
+**`skills/linkedin-profile`.** Troisième skill, les neuf sections de la page
+LinkedIn publique. L'audit fait tourner la promesse à l'envers : chaque
+affirmation déjà sur la page doit tracer vers `profile.md`, et ce qui ne trace
+vers rien est cité et proposé à la suppression. Série C de trois intentions
+dans `interview-intents.md`, formulations ajoutées aux packs en et fr. Le
+résultat adopté s'archive dans `linkedin-page.md` à la racine de l'instance,
+nom ajouté au `.gitignore` et à la règle de fuite de `check.sh`. Routeur passé
+en 0.2.0.
+
+Il manque encore `linkedin-measure` pour boucler les quatre skills du plan
+d'origine, gaté sur des relevés réels. La release v1.1.0 attend ça.
+
 ## 2026-08-27 (nuit). Premier vrai passage, trois bugs
 
 Le bundle a écrit un post de bout en bout sur le profil de son mainteneur,

@@ -30,6 +30,8 @@ posts/        empty for now
 ```
 
 None of it is ever committed to this repository. `.gitignore` enforces that.
+The full contract for these files, format by format, is
+`references/instance.md`; what this skill produces has to conform to it.
 
 ## Step 0. Where it lives, and in what language
 

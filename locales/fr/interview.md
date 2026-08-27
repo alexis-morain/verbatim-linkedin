@@ -157,6 +157,44 @@ La punchline sort presque toujours d'ici.
 
 Facultative. Quand elle donne quelque chose, elle rend le post inattaquable.
 
+## Série C. Entretien de page
+
+### reader-next-step
+
+> Quelqu'un vient de lire ta page et ça a fait mouche. C'est quoi la seule
+> chose que tu veux qu'il fasse ensuite ?
+>
+> Ta réponse devient la fin de ton résumé et la promesse de ton titre. Une
+> action. Un menu ne convertit personne.
+
+Affordance : cases à cocher, construites depuis ce que le profil dit du rôle
+du canal. M'écrire pour un projet, réserver un appel, me suivre pour les
+posts, plus « ou écris la tienne ».
+
+### buyer-words
+
+> Quand un client te décrit son problème, avant que tu aies dit quoi que ce
+> soit, il emploie quels mots ? Donne-moi deux ou trois formules que tu as
+> vraiment entendues.
+>
+> Elles vont dans ton titre et ta liste de compétences. Les gens cherchent
+> avec leurs mots, pas avec les tiens.
+
+Affordance : amorces de mémoire. Trois pistes en italique rappelant des
+situations où un client a décrit le problème, au-dessus d'un champ libre. Des
+phrases entendues, pas inventées.
+
+### proof-pick
+
+> Dans tout ce que ta liste « ce que je peux prouver » contient, quels sont
+> les deux ou trois faits qui doivent porter la page ?
+>
+> Ils passent en haut de ton résumé et dans ta sélection. Le reste garde sa
+> place pour les posts.
+
+Affordance : cases à cocher, une par fait de la liste de preuves du profil.
+La personne choisit ; le moteur ne classe pas ses preuves à sa place.
+
 ## Phrases de liaison
 
 Ce sont celles qu'un pack oublie, et c'est par là que l'anglais fuit dans un

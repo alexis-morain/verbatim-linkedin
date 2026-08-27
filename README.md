@@ -86,11 +86,11 @@ deliberately not in the maintainer's field.
 |---|---|
 | [`linkedin-setup`](skills/linkedin-setup/) | Builds your profile, your pillars, your voice file and your idea bank from a short interview, then hands over to the first post. |
 | [`linkedin-post`](skills/linkedin-post/) | Interview, validation sheet, draft, style pass, revisions, archive, publish, measure at J+7. |
+| [`linkedin-profile`](skills/linkedin-profile/) | Audits and rewrites the nine sections of your public LinkedIn page, headline and About first, from material you can prove. |
 
-Two more are deliberately held back for a second version: a measurement skill
-that reads the store across posts, and a profile skill for the nine sections of
-a LinkedIn profile page. Setup plus post is a complete loop on its own, and two
-skills that work beat four that half do.
+One more is deliberately held back: a measurement skill that reads the store
+across posts. It waits for real measured posts to be built against, because a
+measurement skill written from imagined data measures the imagination.
 
 ## Languages
 

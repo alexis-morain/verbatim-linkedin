@@ -96,3 +96,20 @@ angle gives every later question a thesis to serve.
 The angle is proposed **two at a time**, never one, and each one carries a
 verbatim quote of something the person actually said. If it cannot be quoted,
 the angle was invented and it gets thrown away. See `references/formats.md`.
+
+## Set C. Page interview
+
+Three intents. They run in `linkedin-profile`, and only for what the profile
+does not already answer, which should be most of the time nothing at all. The
+editorial profile is the source; this set fills the three gaps a page has that
+a post does not.
+
+| id | Seeks | The answer becomes |
+|---|---|---|
+| `reader-next-step` | What a stranger should do after reading the page: message, book, follow, subscribe. One action, not a menu. | The close of the About and the promise the headline makes. |
+| `buyer-words` | The words clients use for the problem, in their mouths, not the person's jargon. Two or three phrases actually heard. | The headline vocabulary and the skills list. A search surface built from real speech. |
+| `proof-pick` | Which two or three facts from "what I can prove" carry the page. The person picks; the engine does not rank their proof for them. | The above-the-fold About and the Featured items. |
+
+The affordances apply as everywhere: `reader-next-step` is options to pick
+from, `buyer-words` is memory prompts (heard sentences, not invented ones),
+`proof-pick` is options built from the profile's own proof list.
