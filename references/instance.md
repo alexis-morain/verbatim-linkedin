@@ -26,6 +26,7 @@ because there was no list to diff against. This is the list.
   corpus/                 published posts, as reference material
   posts/                  one file per post produced here, with its measurement
   linkedin-page.md        the public LinkedIn page as applied, optional
+  .env                    engine configuration for this instance, optional
 ```
 
 File names are fixed and English: they are the machine seam, and the engine
@@ -115,14 +116,50 @@ front matter. Optional; an instance that has never run `linkedin-profile`
 does not have it. It exists so the next run can diff against what is really
 on the page instead of asking the person to paste everything again.
 
-## Publishing configuration
+## Configuration
 
-Deliberately not a file in the instance. `lib/publish.py` reads environment
-variables only, documented by `.env.example` at the bundle root; where a
-person keeps them, an exported shell profile or a `.env` loaded by their own
-tooling, is machine specific and outside this contract. The instance holds a
-person's material, never their configuration and never a secret. If a future
-consumer needs per instance configuration, this contract gains it here first.
+Two kinds, and the line between them is what a secret is.
+
+**Publishing configuration is not in the instance.** `lib/publish.py` reads
+environment variables only, documented by `.env.example` at the bundle root;
+where a person keeps them, an exported shell profile or a `.env` loaded by
+their own tooling, is machine specific and outside this contract.
+
+**Engine configuration is, since it differs per instance.** A person can run
+one instance against a hosted model and another against a model on their own
+machine, so the choice belongs next to the material it works on. An instance
+may carry a `.env` holding these keys, all optional:
+
+| Key | What it says |
+|---|---|
+| `VERBATIM_PROVIDER` | `anthropic` for the native wire, `openai` for any endpoint speaking the OpenAI chat format, local inference included |
+| `VERBATIM_MODEL` | the model id, exactly as the provider spells it |
+| `VERBATIM_BASE_URL` | the endpoint, when it is not the provider's own |
+
+**And it does not get to say where the key goes.** The reasoning that keeps
+credentials out of an instance applies to the endpoint too, which is the
+easier half to forget: a file that travels between machines cannot silently
+retarget a credential it is forbidden from holding. An endpoint named in an
+instance `.env` receives the key only when it is the provider's own or a
+runtime on this machine. Anything else has to be named from the process
+environment, either as `VERBATIM_BASE_URL` or by its host in
+`VERBATIM_ENDPOINT_OK`, next to the key it is allowed to receive. Without a
+key in the environment there is nothing to leak and nothing is refused.
+
+**No credential is ever written in the instance.** An API key is read from the
+process environment and from nowhere else, under `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, or `VERBATIM_API_KEY`, which wins over both. A consumer that
+finds a key shaped name in an instance `.env` refuses to start and says which
+line to move, comments included, since a credential commented out rather than
+deleted is still in the file that gets committed: an instance is a directory people copy, sync and sometimes
+commit, and it holds a person's material, never their secrets. The bundle's
+`.env.example` documents both halves.
+
+The process environment overrides the instance `.env`, key by key, so a one
+off run can name another model without editing a file.
+
+If a future consumer needs per instance state this contract does not carry,
+it gains it here first.
 
 ## Conformance
 

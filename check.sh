@@ -11,21 +11,24 @@ bad()  { printf '   FAIL %s\n' "$1"; fail=1; }
 ok()   { printf '   ok   %s\n' "$1"; }
 
 step "tests"
-for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py; do
+for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py \
+         app/tests/test_providers.py app/tests/test_agent.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
 
-step "app web tests"
+step "app suite, with its dependencies"
+# The block above runs on a bare interpreter and proves the stdlib only claim.
+# This one installs the app and runs everything, screens and transport included.
 if command -v uv >/dev/null 2>&1; then
-  if (cd app && uv run --quiet --extra test python -m unittest discover -s tests -p 'test_web*.py') >/dev/null 2>&1; then
-    ok "app/tests/test_web.py"
+  if (cd app && uv run --quiet python -m unittest discover -s tests -p 'test_*.py') >/dev/null 2>&1; then
+    ok "app/tests"
   else
-    bad "app/tests/test_web.py"
-    (cd app && uv run --quiet --extra test python -m unittest discover -s tests -p 'test_web*.py') 2>&1 | tail -20
+    bad "app/tests"
+    (cd app && uv run --quiet python -m unittest discover -s tests -p 'test_*.py') 2>&1 | tail -20
   fi
 else
   # announced degradation, not a silent pass
-  printf '   skip uv not installed, web tests not run\n'
+  printf '   skip uv not installed, the app suite did not run\n'
 fi
 
 step "no model instruction lives under app/"

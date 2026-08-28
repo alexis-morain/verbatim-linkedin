@@ -11,10 +11,11 @@ dependencies = [
     "jinja2>=3.1",
     "pyyaml>=6",
     "python-multipart>=0.0.9",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-test = ["httpx>=0.27"]
+test = []
 
 [project.scripts]
 verbatim = "verbatim_app.cli:main"

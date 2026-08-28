@@ -7,6 +7,7 @@ day somebody wants to host it, the answer is "it is your machine".
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -33,6 +34,24 @@ def main(argv=None) -> int:
     if not (root / "profile.md").is_file():
         print(f"no profile.md in {root}: the app will open on the conformance "
               "report and point you to linkedin-setup", file=sys.stderr)
+
+    # Before anything opens a port. references/instance.md promises that an
+    # instance holding a credential, or pointing a credential somewhere it was
+    # not sent, stops the app rather than starting degraded.
+    from .providers import ProviderError, problems, resolve
+    try:
+        settings = resolve(root, os.environ)
+    except ProviderError as refusal:
+        print(f"{refusal}", file=sys.stderr)
+        return 2
+    gaps = problems(settings)
+    if gaps:
+        print("no model is configured yet ("
+              + ", ".join(g.code for g in gaps)
+              + "); the screens work, the interview waits. See .env.example",
+              file=sys.stderr)
+    else:
+        print(f"model {settings.model} at {settings.base_url}")
 
     from .web import create_app
     import uvicorn
