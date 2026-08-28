@@ -2,6 +2,8 @@
 
 ## 2026-08-28 (soir). Étape 5 découpée, tranche 1 : le socle sans réseau
 
+Commit `07de37c`, poussé.
+
 L'étape 4 est partie sur GitHub (`9a63e30`). L'étape 5, annoncée à 5 ou 6
 sessions, a été découpée en six tranches livrables et la première validée
 avant toute ligne de code : 5.1 le socle sans réseau, 5.2 les outils et le
