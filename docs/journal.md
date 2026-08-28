@@ -2,6 +2,8 @@
 
 ## 2026-08-28 (soir, troisième session). Tranche 5.3 : l'entretien en streaming
 
+Commit `5b3add8`, poussé.
+
 Le premier écran qui parle à un modèle. Aucun endpoint réel, aucune clé : les
 tours sont des flux enregistrés, et la vérification navigateur tourne contre
 deux stubs SSE locaux écrits pour l'occasion. 454 tests app, `check.sh` vert.
