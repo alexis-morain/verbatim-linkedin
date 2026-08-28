@@ -37,6 +37,7 @@ CLAUDE.md
 # Local configuration
 .env
 .env.bak.*
+.claude/
 
 # Noise
 .DS_Store

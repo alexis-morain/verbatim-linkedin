@@ -1,5 +1,95 @@
 # Journal
 
+## 2026-08-28 (soir, seconde session). Tranche 5.2 : les outils, le chargeur de skills, la forme de l'ancrage
+
+Toujours headless, aucun écran, aucun endpoint, comme découpé. Trois modules
+neufs côté app, tous stdlib seule et ajoutés au bloc nu de `check.sh`, plus le
+contrat d'ancrage côté références. 248 tests app, `check.sh` vert. L'app
+tourne sur l'instance réelle en local pour test (l'ancienne instance qui
+tenait le port 8747 a été remplacée).
+
+**`tools.py`.** Les quatre outils que la boucle tend au modèle, chacun avec sa
+frontière dure : `read_instance` (les fichiers du contrat et rien d'autre,
+`.env` refusé avec un message qui dit quoi lire à la place), `write_instance`
+(via `Instance.write`, donc `WRITABLE` seulement, écriture atomique),
+`lint_post` et `publish_plan` (les vrais scripts `lib/` en sous-process, cwd
+sur l'instance). `publish_plan` construit lui-même sa ligne d'arguments et
+`--confirm` n'y existe pas : aucun argument du modèle ne peut faire partir
+quoi que ce soit. Toute sortie de sous-process est expurgée des valeurs des
+variables d'environnement au nom secret avant d'atteindre le modèle. Un refus
+lève `agent.ToolRefused` et son texte dit quoi faire autrement.
+
+**`skills.py`.** Le parseur des `SKILL.md` (front matter via `instance.py`,
+clés requises), la résolution des fichiers cités dans `references/` et
+`locales/`, le bloc system assemblé corps puis fichiers cités, chaque fichier
+nommé par une ligne d'en-tête, sélection de sections pour le pas-à-pas des
+tranches 5.3 à 5.5. Une citation pendante est une erreur dure : c'est le test
+qui aurait attrapé la perte de `measure.md` en v0.1.0, et il tourne maintenant
+sur les trois skills livrés dans les deux langues. Un fichier absent d'un pack
+retombe sur `en`, annoncé dans l'en-tête, jamais en silence.
+
+**`anchors.py` et `references/anchoring.md`.** La décision 3 de l'amendement
+prend sa forme : après le brouillon, un bloc `ANCHORS` de paires `POST:`
+(fragment exact du brouillon) / `SAID:` (citation mot pour mot du transcript,
+dans la langue de l'entretien). La machine vérifie la présence de la citation,
+jamais la vérité de l'affirmation, et ne pardonne que la typographie
+(espaces, guillemets courbes, casse). Trois états d'alarme, tous implémentés :
+`fabricated` et `dangling` sur `verify()`, `unanchored` lu sur le brouillon
+par `uncovered()`, en phrases approximatives. Un plancher de dix caractères
+typographie pliée : une entrée d'une lettre trouve dans n'importe quel texte,
+et une ancre qui ne peut pas rater est une alarme qui ne peut pas sonner.
+
+### La revue : quatre tours, REFUTED trois fois
+
+Le même relecteur à contexte frais, relancé sur chaque vague de correctifs.
+La leçon de 5.1 s'est vérifiée mot pour mot : corriger sous revue casse autant
+que ça répare tant qu'aucun test ne tient l'invariant. Chaque constat corrigé
+a son test de régression.
+
+**Tour 1.** Le vrai trou : `system_block` écrasait les deux axes de langue en
+un seul. Une personne interviewée en français qui publie en anglais recevait
+soit le pack marché français pour un post anglais, soit les questions
+d'entretien en anglais, la fuite de langue exactement. Corrigé : `lang` porte
+l'axe entretien, `output_lang` l'axe publication, `<interface_language>` ne
+résout que côté entretien, les placeholders ambigus résolvent vers les deux
+packs quand les langues diffèrent, et le corps garde ses placeholders (les
+en-têtes portent la résolution). Dans la foulée, les trois skills citaient
+`interview.md` sous `<lang>` alors que c'est l'axe entretien sans ambiguïté :
+passés à `<interface_language>` (linkedin-post 0.2.0, profile et setup 0.1.1).
+Aussi au tour 1 : le marqueur `ANCHORS` décoré perdu en silence, et le
+troisième état d'alarme annoncé par le contrat mais non implémenté.
+
+Deux constats **tenus** en connaissance de cause : la prose anglaise des
+refus d'outils reste dans `app/` (mécanique adressée au modèle, même classe
+que `INTERRUPTED` acté en 5.1 ; la règle `app.yml` couvre l'interface
+utilisateur), et `publish_plan` continue de montrer sa cible, y compris l'id
+d'intégration : vérifier la cible est la raison d'être d'un plan.
+
+**Tours 2 et 3.** Mes correctifs du marqueur ont cassé deux fois, exactement
+le scénario de 5.1 : le marqueur tolérant mangeait la prose d'un brouillon qui
+contenait le mot, puis la porte du marqueur décoré lisait les entrées avec le
+motif tolérant au lieu du strict. L'arbitrage final : le `ANCHORS` nu vaut
+marqueur sans condition, un marqueur décoré ne vaut que suivi d'entrées
+strictement lisibles (`POST:`/`SAID:` majuscules), et un marqueur décoré
+laissé avec du résidu d'entrées illisibles est signalé sans rien découper.
+Le brouillon ne perd jamais de texte, et le silence est traité comme un
+défaut au même titre qu'une fausse alarme. Tour 2 aussi : une ancre d'une
+lettre éteignait `uncovered` et passait `anchored`, d'où le plancher.
+
+**Tour 4 : CONFIRMED.** Trois limites résiduelles au rapport, documentées et
+assumées : un résidu en forme de tableau markdown sous un marqueur décoré
+reste muet (le texte est conservé, le lecteur n'est pas prévenu), une entrée
+mutilée sans deux-points échouée dans le brouillon n'est pas signalée quand un
+vrai bloc existe ailleurs, et deux bords cosmétiques du drapeau « une faute,
+un constat ».
+
+### Ce qui reste vrai
+
+Aucun test de cette tranche ne prouve un endpoint. Les outils sont testés
+contre les vrais `lib/lint.py` et `lib/publish.py` en sous-process, mais
+`publish` n'est jamais piloté qu'en mode plan. Le smoke test par fournisseur
+reste en 5.6, bloquant pour la v2.0.0.
+
 ## 2026-08-28 (soir). Étape 5 découpée, tranche 1 : le socle sans réseau
 
 Commit `07de37c`, poussé.

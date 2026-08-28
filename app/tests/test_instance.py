@@ -120,6 +120,13 @@ class TestPosts(InstanceCase):
         self.assertTrue(body.startswith("Eleven hours."))
         self.assertIn("Session notes", body)
 
+    def test_post_raw_keeps_the_front_matter(self):
+        raw = self.instance.post_raw("2026-08-18-board-pack-hours.md")
+        self.assertTrue(raw.startswith("---\n"))
+        self.assertIn("state: published", raw)
+        with self.assertRaises(InstanceError):
+            self.instance.post_raw("2099-01-01-ghost.md")
+
 
 class TestMeasurementUpdate(InstanceCase):
     def test_update_writes_the_line_and_keeps_the_body_byte_for_byte(self):

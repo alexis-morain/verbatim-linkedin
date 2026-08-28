@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Write a post
@@ -36,7 +36,7 @@ For a voice note, transcribe locally. Nothing about this leaves the machine.
 ## The interview
 
 Intents and ladder: `references/interview-intents.md`, set B.
-Wording: `locales/<lang>/interview.md`.
+Wording: `locales/<interface_language>/interview.md`.
 
 **One question at a time. Never a numbered block.** Ask, wait, dig. Between
 four and six turns.
@@ -115,6 +115,11 @@ Then produce, in this order:
 7. **The raw transcript** of the interview, verbatim. It is material for later.
    The angles that were not taken are sleeping in it, and they go back into
    `ideas.md` at the end of the session.
+8. **The anchors block**, format in `references/anchoring.md`: each claim of
+   the body paired with the interview sentence that backs it, quoted word for
+   word in the language of the interview. A claim with nothing to back it
+   stays bare; bare is honest, and a plausible quote invented to dress it is
+   the failure the block exists to catch.
 
 **The signature block is not generated, it is concatenated.** It is appended
 after a blank line, without passing through the model. A generated signature

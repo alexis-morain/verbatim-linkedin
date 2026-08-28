@@ -12,7 +12,9 @@ ok()   { printf '   ok   %s\n' "$1"; }
 
 step "tests"
 for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py \
-         app/tests/test_providers.py app/tests/test_agent.py; do
+         app/tests/test_providers.py app/tests/test_agent.py \
+         app/tests/test_skills.py app/tests/test_tools.py \
+         app/tests/test_anchors.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
 

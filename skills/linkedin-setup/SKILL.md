@@ -1,7 +1,7 @@
 ---
 name: linkedin-setup
 description: "Onboards a person: builds their editorial profile, their pillars and their idea bank from a short interview, then hands over to the first post. Triggers: set up my LinkedIn profile, define my pillars, I want to start posting. Not for writing a post (use linkedin-post)."
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Setup
@@ -69,7 +69,7 @@ captures them and their absence produces tutorials:
 ## Step 2. The interview
 
 Ten intents, in `references/interview-intents.md`, set A. Wording in
-`locales/<lang>/interview.md`.
+`locales/<interface_language>/interview.md`.
 
 **Every question announces what the answer becomes.** Not afterwards, in the
 question itself. A person who knows they are feeding their public positions

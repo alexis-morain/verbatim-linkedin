@@ -1,7 +1,7 @@
 ---
 name: linkedin-profile
 description: "Audits and rewrites the nine sections of a person's public LinkedIn page from material they can prove, headline and About first. Triggers: optimize my LinkedIn profile page, rewrite my headline, my About section reads flat. Not for building the editorial profile file (use linkedin-setup), not for writing a post (use linkedin-post)."
-version: 0.1.0
+version: 0.1.1
 ---
 
 # The public page
@@ -55,7 +55,7 @@ Announce the verdicts in one compact list before touching anything.
 ## The interview
 
 Three intents, `references/interview-intents.md`, set C. Wording in
-`locales/<lang>/interview.md`. One question at a time, and skip anything
+`locales/<interface_language>/interview.md`. One question at a time, and skip anything
 `profile.md` already answers, which is most things. This interview is short
 on purpose: the material is supposed to exist already.
 

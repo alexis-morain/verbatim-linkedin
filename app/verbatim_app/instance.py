@@ -283,6 +283,12 @@ class Instance:
         result.sort(key=lambda p: (p.date or "", p.filename), reverse=True)
         return result
 
+    def post_raw(self, filename: str) -> str:
+        path = self._child(self.root / "posts", filename)
+        if not path.is_file():
+            raise InstanceError(f"no such post: {filename}")
+        return path.read_text(encoding="utf-8")
+
     def post_body(self, filename: str) -> str:
         path = self._child(self.root / "posts", filename)
         if not path.is_file():
