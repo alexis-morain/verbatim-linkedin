@@ -2,6 +2,8 @@
 
 ## 2026-08-28 (soir, seconde session). Tranche 5.2 : les outils, le chargeur de skills, la forme de l'ancrage
 
+Commit `53b579e`, poussé.
+
 Toujours headless, aucun écran, aucun endpoint, comme découpé. Trois modules
 neufs côté app, tous stdlib seule et ajoutés au bloc nu de `check.sh`, plus le
 contrat d'ancrage côté références. 248 tests app, `check.sh` vert. L'app
