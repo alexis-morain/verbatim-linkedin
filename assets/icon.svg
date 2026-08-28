@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Verbatim mark: a word-for-word quote sitting on a highlighter stroke.
+       Palette is the app's own: ink #10151C, paper #FBFCFD, marker #F2E85C. -->
+  <defs>
+    <!-- one opening quote mark, a "6" shaped typographic comma: solid ball,
+         tapered tail rising to the right. Drawn in a 170x260 box. -->
+    <path id="mark" d="M 150,10
+      C 60,42 0,120 0,196
+      a 82,82 0 1 0 82,-82
+      c -6,0 -12,1 -18,2
+      C 78,74 112,38 160,26 Z"/>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="186" fill="#10151C"/>
+  <!-- the marker swipe, slightly tilted like a hand stroke -->
+  <g transform="rotate(-3 512 560)">
+    <rect x="222" y="432" width="580" height="248" fill="#F2E85C"/>
+  </g>
+  <!-- the quotation mark, ink on the highlight: text posed on the marker
+       switches to ink, the marker itself never changes -->
+  <g fill="#10151C" transform="rotate(-3 512 560)">
+    <use href="#mark" x="0" y="0" transform="translate(322,428)"/>
+    <use href="#mark" x="0" y="0" transform="translate(536,428)"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 1024 1024">
+  <!-- Verbatim favicon: the mark full bleed. Same three colors as the app:
+       ink #10151C, marker #F2E85C, and the quote posed on it in ink. -->
+  <defs>
+    <path id="mark" d="M 150,10
+      C 60,42 0,120 0,196
+      a 82,82 0 1 0 82,-82
+      c -6,0 -12,1 -18,2
+      C 78,74 112,38 160,26 Z"/>
+  </defs>
+  <rect width="1024" height="1024" rx="160" fill="#10151C"/>
+  <g transform="rotate(-3 512 545)">
+    <rect x="122" y="392" width="780" height="310" fill="#F2E85C"/>
+  </g>
+  <g fill="#10151C" transform="rotate(-3 512 545) translate(0,6)">
+    <use href="#mark" transform="translate(250,390) scale(1.24)"/>
+    <use href="#mark" transform="translate(516,390) scale(1.24)"/>
+  </g>
+</svg>
