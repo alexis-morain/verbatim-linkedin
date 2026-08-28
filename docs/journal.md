@@ -1,5 +1,105 @@
 # Journal
 
+## 2026-08-28 (soir, quatrième session). Tranche 5.4 : la fiche de validation
+
+Commits `4ac1633` (la tranche) et `73a2386` (la marque, le favicon, le
+lanceur macOS), poussés.
+
+La garde du skill (« rien n'est écrit tant que la fiche n'est pas
+approuvée ») devient mécanique. 496 tests app, `check.sh` vert. Revue à
+contexte frais : REFUTED au premier tour, CONFIRMED au second, sabotage des
+tests de régression vérifié par le relecteur.
+
+### Le point dur, tranché : une clé dans conversation.json, pas un fichier
+
+La fiche est un état de la conversation, pas une matière de l'instance. Son
+approbation doit être atomique avec la position de la conversation : une
+fiche approuvée à côté d'une conversation qui a continué est la
+désynchronisation qu'un second fichier invite. Le contrat a gagné sa clause
+avant le code : clé `sheet` optionnelle, absente tant que rien n'est proposé,
+donc un fichier sans fiche reste identique à l'octet pour un lecteur ancien,
+et `version` reste à 1. Le transcript ne bouge pas : la fiche est une
+reformulation du moteur en attente d'une décision, pas des mots de la
+personne, et les mots qu'elle reformule sont déjà dedans.
+
+### Trois rôles, trois frontières
+
+- **Le modèle propose, et rien d'autre.** Outil `propose_sheet`, la même
+  forme de frontière que `publish_plan` et son `--confirm` inexistant :
+  aucun argument de l'outil n'atteint `approved`. Une proposition remplace
+  une fiche `proposed`, est refusée sur une fiche `approved` : ce qui est
+  signé ne se troque pas sous la signature.
+- **La personne approuve, d'un clic.** POST sous le verrou de tour : une
+  approbation écrite à côté d'un tour en cours serait écrasée par la
+  sauvegarde suivante du tour, une approbation perdue en silence. Perdre le
+  verrou ne perd rien, et l'écran le dit désormais (notice `turn-running`,
+  ajoutée sur suggestion du relecteur au second tour).
+- **La fiche approuvée clôt les questions, pas l'entretien.** Le tour répond
+  409 `sheet-approved`, re-vérifié sous le verrou comme `closed`. `state`
+  reste `open` : `closed` veut dire « devenu un post » et ce sens ne se
+  surcharge pas. Conséquence assumée : `interview.close()` n'a toujours pas
+  d'appelant, contrairement à ce que la note de session précédente
+  annonçait ; son premier appelant est l'archivage.
+
+### La revue : REFUTED au premier tour, et le constat était le bon
+
+**La signature se transférait.** L'approbation signait la fiche présente sur
+le disque à l'instant du clic, pas celle que la personne avait lue. Une
+proposition B peut remplacer la fiche A entre l'affichage et le clic (un
+tour qui streame encore, un second onglet), et celui qui écrit les
+remplacements est le modèle, précisément la partie que la fiche surveille.
+Le correctif : la fiche a une identité, `Sheet.digest()`, condensé de son
+contenu seul, pas d'horodatage : un même contenu reproposé est la même
+décision, et un tour peut proposer deux fois dans la même seconde. Le
+formulaire porte ce condensé, `approve()` l'exige en positionnel pour
+qu'aucun appelant ne puisse signer à l'aveugle, et un écart n'approuve
+rien : l'écran revient avec la fiche telle qu'elle est et une phrase du pack
+qui dit pourquoi.
+
+Leçon 5.3 appliquée avant d'écrire le correctif : le frère de cette garde
+est le chemin vivant. La trame SSE `sheet` porte le condensé et le script le
+déplace dans le formulaire en remplissant le panneau, sinon le correctif
+recréait le bug exactement là où il est le plus probable.
+
+Deux constats tenus en connaissance de cause : la phrase de succès de
+`propose_sheet` reste en anglais sous `app/` (trafic d'outil adressé au
+modèle, même classe que les refus, actée en 5.2 ; c'est la première du
+chemin heureux, noté), et le skill ne nomme pas l'outil `propose_sheet`
+(aucun skill ne nomme aucun outil ; un modèle qui rend la fiche en prose ne
+déclenche pas le mécanisme, à régler en 5.5 quand la rédaction donne à la
+garde quelque chose à garder).
+
+### Le reste de la tranche
+
+`_check_sheet` refuse une fiche mal formée avec le fichier, comme
+`_check_message` : un `state` inconnu passerait sinon pour « pas approuvé »
+et rouvrirait les questions en silence. L'écran rend le squelette du panneau
+côté serveur (labels des packs), `interview.js` ne fait que remplir des
+slots en `textContent` et révéler ; la trame `sheet` suit sa `tool_result`,
+après la sauvegarde, disque avant écran comme le reste. `STEP_SECTIONS`
+gagne « The validation sheet » : c'est le skill qui dit quand proposer,
+l'app n'a rien à dire. Serif sur le moment fort, la conviction et les
+premières lignes (la matière du post), grotesque sur la reformulation.
+
+**Le trou connu qui a grossi** : les deux lignes d'`interview.js` qui
+déplacent le condensé dans le formulaire n'ont aucun test (les supprimer
+laisse les 496 verts). C'était déjà le trou documenté du fichier ; il porte
+maintenant une ligne de sécurité. Le harnais de 5.5 n'est plus un confort.
+
+### À côté de la tranche : l'app macOS et la marque
+
+- `Verbatim.app` (construite par `scripts/macos-app.sh`, générique) : garde
+  son propre clone du dépôt sous Application Support, `reset --hard
+  origin/main` à chaque lancement, relance le serveur si la révision a
+  changé, ouvre le navigateur sur le port 8748 (le 8747 reste au dev).
+  Pousser sur GitHub est le processus de release. La clé se met dans
+  `~/.config/verbatim/env`, jamais dans l'instance. Installée et testée :
+  clone, install, page servie.
+- La marque : une citation posée sur un trait de surligneur. Encre
+  `#10151C`, marqueur `#F2E85C` (la couleur « prouve ça » du plan),
+  guillemets serif en encre posés dessus. `assets/icon.svg` et
+  `assets/icon-1024.png`, icns générée au build, favicon servi par l'app.
+
 ## 2026-08-28 (soir, troisième session). Tranche 5.3 : l'entretien en streaming
 
 Commit `5b3add8`, poussé.
