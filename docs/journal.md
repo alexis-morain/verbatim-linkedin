@@ -2,6 +2,8 @@
 
 ## 2026-08-28 (soir, cinquième session). Tranche 5.5 : le brouillon et la traçabilité
 
+Commit `d74ff23`.
+
 L'écran qui fait exister le nom du produit. 557 tests app plus 31 tests JS,
 `check.sh` vert. Revue à contexte frais : CONFIRMED sur les sept
 affirmations au premier tour, sept trouvailles, cinq corrigées et deux
