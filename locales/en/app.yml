@@ -1,0 +1,93 @@
+# Interface strings for the local app. One flat map per screen.
+# The engine templates hold no user-facing text; if a string is missing
+# here the English one shows and the app says the pack is incomplete.
+language: en
+native_reviewed: false
+
+app:
+  title: "Verbatim"
+  local_notice: "Runs on this machine only, bound to 127.0.0.1. Nothing leaves."
+  instance: "Instance"
+  pack_incomplete: "This language pack is missing {count} interface strings, shown in English."
+
+nav:
+  overview: "Overview"
+  profile: "Profile"
+  ideas: "Ideas"
+  posts: "Posts"
+  corpus: "Corpus"
+
+gaps:
+  heading: "This instance does not pass conformance"
+  profile-missing: "profile.md is missing. Run linkedin-setup before anything else."
+  status-unparsed: "The Status block of profile.md does not parse."
+  not-filled: "The profile says filled: no. No consumer pretends to know the person; run linkedin-setup."
+  signature-missing: "The Signature block section is absent. That means an incomplete migration, not an empty signature."
+  file-missing: "Missing companion file: {detail}"
+  post-keys-missing: "A post file is missing measurement keys: {detail}"
+
+overview:
+  title: "Overview"
+  status: "Status"
+  filled: "filled"
+  "yes": "yes"
+  "no": "no"
+  updated: "updated"
+  source: "source"
+  languages: "languages"
+  next_session: "Next session"
+  no_next_session: "The idea bank does not name a next session. That line decides whether there is a next post."
+  pillars: "Published posts per pillar"
+  pillar: "Pillar"
+  published: "published"
+  no_published: "No published post yet. The counter runs over published posts only."
+  recent: "Latest posts"
+
+profile:
+  title: "Profile"
+  hint: "This is profile.md, verbatim. The file is the database; what you save here is what every skill reads."
+  save: "Save profile.md"
+  saved: "Saved."
+
+ideas:
+  title: "Idea bank"
+  next_session: "Next session"
+  used: "Used"
+  used_date: "Date"
+  used_pillar: "Pillar"
+  used_angle: "Angle"
+  used_file: "File"
+  empty: "The bank is empty. A session never closes leaving it poorer than it found it."
+
+posts:
+  title: "Posts"
+  date: "Date"
+  state: "State"
+  pillar: "Pillar"
+  label: "Label"
+  chars: "Chars"
+  measured: "Measured"
+  not_measured: "not yet"
+  empty: "No post produced here yet."
+  state_draft: "draft"
+  state_scheduled: "scheduled"
+  state_published: "published"
+
+post:
+  body: "The post, as the file holds it"
+  measure: "Measurement, day 7"
+  measure_hint: "Three numbers, none of them is a like. Empty means nobody looked yet, zero means it produced nothing."
+  measured_on: "Measured on"
+  inbound_connections: "Inbound connections from target profiles"
+  inbound_dms: "DMs that mention a project or a mandate"
+  meeting_mentions: "Times it came up in a call"
+  note: "One line on what happened"
+  save: "Save measurement"
+  saved: "Measurement written to the post file."
+  back: "All posts"
+
+corpus:
+  title: "Corpus"
+  hint: "Posts published before this engine existed. Read, never rewritten."
+  empty: "No corpus file."
+  back: "All corpus files"

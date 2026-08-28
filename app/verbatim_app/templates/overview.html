@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ t('overview.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('overview.title') }}</h1>
+
+{% if status %}
+<dl class="facts">
+  <dt>{{ t('overview.filled') }}</dt>
+  <dd>{% if status.filled %}{{ t('overview.yes') }}{% else %}{{ t('overview.no') }}{% endif %}</dd>
+  <dt>{{ t('overview.source') }}</dt>
+  <dd class="mono">{{ status.source }}</dd>
+  <dt>{{ t('overview.updated') }}</dt>
+  <dd class="mono">{{ status.updated }}</dd>
+  <dt>{{ t('overview.languages') }}</dt>
+  <dd class="mono">{{ status.interface_language }} / {{ status.output_language_default }}</dd>
+</dl>
+{% endif %}
+
+<h2>{{ t('overview.next_session') }}</h2>
+{% if next_session %}
+<p class="callout">{{ next_session }}</p>
+{% else %}
+<p class="empty">{{ t('overview.no_next_session') }}</p>
+{% endif %}
+
+<h2>{{ t('overview.pillars') }}</h2>
+{% if counter %}
+<table>
+  <tbody>
+    {% for pillar, count in counter.items() | sort %}
+    <tr>
+      <th scope="row">{{ t('overview.pillar') }} {{ pillar }}</th>
+      <td class="mono">{{ count }} {{ t('overview.published') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">{{ t('overview.no_published') }}</p>
+{% endif %}
+
+{% if posts %}
+<h2>{{ t('overview.recent') }}</h2>
+<ul class="postlist">
+  {% for post in posts %}
+  <li>
+    <a href="/posts/{{ post.filename }}"><span class="mono">{{ post.date }}</span>
+    {{ post.hook.splitlines()[0] if post.hook else post.filename }}</a>
+    <span class="state state-{{ post.state }}">{{ t('posts.state_' + (post.state or 'draft')) }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

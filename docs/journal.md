@@ -1,5 +1,55 @@
 # Journal
 
+## 2026-08-28. Gate levé par Alexis, étape 4 livrée : le socle applicatif
+
+Alexis a levé explicitement le gate des 5 posts publiés pour la partie
+applicative (« continue la construction de l'app, sans avoir tous les posts
+écrits/publiés »). L'étape 3 (`linkedin-measure`) reste gatée sur des relevés
+réels : coder le magasin de mesure contre des données inventées n'a pas changé
+de statut. Le risque nommé au plan reste vrai et est maintenant porté par une
+décision, pas par un oubli : construire l'outil au lieu de publier.
+
+Livré, l'étape 4 en entier, en TDD :
+
+**`app/verbatim_app/instance.py`.** La couche disque-est-la-base : lecture et
+écriture des fichiers du contrat `references/instance.md`. Conformité dans
+l'ordre du contrat, compteur de piliers recalculé à la lecture sur
+`state: published` seulement, mise à jour de mesure textuelle qui préserve le
+reste du front matter et le corps octet pour octet, écritures atomiques et
+limitées aux fichiers du contrat. Stdlib seule, PyYAML optionnel avec repli
+maison testé contre PyYAML, même philosophie que `lint.py`.
+
+**Les écrans froids.** FastAPI + Jinja2, zéro build front, zéro connexion LLM :
+Vue d'ensemble (Status, prochaine session, compteur), Profil (le fichier en
+textarea, verbatim), Idées (la banque parsée, badges pilier et tunnel), Posts
+(liste, détail, formulaire de mesure J+7), Corpus (lecture seule). Bind
+127.0.0.1 en dur dans `cli.py`, garde same-origin qui refuse tout POST
+cross-origin. Les chaînes d'interface vivent dans `locales/<lang>/app.yml`
+(en, fr, gabarit `_template`), dégradation annoncée quand un pack est
+incomplet, aucun texte utilisateur dans les templates.
+
+**Le paquet.** `app/pyproject.toml`, nom `verbatim-linkedin`, commande
+`verbatim` (sert une instance : `uv run --project app verbatim <instance>`),
+version `2.0.0.dev0`. `check.sh` étendu : tests d'instance dans le bloc
+python3, tests web via `uv` (skip annoncé sans uv), fichiers de l'app dans la
+vérification de tracking, et le grep du plan qui refuse toute chaîne
+d'instruction LLM sous `app/verbatim_app/`.
+
+42 tests app (23 instance + 19 web), `check.sh` entièrement vert, écrans
+vérifiés en vrai navigateur sur le persona Nadia Feriel. Design : papier
+chaud, serif + mono données, un accent outremer, radius zéro, aucune ombre ;
+l'orange reste réservé au panneau de traçabilité de l'étape 5.
+
+La revue à contexte frais d'avant commit a refusé la première version pour un
+vrai bug : un backslash dans la note de mesure écrivait un scalaire YAML
+invalide et mettait tous les écrans en 500, fichier à réparer à la main.
+Corrigé avec test de régression, plus trois durcissements sortis de la même
+revue : compteurs négatifs refusés, garde Host contre le DNS rebinding (la
+garde Origin ne couvre pas les GET), et une tournure du pack fr.
+
+Prochain morceau : l'étape 5, le routeur moteur (`agent.py`, la boucle
+multi-fournisseurs), le gros du chantier.
+
 ## 2026-08-27 (nuit). V2 grillée, contrat d'instance, troisième skill
 
 Le plan V2 (l'application locale) a été grillé et acté côté instance de

@@ -1,0 +1,221 @@
+/* Verbatim. One deliberate look: warm paper, warm ink, a single saturated
+   ultramarine, square corners everywhere, no shadows. Serif for prose,
+   mono for anything that is data. Orange is reserved for the traceability
+   panel (a sentence with no anchor) and is not used for decoration. */
+
+:root {
+  --paper: #f5f1e8;
+  --paper-2: #ece6d8;
+  --ink: #221e16;
+  --muted: #6b6353;
+  --line: #cdc4b0;
+  --accent: #223fbd;
+  --alarm: #a33111;
+  --ok: #2f6b2f;
+  --serif: "Iowan Old Style", "Palatino Nova", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { height: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.mono { font-family: var(--mono); font-size: 0.82em; }
+
+.frame {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ rail */
+
+.rail {
+  background: var(--paper-2);
+  border-right: 1px solid var(--line);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.wordmark::before { content: "\00AB\2009"; color: var(--accent); }
+.wordmark::after { content: "\2009\00BB"; color: var(--accent); }
+
+.rail nav { display: flex; flex-direction: column; }
+
+.rail nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.rail nav a:first-child { border-top: 1px solid var(--line); }
+.rail nav a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+.rail nav a:hover { background: var(--paper); }
+
+.rail-foot {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.rail-foot .mono { word-break: break-all; }
+
+/* ------------------------------------------------------------------ main */
+
+main {
+  padding: 2.25rem 3rem 4rem;
+  max-width: 72ch;
+}
+
+h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 1rem; }
+h2 { font-size: 1.15rem; margin: 2.25rem 0 0.75rem; }
+
+a { color: var(--accent); }
+
+.hint { color: var(--muted); margin-top: -0.5rem; }
+
+.empty { color: var(--muted); font-style: italic; }
+
+.flash { color: var(--ok); font-weight: 700; }
+
+.degraded, .gaps {
+  border: 1px solid var(--alarm);
+  color: var(--alarm);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1.5rem;
+}
+.gaps h2 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--alarm); }
+.gaps ul { margin: 0; padding-left: 1.2rem; }
+
+/* the one signature device: a heavy top rule, never a colored side border */
+.callout {
+  border-top: 3px solid var(--ink);
+  padding-top: 0.6rem;
+  font-size: 1.05rem;
+}
+
+/* ---------------------------------------------------------------- tables */
+
+table { border-collapse: collapse; width: 100%; }
+th, td {
+  text-align: left;
+  padding: 0.45rem 0.75rem 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+thead th { font-family: var(--mono); font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 1.5rem; margin: 0 0 1rem; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+
+/* ----------------------------------------------------------------- lists */
+
+.postlist { list-style: none; padding: 0; margin: 0; }
+.postlist li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.postlist a { text-decoration: none; color: var(--ink); }
+.postlist a:hover { color: var(--accent); }
+.postlist .mono { color: var(--muted); margin-right: 0.5rem; }
+
+.angles { list-style: none; padding: 0; margin: 0; }
+.angles li { padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--ink);
+  padding: 0 0.35rem;
+  margin-right: 0.35rem;
+  font-size: 0.72rem;
+}
+.badge-visibility { border-color: var(--accent); color: var(--accent); }
+.badge-trust { border-color: var(--ink); }
+.badge-action { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.state { font-family: var(--mono); font-size: 0.78rem; }
+.state-draft { color: var(--muted); }
+.state-scheduled { color: var(--accent); }
+.state-published { color: var(--ok); }
+
+/* ----------------------------------------------------------------- forms */
+
+textarea, input[type="text"], input[type="date"], input[type="number"] {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  width: 100%;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fffdf7;
+  color: var(--ink);
+  padding: 0.5rem 0.6rem;
+}
+
+textarea { resize: vertical; }
+
+button {
+  font-family: var(--serif);
+  font-size: 1rem;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.5rem 1.4rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+button:hover { background: var(--accent); border-color: var(--accent); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.measure { display: grid; gap: 0.75rem; max-width: 34rem; }
+.measure label { display: grid; gap: 0.25rem; }
+.measure button { justify-self: start; }
+
+.post-body {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+}
+
+/* ------------------------------------------------------------ small view */
+
+@media (max-width: 720px) {
+  .frame { grid-template-columns: 1fr; }
+  .rail { flex-direction: row; flex-wrap: wrap; align-items: baseline; border-right: 0; border-bottom: 1px solid var(--line); }
+  .rail-foot { display: none; }
+  main { padding: 1.5rem 1.25rem 3rem; }
+}

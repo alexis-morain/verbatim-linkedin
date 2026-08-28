@@ -1,0 +1,93 @@
+# Chaînes d'interface de l'application locale. Une carte plate par écran.
+# Les gabarits du moteur ne portent aucun texte destiné à la personne ; si
+# une chaîne manque ici, l'anglaise s'affiche et l'app annonce le trou.
+language: fr
+native_reviewed: true
+
+app:
+  title: "Verbatim"
+  local_notice: "Tourne sur cette machine seulement, lié à 127.0.0.1. Rien ne sort."
+  instance: "Instance"
+  pack_incomplete: "Il manque {count} chaînes d'interface à ce pack de langue, affichées en anglais."
+
+nav:
+  overview: "Vue d'ensemble"
+  profile: "Profil"
+  ideas: "Idées"
+  posts: "Posts"
+  corpus: "Corpus"
+
+gaps:
+  heading: "Cette instance ne passe pas la conformité"
+  profile-missing: "profile.md manque. Lancer linkedin-setup avant toute chose."
+  status-unparsed: "Le bloc Status de profile.md ne se lit pas."
+  not-filled: "Le profil dit filled: no. Aucun consommateur ne prétend connaître la personne ; lancer linkedin-setup."
+  signature-missing: "La section Signature block est absente. C'est une migration incomplète, pas une signature vide."
+  file-missing: "Fichier compagnon manquant : {detail}"
+  post-keys-missing: "Un fichier de post n'a pas toutes les clés de mesure : {detail}"
+
+overview:
+  title: "Vue d'ensemble"
+  status: "Status"
+  filled: "rempli"
+  "yes": "oui"
+  "no": "non"
+  updated: "mis à jour"
+  source: "source"
+  languages: "langues"
+  next_session: "Prochaine session"
+  no_next_session: "La banque d'idées ne nomme pas de prochaine session. Cette ligne décide s'il y a un prochain post."
+  pillars: "Posts publiés par pilier"
+  pillar: "Pilier"
+  published: "publiés"
+  no_published: "Aucun post publié pour l'instant. Le compteur ne court que sur les posts publiés."
+  recent: "Derniers posts"
+
+profile:
+  title: "Profil"
+  hint: "Ceci est profile.md, verbatim. Le fichier est la base : ce que vous enregistrez ici est ce que chaque skill lit."
+  save: "Enregistrer profile.md"
+  saved: "Enregistré."
+
+ideas:
+  title: "Banque d'idées"
+  next_session: "Prochaine session"
+  used: "Utilisées"
+  used_date: "Date"
+  used_pillar: "Pilier"
+  used_angle: "Angle"
+  used_file: "Fichier"
+  empty: "La banque est vide. Une session ne se ferme jamais en la laissant plus pauvre."
+
+posts:
+  title: "Posts"
+  date: "Date"
+  state: "État"
+  pillar: "Pilier"
+  label: "Étiquette"
+  chars: "Signes"
+  measured: "Mesuré"
+  not_measured: "pas encore"
+  empty: "Aucun post produit ici pour l'instant."
+  state_draft: "brouillon"
+  state_scheduled: "programmé"
+  state_published: "publié"
+
+post:
+  body: "Le post, tel que le fichier le porte"
+  measure: "Mesure, J+7"
+  measure_hint: "Trois chiffres, aucun n'est un like. Vide veut dire que personne n'a regardé, zéro que le post n'a rien produit."
+  measured_on: "Mesuré le"
+  inbound_connections: "Demandes de connexion de profils cibles"
+  inbound_dms: "Messages privés qui mentionnent un projet ou un mandat"
+  meeting_mentions: "Fois où le post est revenu en rendez-vous"
+  note: "Une ligne sur ce qui s'est passé"
+  save: "Enregistrer la mesure"
+  saved: "Mesure écrite dans le fichier du post."
+  back: "Tous les posts"
+
+corpus:
+  title: "Corpus"
+  hint: "Les posts publiés avant ce moteur. Lus, jamais réécrits."
+  empty: "Aucun fichier de corpus."
+  back: "Tous les fichiers du corpus"

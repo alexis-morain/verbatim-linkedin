@@ -43,3 +43,7 @@ CLAUDE.md
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# app virtualenv and build leftovers
+app/.venv/
+app/dist/

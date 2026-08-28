@@ -11,9 +11,28 @@ bad()  { printf '   FAIL %s\n' "$1"; fail=1; }
 ok()   { printf '   ok   %s\n' "$1"; }
 
 step "tests"
-for t in lib/test_lint.py lib/test_publish.py; do
+for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
+
+step "app web tests"
+if command -v uv >/dev/null 2>&1; then
+  if (cd app && uv run --quiet --extra test python -m unittest discover -s tests -p 'test_web*.py') >/dev/null 2>&1; then
+    ok "app/tests/test_web.py"
+  else
+    bad "app/tests/test_web.py"
+    (cd app && uv run --quiet --extra test python -m unittest discover -s tests -p 'test_web*.py') 2>&1 | tail -20
+  fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip uv not installed, web tests not run\n'
+fi
+
+step "no model instruction lives under app/"
+# Prompts stay in skills/ and locales/. The app carries mechanics only.
+prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai|respond only with|never reveal' \
+           app/verbatim_app 2>/dev/null || true)"
+if [ -z "$prompts" ]; then ok "clean"; else bad "instruction strings:"; echo "$prompts" | sed 's/^/     /'; fi
 
 step "language packs"
 for dir in locales/*/; do
@@ -33,7 +52,7 @@ if [ -z "$leaked" ]; then ok "clean"; else bad "these are somebody's profile:"; 
 
 step "every engine file is actually tracked"
 missing=""
-for f in $(find references skills locales lib -type f ! -name '*.pyc' 2>/dev/null); do
+for f in $(find references skills locales lib app/verbatim_app app/tests -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml; do
   git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
 done
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi

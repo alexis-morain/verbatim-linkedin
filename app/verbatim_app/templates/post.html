@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ post.filename }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<p><a href="/posts">&larr; {{ t('post.back') }}</a></p>
+<h1 class="mono">{{ post.filename }}</h1>
+
+<dl class="facts">
+  <dt>{{ t('posts.date') }}</dt><dd class="mono">{{ post.date }}</dd>
+  <dt>{{ t('posts.state') }}</dt>
+  <dd><span class="state state-{{ post.state }}">{{ t('posts.state_' + (post.state or 'draft')) }}</span></dd>
+  <dt>{{ t('posts.pillar') }}</dt><dd class="mono">P{{ post.pillar }}</dd>
+  <dt>{{ t('posts.label') }}</dt><dd class="mono">{{ post.label }}</dd>
+  <dt>{{ t('posts.chars') }}</dt><dd class="mono">{{ post.chars }}</dd>
+</dl>
+
+<h2>{{ t('post.body') }}</h2>
+<pre class="post-body">{{ body }}</pre>
+
+<h2>{{ t('post.measure') }}</h2>
+<p class="hint">{{ t('post.measure_hint') }}</p>
+{% if saved %}<p class="flash">{{ t('post.saved') }}</p>{% endif %}
+<form method="post" action="/posts/{{ post.filename }}/measure" class="measure">
+  <label>{{ t('post.measured_on') }}
+    <input type="date" name="measured" value="{{ post.measured or '' }}">
+  </label>
+  <label>{{ t('post.inbound_connections') }}
+    <input type="number" min="0" name="inbound_connections"
+           value="{{ post.inbound_connections if post.inbound_connections is not none }}">
+  </label>
+  <label>{{ t('post.inbound_dms') }}
+    <input type="number" min="0" name="inbound_dms"
+           value="{{ post.inbound_dms if post.inbound_dms is not none }}">
+  </label>
+  <label>{{ t('post.meeting_mentions') }}
+    <input type="number" min="0" name="meeting_mentions"
+           value="{{ post.meeting_mentions if post.meeting_mentions is not none }}">
+  </label>
+  <label>{{ t('post.note') }}
+    <input type="text" name="note" value="{{ post.note or '' }}">
+  </label>
+  <button type="submit">{{ t('post.save') }}</button>
+</form>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ t('corpus.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('corpus.title') }}</h1>
+<p class="hint">{{ t('corpus.hint') }}</p>
+{% if names %}
+<ul class="postlist">
+  {% for name in names %}
+  <li><a class="mono" href="/corpus/{{ name }}">{{ name }}</a></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">{{ t('corpus.empty') }}</p>
+{% endif %}
+{% endblock %}

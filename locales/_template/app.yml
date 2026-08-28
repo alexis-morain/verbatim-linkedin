@@ -1,0 +1,7 @@
+# Interface strings for the local app, one flat map per screen.
+# Copy from locales/en/app.yml and translate every value. Keys are the
+# contract and never change per language. A missing key is legal: the
+# English string shows and the app announces the pack is incomplete.
+# {placeholders} are filled by the app and must survive translation.
+language: xx
+native_reviewed: false

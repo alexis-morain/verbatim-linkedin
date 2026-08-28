@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ t('ideas.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('ideas.title') }}</h1>
+
+{% if bank and bank.next_session %}
+<h2>{{ t('ideas.next_session') }}</h2>
+<p class="callout">{{ bank.next_session }}</p>
+{% endif %}
+
+{% if sections %}
+  {% for section, angles in sections.items() %}
+  <h2>{{ section }}</h2>
+  <ul class="angles">
+    {% for angle in angles %}
+    <li>
+      <span class="badge mono">P{{ angle.pillar }}</span>
+      <span class="badge badge-{{ (angle.label or '')|lower }} mono">{{ angle.label }}</span>
+      {{ angle.text }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+{% else %}
+<p class="empty">{{ t('ideas.empty') }}</p>
+{% endif %}
+
+{% if bank and bank.used %}
+<h2>{{ t('ideas.used') }}</h2>
+<table>
+  <thead>
+    <tr>
+      <th>{{ t('ideas.used_date') }}</th>
+      <th>{{ t('ideas.used_pillar') }}</th>
+      <th>{{ t('ideas.used_angle') }}</th>
+      <th>{{ t('ideas.used_file') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in bank.used %}
+    <tr>
+      <td class="mono">{{ entry.date }}</td>
+      <td class="mono">{{ entry.pillar }}</td>
+      <td>{{ entry.angle }}</td>
+      <td class="mono">{{ entry.file }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ t('app.title') }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/verbatim.css">
+</head>
+<body>
+  <div class="frame">
+    <aside class="rail">
+      <p class="wordmark">{{ t('app.title') }}</p>
+      <nav>
+        <a href="/"{% if request.url.path == '/' %} aria-current="page"{% endif %}>{{ t('nav.overview') }}</a>
+        <a href="/profile"{% if request.url.path == '/profile' %} aria-current="page"{% endif %}>{{ t('nav.profile') }}</a>
+        <a href="/ideas"{% if request.url.path == '/ideas' %} aria-current="page"{% endif %}>{{ t('nav.ideas') }}</a>
+        <a href="/posts"{% if request.url.path.startswith('/posts') %} aria-current="page"{% endif %}>{{ t('nav.posts') }}</a>
+        <a href="/corpus"{% if request.url.path.startswith('/corpus') %} aria-current="page"{% endif %}>{{ t('nav.corpus') }}</a>
+      </nav>
+      <div class="rail-foot">
+        <p class="mono">{{ t('app.instance') }}<br>{{ instance_root }}</p>
+        <p>{{ t('app.local_notice') }}</p>
+      </div>
+    </aside>
+    <main>
+      {% if pack_missing %}
+      <p class="degraded">{{ t('app.pack_incomplete', count=pack_missing) }}</p>
+      {% endif %}
+      {% if gaps %}
+      <section class="gaps">
+        <h2>{{ t('gaps.heading') }}</h2>
+        <ul>
+          {% for gap in gaps %}
+          <li>{{ t('gaps.' + gap.code, detail=gap.detail) }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

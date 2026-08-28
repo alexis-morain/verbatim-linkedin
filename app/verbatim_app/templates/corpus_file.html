@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<p><a href="/corpus">&larr; {{ t('corpus.back') }}</a></p>
+<h1 class="mono">{{ name }}</h1>
+<pre class="post-body">{{ text }}</pre>
+{% endblock %}

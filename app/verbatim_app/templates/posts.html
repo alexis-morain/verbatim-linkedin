@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('posts.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('posts.title') }}</h1>
+{% if posts %}
+<table>
+  <thead>
+    <tr>
+      <th>{{ t('posts.date') }}</th>
+      <th>{{ t('posts.state') }}</th>
+      <th>{{ t('posts.pillar') }}</th>
+      <th>{{ t('posts.label') }}</th>
+      <th>{{ t('posts.chars') }}</th>
+      <th>{{ t('posts.measured') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for post in posts %}
+    <tr>
+      <td class="mono"><a href="/posts/{{ post.filename }}">{{ post.date }}</a></td>
+      <td><span class="state state-{{ post.state }}">{{ t('posts.state_' + (post.state or 'draft')) }}</span></td>
+      <td class="mono">P{{ post.pillar }}</td>
+      <td class="mono">{{ post.label }}</td>
+      <td class="mono">{{ post.chars }}</td>
+      <td class="mono">{% if post.measured %}{{ post.measured }}{% else %}<span class="empty">{{ t('posts.not_measured') }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">{{ t('posts.empty') }}</p>
+{% endif %}
+{% endblock %}
