@@ -2,6 +2,11 @@
 
 ## 2026-08-28. Gate levé par Alexis, étape 4 livrée : le socle applicatif
 
+Commit `7722fc1`, local au moment de la session, non poussé. Le prompt de la
+session suivante (étape 5, à découper en tranches) a été remis à Alexis. Un
+conflit de port a clos la session : la démo sur le persona occupait 8747,
+arrêtée pour laisser la place à l'app sur l'instance réelle.
+
 Alexis a levé explicitement le gate des 5 posts publiés pour la partie
 applicative (« continue la construction de l'app, sans avoir tous les posts
 écrits/publiés »). L'étape 3 (`linkedin-measure`) reste gatée sur des relevés
