@@ -2,7 +2,9 @@
 
 ## 2026-08-28 (soir, cinquième session). Tranche 5.5 : le brouillon et la traçabilité
 
-Commit `d74ff23`.
+Commits `d74ff23` (la tranche) et `6e3f998` (la référence de commit),
+poussés sur `main`. L'app installée se met donc à jour au prochain
+lancement.
 
 L'écran qui fait exister le nom du produit. 557 tests app plus 31 tests JS,
 `check.sh` vert. Revue à contexte frais : CONFIRMED sur les sept
