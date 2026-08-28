@@ -27,6 +27,15 @@ class InstanceError(Exception):
     pass
 
 
+class UnreadableError(InstanceError):
+    """The file is there and its bytes will not come back as text.
+
+    Separate from "it is not there" because the two want different screens:
+    one is a file to create, the other is a file to repair, and a consumer
+    that cannot tell them apart shows the wrong one.
+    """
+
+
 # Files a consumer may write. Everything else in the instance is either
 # produced by a dedicated skill (posts/, linkedin-page.md via its owner)
 # or is somebody's raw corpus, which is never rewritten.
@@ -78,9 +87,14 @@ class PostMeta:
     meeting_mentions: int | None
     note: str | None
     present_keys: tuple = ()
+    #: The file is there and its front matter cannot be read. Reported, never
+    #: guessed at, and never allowed to take a screen down with it.
+    unreadable: bool = False
 
     @property
     def missing_keys(self):
+        if self.unreadable:
+            return ()
         return tuple(k for k in MEASURE_KEYS if k not in self.present_keys)
 
 
@@ -176,6 +190,46 @@ def parse_front_matter_fallback(block: str) -> dict:
     return data
 
 
+def read_text(path, name: str) -> str:
+    """Every read of an instance file goes through here.
+
+    One place, because the failure is always the same and always widens the
+    same way: a file saved in another encoding or with a mode that came across
+    wrong is one file, and every screen in this app renders the conformance
+    report, so a raw failure anywhere takes the whole app down. Guarding the
+    readers one at a time is how this came back three times.
+    """
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except (OSError, ValueError) as unreadable:
+        raise UnreadableError(
+            f"{name} cannot be read: {type(unreadable).__name__}") from None
+
+
+def atomic_write(path, text: str) -> None:
+    """Write the whole file or leave the previous one untouched.
+
+    Nothing in an instance is ever half a file. A profile caught mid write is
+    somebody's material; a conversation caught mid write is a conversation the
+    provider rejects on the next request.
+
+    The rename is atomic, so this covers a crash, a kill and a failed write.
+    It does not fsync, so it does not cover a power loss: the rename can land
+    before the bytes do. Naming the limit rather than implying the stronger
+    promise, since a durability claim nobody tested is worse than none.
+    """
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def _measurement_line(key: str, value) -> str:
     if value is None:
         return f"{key}:"
@@ -211,21 +265,12 @@ class Instance:
         path = self._child(self.root, name)
         if not path.is_file():
             raise InstanceError(f"{name} not found in {self.root}")
-        return path.read_text(encoding="utf-8")
+        return read_text(path, name)
 
     def write(self, name: str, text: str) -> None:
         if name not in WRITABLE:
             raise InstanceError(f"{name} is not a file this consumer may write")
-        path = self._child(self.root, name)
-        fd, tmp = tempfile.mkstemp(dir=self.root, prefix=f".{name}.")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(text)
-            os.replace(tmp, path)
-        except BaseException:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-            raise
+        atomic_write(self._child(self.root, name), text)
 
     # -- profile
 
@@ -260,9 +305,22 @@ class Instance:
             return []
         result = []
         for path in sorted(directory.glob("*.md")):
-            raw = path.read_text(encoding="utf-8")
-            block, _ = split_front_matter(raw)
-            data = parse_front_matter(block) if block else {}
+            try:
+                raw = read_text(path, path.name)
+                block, _ = split_front_matter(raw)
+                data = parse_front_matter(block) if block else {}
+            except Exception:
+                # One post file nobody can read is one post file, not the whole
+                # app. Every screen renders the conformance report, so this
+                # loop decides whether a bad byte in one archive takes down the
+                # profile screen too. It is reported as a gap, never guessed at.
+                result.append(PostMeta(
+                    filename=path.name, date=None, pillar=None, format=None,
+                    label=None, hook="", chars=None, state=None,
+                    published_ref=None, measured=None, inbound_connections=None,
+                    inbound_dms=None, meeting_mentions=None, note=None,
+                    present_keys=(), unreadable=True))
+                continue
             result.append(PostMeta(
                 filename=path.name,
                 date=data.get("date"),
@@ -287,13 +345,13 @@ class Instance:
         path = self._child(self.root / "posts", filename)
         if not path.is_file():
             raise InstanceError(f"no such post: {filename}")
-        return path.read_text(encoding="utf-8")
+        return read_text(path, filename)
 
     def post_body(self, filename: str) -> str:
         path = self._child(self.root / "posts", filename)
         if not path.is_file():
             raise InstanceError(f"no such post: {filename}")
-        _, body = split_front_matter(path.read_text(encoding="utf-8"))
+        _, body = split_front_matter(read_text(path, filename))
         return body
 
     def pillar_counter(self) -> dict:
@@ -311,7 +369,7 @@ class Instance:
         path = self._child(self.root / "posts", filename)
         if not path.is_file():
             raise InstanceError(f"no such post: {filename}")
-        raw = path.read_text(encoding="utf-8")
+        raw = read_text(path, filename)
         block, _ = split_front_matter(raw)
         if block is None:
             raise InstanceError(f"{filename} has no front matter to update")
@@ -390,7 +448,7 @@ class Instance:
         path = self._child(self.root / "corpus", name)
         if not path.is_file():
             raise InstanceError(f"no such corpus file: {name}")
-        return path.read_text(encoding="utf-8")
+        return read_text(path, name)
 
     # -- conformance, references/instance.md order
 
@@ -403,13 +461,21 @@ class Instance:
             gaps.append(Gap("status-unparsed"))
         elif not status.filled:
             gaps.append(Gap("not-filled"))
-        if not re.search(r"^## Signature block\s*$",
-                         self.read("profile.md"), re.MULTILINE):
+        try:
+            profile = self.read("profile.md")
+        except InstanceError:
+            profile = None
+            gaps.append(Gap("profile-unreadable"))
+        if profile is not None and not re.search(
+                r"^## Signature block\s*$", profile, re.MULTILINE):
             gaps.append(Gap("signature-missing"))
         for name in COMPANIONS:
             if not (self.root / name).is_file():
                 gaps.append(Gap("file-missing", name))
         for post in self.posts():
+            if post.unreadable:
+                gaps.append(Gap("post-unreadable", post.filename))
+                continue
             if post.missing_keys:
                 gaps.append(Gap("post-keys-missing",
                                 f"{post.filename}: {' '.join(post.missing_keys)}"))

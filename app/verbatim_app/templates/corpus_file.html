@@ -3,5 +3,12 @@
 {% block content %}
 <p><a href="/corpus">&larr; {{ t('corpus.back') }}</a></p>
 <h1 class="mono">{{ name }}</h1>
+{% if unreadable %}
+<div class="gaps">
+  <p>{{ t('corpus.unreadable') }}</p>
+  <p class="mono">{{ unreadable }}</p>
+</div>
+{% else %}
 <pre class="post-body">{{ text }}</pre>
+{% endif %}
 {% endblock %}

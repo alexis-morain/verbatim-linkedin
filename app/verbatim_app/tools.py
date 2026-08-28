@@ -56,9 +56,15 @@ def _required(arguments: dict, name: str) -> str:
     return value
 
 
-def _redact(text: str, environ) -> str:
-    """Strike the values of secret named variables out of a subprocess
-    answer. The name survives, the value never does."""
+def redact(text: str, environ) -> str:
+    """Strike the values of secret named variables out of anything on its way
+    to a model or to a screen. The name survives, the value never does.
+
+    Shared with the interview screen, which puts a provider's own error body in
+    front of somebody: a gateway that echoes an Authorization header into a
+    debug message is the same accident as a subprocess printing its own
+    environment.
+    """
     for name, value in environ.items():
         if not isinstance(value, str) or len(value) < 4:
             continue
@@ -147,8 +153,8 @@ def _lint(bundle: Path, inst: Instance, arguments: dict, environ,
                 inst.root, environ, timeout)
     answer = (done.stdout + ("\n" + done.stderr if done.stderr else "")).strip()
     if done.returncode not in (0, 1):
-        raise ToolRefused(_redact(answer, environ))
-    return _redact(answer, environ)
+        raise ToolRefused(redact(answer, environ))
+    return redact(answer, environ)
 
 
 def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
@@ -157,9 +163,9 @@ def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
     done = _run(bundle / "lib" / "publish.py", ["-", "--plan"], text,
                 inst.root, environ, timeout)
     if done.returncode != 0:
-        raise ToolRefused(_redact(
+        raise ToolRefused(redact(
             (done.stderr or done.stdout).strip(), environ))
-    return _redact(done.stdout.strip(), environ)
+    return redact(done.stdout.strip(), environ)
 
 
 # ------------------------------------------------------------------- factory

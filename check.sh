@@ -14,7 +14,7 @@ step "tests"
 for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py \
          app/tests/test_providers.py app/tests/test_agent.py \
          app/tests/test_skills.py app/tests/test_tools.py \
-         app/tests/test_anchors.py; do
+         app/tests/test_anchors.py app/tests/test_interview.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
 
@@ -39,6 +39,32 @@ prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai
            app/verbatim_app 2>/dev/null || true)"
 if [ -z "$prompts" ]; then ok "clean"; else bad "instruction strings:"; echo "$prompts" | sed 's/^/     /'; fi
 
+step "no sentence reaches a browser from under app/"
+# An HTTPException detail is rendered as the whole page body on a plain form
+# navigation, so a sentence written here is a sentence in the wrong language on
+# a French screen. Machine codes only; the sentence lives in locales/<lang>/app.yml.
+# Scoped to routes/, which is where an HTTPException can be raised at all.
+# Anything that is not a bare double quoted kebab literal fails, so a single
+# quoted string, an f-string and a call all fail: none of them is a fixed code.
+# An SSE frame's technical text uses another keyword for the same reason.
+prose="$(grep -rnoE '(^|[^_[:alnum:]])detail=[^,)]*' app/verbatim_app/routes --include='*.py' 2>/dev/null \
+         | grep -vE 'detail="[a-z0-9-]+"$' || true)"
+if [ -z "$prose" ]; then ok "clean"; else bad "prose in an error detail:"; echo "$prose" | sed 's/^/     /'; fi
+
+step "the interview screen's script parses"
+# The one file in this bundle with no test behind it. A syntax check is not a
+# test and is not pretended to be one: it catches the edit that breaks every
+# scenario at once, and nothing finer. See docs/journal.md.
+if command -v node >/dev/null 2>&1; then
+  if node --check app/verbatim_app/static/interview.js >/dev/null 2>&1; then
+    ok "interview.js"
+  else
+    bad "interview.js"; node --check app/verbatim_app/static/interview.js 2>&1 | sed 's/^/     /'
+  fi
+else
+  printf '   skip node not installed, interview.js was not parsed\n'
+fi
+
 step "language packs"
 for dir in locales/*/; do
   code="$(basename "$dir")"
@@ -53,7 +79,11 @@ done
 step "no profile file is tracked outside examples/"
 leaked="$(git ls-files | grep -E '(^|/)(profile|profil|voice|voix|pillars|piliers|ideas|idees|measure|mesure|linkedin-page)\.md$' \
           | grep -v '^examples/' | grep -v '^references/' | grep -v '\.template\.md$' || true)"
-if [ -z "$leaked" ]; then ok "clean"; else bad "these are somebody's profile:"; echo "$leaked" | sed 's/^/     /'; fi
+# An interview transcript is the rawest thing a person ever says to this
+# engine. It has no fixed file name to grep for, so the directory is the rule.
+leaked="$leaked
+$(git ls-files | grep -E '(^|/)interviews/' || true)"
+if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "these are somebody's profile:"; echo "$leaked" | sed 's/^/     /'; fi
 
 step "every engine file is actually tracked"
 missing=""

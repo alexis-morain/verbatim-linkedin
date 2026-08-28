@@ -107,13 +107,13 @@ def citations(bundle_root, text: str, lang: str,
         if PLACEHOLDER.search(cited) is None:
             targets = [cited]
         elif INTERFACE in cited:
-            targets = [PLACEHOLDER.sub(lang, cited)]
+            targets = [_fill(cited, lang)]
         else:
-            targets = [PLACEHOLDER.sub(code, cited) for code in both]
+            targets = [_fill(cited, code) for code in both]
         for asked in targets:
             resolved, fallback = asked, False
             if not (root / resolved).is_file():
-                stand_in = PLACEHOLDER.sub("en", cited)
+                stand_in = _fill(cited, "en")
                 if stand_in == asked or not (root / stand_in).is_file():
                     raise SkillError(
                         f"the skill cites {cited}, and {asked} is not in the "
@@ -126,6 +126,26 @@ def citations(bundle_root, text: str, lang: str,
             found.append(Citation(cited=cited, resolved=resolved,
                                   fallback=fallback, asked=asked))
     return found
+
+
+#: A language code names a directory under `locales/`, so it is checked the
+#: way every other path segment in this engine is.
+LANG = re.compile(r"\A[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?\Z")
+
+
+def _fill(cited: str, lang: str) -> str:
+    """Put a language code into a cited path.
+
+    Substituted as data, not as a replacement template: a language code read
+    out of somebody's profile is somebody's text, and `\\1` in a replacement
+    means something entirely different from `\\1` in a path. Checked as a path
+    segment for the same reason, since that is what it becomes.
+    """
+    if not LANG.match(lang):
+        raise SkillError(
+            f"{lang!r} is not a language code. It names a directory under "
+            "locales/, so it is two or three letters, optionally a region.")
+    return PLACEHOLDER.sub(lambda match: lang, cited)
 
 
 def split_sections(body: str) -> list:

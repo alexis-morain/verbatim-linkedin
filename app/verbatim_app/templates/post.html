@@ -14,11 +14,21 @@
 </dl>
 
 <h2>{{ t('post.body') }}</h2>
+{% if unreadable %}
+<div class="gaps">
+  <p>{{ t('post.unreadable') }}</p>
+  <p class="mono">{{ unreadable }}</p>
+</div>
+{% else %}
 <pre class="post-body">{{ body }}</pre>
+{% endif %}
 
 <h2>{{ t('post.measure') }}</h2>
 <p class="hint">{{ t('post.measure_hint') }}</p>
 {% if saved %}<p class="flash">{{ t('post.saved') }}</p>{% endif %}
+{% if unreadable %}
+<p class="empty">{{ t('post.measure_blocked') }}</p>
+{% else %}
 <form method="post" action="/posts/{{ post.filename }}/measure" class="measure">
   <label>{{ t('post.measured_on') }}
     <input type="date" name="measured" value="{{ post.measured or '' }}">
@@ -40,4 +50,5 @@
   </label>
   <button type="submit">{{ t('post.save') }}</button>
 </form>
+{% endif %}
 {% endblock %}

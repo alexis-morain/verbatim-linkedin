@@ -4,6 +4,7 @@ Needs fastapi and httpx, so run through the project environment:
     cd app && uv run --extra test python -m unittest discover -s tests
 """
 
+import re
 import shutil
 import sys
 import tempfile
@@ -32,6 +33,124 @@ class WebCase(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
+
+
+class TestOneBadFileDoesNotTakeTheAppDown(WebCase):
+    """Every screen renders the conformance report, so a file nobody can read
+    decides whether one row is wrong or the whole app is gone."""
+
+    SCREENS = ("/", "/profile", "/ideas", "/posts", "/corpus", "/interview")
+
+    def all_screens_render(self):
+        for path in self.SCREENS:
+            self.assertEqual(self.client.get(path).status_code, 200, path)
+
+    def test_a_post_whose_front_matter_is_not_yaml(self):
+        (self.root / "posts" / "2026-01-01-broken.md").write_text(
+            "---\ndate: [unclosed\nhook: |\n  x\n---\n\nbody\n",
+            encoding="utf-8")
+        self.all_screens_render()
+        self.assertIn("2026-01-01-broken.md", self.client.get("/").text)
+
+    def test_a_post_holding_bytes_that_are_not_text(self):
+        (self.root / "posts" / "2026-01-01-bytes.md").write_bytes(
+            b"---\ndate: 2026-01-01\n---\n\n\xff\xfe body\n")
+        self.all_screens_render()
+
+    def test_a_post_nobody_may_open(self):
+        import os
+        path = self.root / "posts" / "2026-08-25-agency-segment.md"
+        os.chmod(path, 0o000)
+        try:
+            self.all_screens_render()
+        finally:
+            os.chmod(path, 0o644)
+
+    def test_a_corpus_file_saved_in_another_encoding(self):
+        # What corpus/ is for: older writing exported from another tool. The
+        # index links every name it globs, so the link has to land somewhere.
+        (self.root / "corpus" / "old.md").write_bytes(
+            "Une idée, écrite en 2024.\n".encode("latin-1"))
+        self.all_screens_render()
+        page = self.client.get("/corpus/old.md")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("will not come back as text", page.text)
+
+    def test_a_corpus_file_nobody_may_open(self):
+        import os
+        path = self.root / "corpus" / "2026-07-02-eleven-slides.md"
+        os.chmod(path, 0o000)
+        try:
+            self.all_screens_render()
+            self.assertEqual(self.client.get(f"/corpus/{path.name}").status_code,
+                             200)
+        finally:
+            os.chmod(path, 0o644)
+
+    def test_a_post_that_does_not_read_still_has_a_screen(self):
+        name = "2026-01-01-bytes.md"
+        (self.root / "posts" / name).write_bytes(
+            b"---\ndate: 2026-01-01\n---\n\n\xff\xfe body\n")
+        page = self.client.get(f"/posts/{name}")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("will not come back as text", page.text)
+
+    def test_the_measurement_is_not_written_over_a_file_that_does_not_read(self):
+        name = "2026-01-01-bytes.md"
+        path = self.root / "posts" / name
+        original = b"---\ndate: 2026-01-01\n---\n\n\xff\xfe body\n"
+        path.write_bytes(original)
+        reply = self.client.post(f"/posts/{name}/measure",
+                                 data={"inbound_dms": "3"})
+        self.assertEqual(reply.status_code, 200)  # after the 303
+        self.assertEqual(path.read_bytes(), original)
+        self.assertNotIn("Saved", reply.text)
+
+    def test_a_missing_file_is_still_a_404(self):
+        # The two states want different screens: one is a file to create, the
+        # other is a file to repair.
+        self.assertEqual(self.client.get("/corpus/nope.md").status_code, 404)
+        self.assertEqual(self.client.get("/posts/nope.md").status_code, 404)
+
+    def test_a_profile_holding_bytes_that_are_not_text(self):
+        (self.root / "profile.md").write_bytes(b"# Profile\n\n\xff\xfe\n")
+        self.all_screens_render()
+        page = self.client.get("/").text
+        self.assertIn("is there and cannot be read", page)
+        # The report is a superset, never a replacement: the unreadable file
+        # does not swallow what was already known about it.
+        self.assertIn("does not parse", page)
+
+
+class TestTheLanguagePacks(unittest.TestCase):
+    """A placeholder is part of the key's contract, not part of its prose.
+
+    `Strings.__call__` swallows a format error and returns the text as it is,
+    which is the right call at runtime and the wrong one to find out about in
+    front of somebody: the screen then shows a literal brace. This is where a
+    renamed placeholder gets caught instead.
+    """
+
+    def packs(self):
+        from verbatim_app.i18n import _load_pack
+        return _load_pack("en"), _load_pack("fr")
+
+    def placeholders(self, text):
+        return set(re.findall(r"\{(\w+)\}", text)) if isinstance(text, str) else set()
+
+    def test_every_translated_string_keeps_the_placeholders_it_is_given(self):
+        base, other = self.packs()
+        for key, english in base.items():
+            if key not in other:
+                continue
+            self.assertEqual(self.placeholders(english),
+                             self.placeholders(other[key]),
+                             f"placeholders differ for {key}")
+
+    def test_the_french_pack_is_complete(self):
+        base, other = self.packs()
+        missing = sorted(set(base) - set(other) - {"language", "native_reviewed"})
+        self.assertEqual(missing, [])
 
 
 class TestScreens(WebCase):

@@ -74,7 +74,20 @@ DEFAULT_PORTS = {"https": 443, "http": 80}
 
 
 class ProviderError(Exception):
-    pass
+    """A refusal, with a machine handle on it.
+
+    The message is written for a terminal, where the engine speaks in its own
+    voice and there is no language pack. A screen has one, so a refusal that
+    can reach a screen also carries a `code` naming which refusal it is and a
+    `detail` holding only machine facts, variable names and hosts. The screen
+    renders the pack's sentence around those; printing the message would put
+    English prose on a French page.
+    """
+
+    def __init__(self, message, code: str = "", detail: str = ""):
+        super().__init__(message)
+        self.code = code
+        self.detail = detail
 
 
 @dataclass(frozen=True)
@@ -185,7 +198,8 @@ def _refuse_secrets(raw: str, path) -> None:
             f"{path} holds credentials: {', '.join(sorted(set(named)))}. "
             "An instance is a directory people copy, sync and sometimes "
             "commit, so it never carries a key. Move those lines to your "
-            "shell environment and delete them here, comments included."
+            "shell environment and delete them here, comments included.",
+            code="secrets-in-instance", detail=", ".join(sorted(set(named)))
         )
 
 
@@ -199,7 +213,16 @@ def resolve(instance_root, environ) -> Settings:
     root = Path(instance_root)
     path = root / ".env"
     if path.is_file():
-        _refuse_secrets(path.read_text(encoding="utf-8"), path)
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except (OSError, ValueError) as unreadable:
+            # Saved in another encoding, or a mode that came across wrong. The
+            # screen that would show the fix is the one that reads this file,
+            # so a traceback here takes away the way out.
+            raise ProviderError(
+                f"{path} cannot be read: {type(unreadable).__name__}",
+                code="env-unreadable") from None
+        _refuse_secrets(raw, path)
     from_file = read_env_file(path)
 
     def setting(name, default=""):
@@ -228,11 +251,13 @@ def _refuse_userinfo(base_url: str) -> None:
     if parts.username or parts.password:
         raise ProviderError(
             "the endpoint carries a user and password in the URL; that is a "
-            "credential in a file that is not allowed to hold one")
+            "credential in a file that is not allowed to hold one",
+            code="credential-in-endpoint")
     if any(marker in (parts.query or "").upper() for marker in SECRET_MARKERS):
         raise ProviderError(
             "the endpoint carries what looks like a credential in its query "
-            "string; put it in the process environment instead")
+            "string; put it in the process environment instead",
+            code="credential-in-endpoint")
 
 
 def _authority(parts):
@@ -254,7 +279,8 @@ def _refuse_untrusted_endpoint(base_url, provider, environ, path) -> None:
         raise ProviderError(
             f"{path} would send the key to {host!r} in clear text. A file that "
             "travels between machines does not get to downgrade the transport "
-            "carrying a credential.")
+            "carrying a credential.",
+            code="endpoint-in-clear", detail=host)
     # Port included: the provider's name on another port is another endpoint.
     if _authority(parts) == _authority(urlsplit(DEFAULT_BASE_URL.get(provider, ""))):
         return
@@ -266,7 +292,8 @@ def _refuse_untrusted_endpoint(base_url, provider, environ, path) -> None:
         f"{path} sends the key to {host!r}, and that file is not trusted to "
         "decide where a credential goes. Either export VERBATIM_BASE_URL "
         f"yourself, or name the host in {ENDPOINT_OK} next to the key it is "
-        "allowed to receive.")
+        "allowed to receive.",
+        code="endpoint-untrusted", detail=host)
 
 
 def _api_key(provider: str, environ) -> str | None:

@@ -155,9 +155,10 @@ class Agent:
                                   "content": text, "is_error": failed}
                 yield Step("tool_result", call=call, result=text,
                            is_error=failed)
-        yield Step("ceiling",
-                   result=f"stopped after {self.max_turns} turns without an "
-                          "answer; the conversation is kept, nothing is lost")
+        # The ceiling itself, with the figure that explains it. No sentence:
+        # a consumer says it in whatever language it speaks, and a sentence
+        # written here would only ever be one of them.
+        yield Step("ceiling", result=str(self.max_turns))
 
     def _turn(self, system, messages, declarations):
         """One request. Yields as the answer arrives, returns what it held."""

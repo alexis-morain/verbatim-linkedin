@@ -8,6 +8,7 @@ the contract wins and this file is wrong.
 Runs with the standard library only:  python3 app/tests/test_instance.py
 """
 
+import os
 import shutil
 import sys
 import tempfile
@@ -18,7 +19,9 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app import instance as inst  # noqa: E402
-from verbatim_app.instance import Instance, InstanceError  # noqa: E402
+from verbatim_app.instance import (  # noqa: E402
+    Instance, InstanceError, atomic_write,
+)
 
 
 class InstanceCase(unittest.TestCase):
@@ -232,6 +235,63 @@ class TestFrontMatterFallback(InstanceCase):
             block, _ = inst.split_front_matter(raw)
             self.assertEqual(inst.parse_front_matter_fallback(block),
                              inst.parse_front_matter(block))
+
+
+
+class TestAtomicWrite(unittest.TestCase):
+    """The promise `atomic_write` makes: the whole file, or the previous one
+    untouched. It covers a crash and a failed write; it does not fsync, so it
+    does not cover a power loss, and the docstring says so."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="verbatim-atomic-")
+        self.path = Path(self.tmp) / "profile.md"
+        self.path.write_text("the previous one\n", encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def leftovers(self):
+        return [p.name for p in Path(self.tmp).iterdir()
+                if p.name != self.path.name]
+
+    def test_a_write_that_fails_leaves_the_previous_file(self):
+        original = os.replace
+
+        def refusing(source, target):
+            raise OSError("no space left on device")
+
+        os.replace = refusing
+        try:
+            with self.assertRaises(OSError):
+                atomic_write(self.path, "the new one\n")
+        finally:
+            os.replace = original
+        self.assertEqual(self.path.read_text(encoding="utf-8"),
+                         "the previous one\n")
+        self.assertEqual(self.leftovers(), [])
+
+    def test_a_write_that_succeeds_leaves_no_temporary_behind(self):
+        atomic_write(self.path, "the new one\n")
+        self.assertEqual(self.path.read_text(encoding="utf-8"), "the new one\n")
+        self.assertEqual(self.leftovers(), [])
+
+    def test_the_file_is_never_seen_half_written(self):
+        # os.replace is the whole mechanism: the name points at the old inode
+        # until it points at the complete new one, never at a partial file.
+        seen = []
+        original = os.replace
+
+        def watching(source, target):
+            seen.append(Path(target).read_text(encoding="utf-8"))
+            return original(source, target)
+
+        os.replace = watching
+        try:
+            atomic_write(self.path, "the new one\n")
+        finally:
+            os.replace = original
+        self.assertEqual(seen, ["the previous one\n"])
 
 
 if __name__ == "__main__":

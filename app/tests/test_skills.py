@@ -276,5 +276,20 @@ class TestShippedSkills(unittest.TestCase):
                       [c.resolved for c in block.citations])
 
 
+class TestALanguageCodeIsAPathSegment(unittest.TestCase):
+    """It comes out of somebody's profile and becomes a directory name."""
+
+    def test_a_code_that_is_not_one_is_refused(self):
+        for bad in ("../../etc", "\\1", "en/../..", "e", "toolongforacode",
+                    "en;rm", ".", ""):
+            with self.assertRaises(SkillError, msg=repr(bad)):
+                citations(REPO, "locales/<lang>/style.md", bad)
+
+    def test_the_codes_this_bundle_ships_are_accepted(self):
+        for good in ("en", "fr"):
+            found = citations(REPO, "locales/<lang>/style.md", good)
+            self.assertEqual(found[0].resolved, f"locales/{good}/style.md")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2 if "-v" in sys.argv else 1)

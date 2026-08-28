@@ -1,5 +1,164 @@
 # Journal
 
+## 2026-08-28 (soir, troisième session). Tranche 5.3 : l'entretien en streaming
+
+Le premier écran qui parle à un modèle. Aucun endpoint réel, aucune clé : les
+tours sont des flux enregistrés, et la vérification navigateur tourne contre
+deux stubs SSE locaux écrits pour l'occasion. 454 tests app, `check.sh` vert.
+
+### Le trou de conception, traité avant le code
+
+Un entretien en cours est de l'état par instance que `references/instance.md`
+ne portait pas, et le contrat dit lui-même que ce cas passe par lui d'abord.
+Nouvelle section `## interviews/`, écrite avant la première ligne de code.
+
+Un entretien vit dans `interviews/<YYYY-MM-DD-HHMM>/`, suffixé `-2`, `-3` si
+deux démarrent dans la même minute. Deux fichiers :
+
+- **`conversation.json`, la vérité.** Le seul fichier non markdown d'une
+  instance, pour une raison : un `tool_use` porte un id que la requête
+  suivante doit renvoyer, et un aller-retour markdown qui perd cet id produit
+  une conversation que le fournisseur refuse. Réécrit après chaque pas qui
+  change la conversation.
+- **`transcript.md`, le rendu.** Écrit à chaque sauvegarde, jamais relu. Front
+  matter (`state`, dates, les deux langues, modèle, jetons, `spent`) puis une
+  suite de `## Asked` et `## Said` dans l'ordre.
+
+**La source d'ancrage se lit dans le JSON, jamais sur les titres du markdown.**
+Un modèle qui écrit `## Said` dans sa réponse écrit du texte, il ne devient pas
+quelqu'un ; les rôles se lisent sur la forme des blocs, où un tour de la
+personne et une réponse d'outil sont deux formes différentes bien que les deux
+voyagent sur un message de rôle `user`. Le trafic d'outils reste dans le JSON :
+un fichier que le moteur a lu n'est pas une chose que la personne a dite.
+
+Trois fins écrites : devenir un post, être jeté, être laissé. Rien n'agrège sur
+ce dossier. `.gitignore` et `check.sh` refusent qu'un transcript soit suivi.
+
+### La garde loopback contre le SSE : tranchée, pas supposée
+
+Vérifié plutôt que présumé : un navigateur **n'envoie pas** d'en-tête `Origin`
+sur un GET same-origin. La garde ne cassait donc pas le streaming. Mais elle
+avait le trou symétrique : une page hostile qui pose
+`<img src="http://127.0.0.1:8747/…/stream">` fait un GET no-cors sans `Origin`,
+ne lit rien, et fait payer les jetons.
+
+D'où : **le tour est un POST qui streame, pas un `EventSource`.** `EventSource`
+ne parle que GET. Le format de fil reste server-sent events, le client est
+`fetch`. Règle posée dans `web.py` : aucun GET de cette app ne change ni ne
+coûte quoi que ce soit. La garde compare désormais l'origine entière, port et
+schéma compris, contre le `Host` : comparer les noms d'hôte acceptait
+`http://localhost:3000`, qui est le serveur local de quelqu'un d'autre.
+
+### Le coût
+
+Tarif au million quand le modèle est dans la table, taille exacte du bloc
+envoyé à chaque tour, et un total qui court. Aucune prévision. `conversation.json`
+gagne `spent`, accumulé tour par tour **au tarif du modèle qui a tourné ce
+tour-là**, et qui passe à vide définitivement dès qu'un tour n'a pas de prix :
+un total qui laisse tomber un tour en silence est pire que pas de total, et
+appliquer le tarif d'aujourd'hui aux tours d'hier est pire encore.
+
+### Ce qui est livré
+
+`interview.py` (le magasin, stdlib seule), `routes/interview.py` (le hub,
+l'écran, le tour en streaming, le rejet), `web.py` amendé (les deux seams
+injectés, environnement et transport, plus la garde durcie), trois gabarits,
+`static/interview.js`, le bloc `interview:` des deux packs de langue, et une
+extraction du lecteur et de l'écriture atomique hors d'`instance.py`.
+
+Le premier message d'un entretien est **ce que la personne écrit**, jamais une
+amorce écrite par l'app. Les trois portes d'entrée du skill deviennent la
+banque d'angles à côté du champ : cliquer sur un angle le met dans le champ, et
+cet angle est une ligne d'`ideas.md`. L'app ne met de mots dans la bouche de
+personne, ni de la personne ni du modèle.
+
+### La revue : dix tours, REFUTED neuf fois, CONFIRMED au dixième
+
+Trente-cinq constats, chacun corrigé avec son test de régression, chaque test
+vérifié par sabotage. Les plus instructifs :
+
+**Un test creux.** `TestWalkingAwayMidTurn` passait par le client HTTP et
+lisait le disque après la boucle : supprimer la sauvegarde en cours de flux ne
+cassait aucun test. Le remplaçant pilote le générateur de la route et lit le
+disque **entre deux trames**.
+
+**Le tour abandonné ne comptait pas ses jetons.** `Agent.usage` n'intègre les
+chiffres d'un tour qu'à la fin de ce tour, donc un générateur fermé pendant que
+la réponse arrive écrivait zéro. L'écran affichait un prix, le disque écrivait
+zéro, le fournisseur facturait. Le code énonçait la règle contraire trois
+fichiers plus loin. Corrigé en suivant `pending`, vidé à chaque pas qui
+signifie que le tour est fini.
+
+**Deux régressions de mes propres correctifs.** Sortir le verrou du handler
+pour qu'il ne fuie pas a fait que les deux concurrents obtenaient 200, le
+perdant recevant son refus dans le flux après que le JS avait vidé le champ.
+D'où la trame `accepted`, émise juste après l'écriture des mots et avant le
+premier jeton dépensé : avant elle, un refus n'a rien écrit et le texte reste
+dans le champ ; après elle, tout échec appartient à un tour qui a eu lieu.
+
+**Un tour qui échoue laissait `['user']` sur disque**, donc retaper produisait
+deux messages `user` d'affilée, ce qu'un fournisseur refuse. `say()` continue
+désormais le tour qui n'a pas eu sa réponse au lieu d'en ouvrir un second.
+
+### La leçon de méthode, qui vaut plus que la liste des constats
+
+Les rounds 6 à 9 ont trouvé **le même défaut quatre fois**, de plus en plus
+loin : un fichier illisible qui emporte un écran, puis tous les écrans, puis un
+lien qui mène dans le mur. J'ai corrigé une garde à la fois quatre fois de
+suite, et c'est exactement ce qui l'a fait revenir. Le round 9 est le premier
+où j'ai fait le geste structurel : **un seul lecteur de fichier dans
+`instance.py`**, une seule ligne `read_text(encoding="utf-8")` dans tout le
+fichier, à l'intérieur.
+
+Règle pour les tranches suivantes : quand une revue trouve une garde
+manquante, chercher les frères et sœurs de cette garde **avant** d'écrire le
+correctif. Une garde ajoutée seule est une invitation à recommencer.
+
+Deux décisions sont nées de là et tiennent au-delà de cette tranche :
+« absent » et « ne se lit pas » sont deux états différents qui veulent deux
+écrans différents, un 404 sur un fichier qui existe envoyant chercher la
+mauvaise chose ; et une mesure ne s'écrit jamais par-dessus un fichier qui ne
+se lit pas, parce que l'écrire remplacerait le contenu réel par ce qu'on aurait
+réussi à en parser.
+
+### Ce qui n'est pas prouvé, et qui est écrit
+
+**`static/interview.js` n'a aucun test.** Vérifié à la main dans le navigateur
+et par le relecteur sur douze scénarios avec un shim DOM, mais rien dans la
+suite ne le tient. `check.sh` fait un `node --check` en disant explicitement
+que ce n'est pas un test. Un harnais DOM est un chantier de taille de tranche
+et ce fichier grandit en 5.5 : c'est là qu'il faut le construire.
+
+**Aucun test de ce dépôt ne prouve un endpoint.** Les deux stubs prouvent le
+navigateur et le parseur, pas un fournisseur. Le smoke test par fournisseur
+reste en 5.6 et reste bloquant pour la v2.0.0.
+
+**Trois failles connues, jugées sans dommage réel** et laissées telles quelles :
+les deux écritures des écrans froids (`POST /profile`, la mesure) font un 500
+sur une instance non inscriptible, code d'étape 4 que l'écran d'entretien gère
+correctement de son côté ; un fichier ordinaire ou un dossier en mode 000
+portant un nom d'entretien affiche un bouton « jeter » qui ne fait rien en
+silence ; un FIFO à la place d'un fichier d'instance bloque le worker au lieu
+de tomber. Aucune ne s'obtient sans le provoquer à la main.
+
+### Incident à signaler
+
+Un des relecteurs à contexte frais a passé `transport=None` à `create_app`,
+donc `http_transport()` a émis une requête vers `api.anthropic.com` portant la
+chaîne littérale `sk-test`. Retour 401. Aucune vraie clé lue ni envoyée, rien
+facturé. Les consignes des rounds suivants exigent un transport factice
+explicite et `VERBATIM_BASE_URL` sur un port mort.
+
+### L'instance réelle
+
+Les deux constats de conformité vus à la session précédente sont traités et
+`../linkedin` passe la conformité. Le bloc signature n'avait jamais été perdu,
+son titre n'avait jamais été migré (`## Bloc signature` devient
+`## Signature block`) ; `published_ref:` ajouté vide, jamais deviné.
+Sauvegardes horodatées à côté. **Neuf autres titres de `profile.md` sont encore
+en français** alors que le contrat dit que les titres de section restent
+anglais : aucun impact consommateur aujourd'hui, migration laissée à Alexis.
+
 ## 2026-08-28 (soir, seconde session). Tranche 5.2 : les outils, le chargeur de skills, la forme de l'ancrage
 
 Commit `53b579e`, poussé.

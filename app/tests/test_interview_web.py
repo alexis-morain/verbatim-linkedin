@@ -1,0 +1,1503 @@
+"""Tests for the interview screen: the first one that talks to a model.
+
+No key and no socket. Every turn here is a recorded provider stream handed to
+the app through the same seam the loop already had, which is the reason that
+seam exists.
+
+    cd app && uv run --quiet python -m unittest discover -s tests
+"""
+
+import json
+import re
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "app"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from test_agent import Replay, asks, says  # noqa: E402
+
+from verbatim_app import interview  # noqa: E402
+from verbatim_app.web import create_app  # noqa: E402
+
+CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
+
+#: Codes an SSE frame carries. They get an `error_` sentence, not a
+#: `refused_` one, and TestEveryCodeHasASentence covers them separately.
+FRAME_CODES = {"turn-running", "closed", "gone", "engine-failed",
+               "bundle-broken"}
+
+
+def frames(text: str) -> list:
+    """The SSE payloads of a response body, in order."""
+    return [json.loads(line[len("data: "):])
+            for line in text.splitlines() if line.startswith("data: ")]
+
+
+def kinds(text: str) -> list:
+    return [frame["kind"] for frame in frames(text)]
+
+
+def spoken(text: str) -> str:
+    return "".join(frame["text"] for frame in frames(text)
+                   if frame["kind"] == "text")
+
+
+class Bare:
+    """Just enough of a Request for the turn generator, which only ever reaches
+    for application state. Driving that generator directly is the only way to
+    watch a turn from inside while it is still running."""
+
+    def __init__(self, app):
+        self.app = app
+
+
+class WebCase(unittest.TestCase):
+    environ = CONFIGURED
+    scripts = ()
+    lang = "en"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="verbatim-interview-web-")
+        self.root = Path(self.tmp) / "instance"
+        shutil.copytree(REPO / "examples", self.root)
+        (self.root / "README.md").unlink(missing_ok=True)
+        self.transport = Replay(*self.scripts)
+        self.app = create_app(self.root, lang=self.lang,
+                              environ=dict(self.environ),
+                              transport=self.transport)
+        self.client = TestClient(self.app, base_url="http://127.0.0.1:8747")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def open_interview(self):
+        reply = self.client.post("/interview", follow_redirects=False)
+        return reply.headers["location"].rsplit("/", 1)[-1]
+
+    def turn(self, interview_id, text=""):
+        return self.client.post(f"/interview/{interview_id}/turn",
+                                data={"text": text})
+
+
+class TestTheHub(WebCase):
+    def test_the_screen_names_the_model_that_would_answer(self):
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("claude-opus-5", page.text)
+        self.assertIn("api.anthropic.com", page.text)
+
+    def test_a_priced_model_shows_its_rate_before_anything_is_spent(self):
+        page = self.client.get("/interview")
+        self.assertIn("5.00", page.text)
+        self.assertIn("25.00", page.text)
+
+    def test_an_interview_can_be_started(self):
+        self.assertIn('action="/interview"', self.client.get("/interview").text)
+
+
+class TestAnUnpricedModel(WebCase):
+    environ = {"VERBATIM_PROVIDER": "openai", "VERBATIM_MODEL": "qwen2.5:14b",
+               "VERBATIM_BASE_URL": "http://127.0.0.1:11434/v1"}
+
+    def test_tokens_are_promised_and_no_price_is_invented(self):
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("qwen2.5:14b", page.text)
+        self.assertIn("no price", page.text.lower())
+
+    def test_a_local_endpoint_needs_no_key(self):
+        # is_loopback, so key-missing is not a problem here and the screen
+        # offers to start.
+        self.assertIn('action="/interview"', self.client.get("/interview").text)
+
+
+class TestNothingConfigured(WebCase):
+    environ = {}
+
+    def test_the_screen_says_what_to_do_instead_of_crashing(self):
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("key-missing", page.text)
+        self.assertIn("ANTHROPIC_API_KEY", page.text)
+
+    def test_no_interview_can_be_started_without_a_model(self):
+        self.assertNotIn('action="/interview"', self.client.get("/interview").text)
+        reply = self.client.post("/interview", follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"], "/interview")
+        self.assertEqual(interview.listing(self.root), [])
+
+    def test_the_other_screens_still_work(self):
+        self.assertEqual(self.client.get("/").status_code, 200)
+
+
+class TestASecretInTheInstance(WebCase):
+    def test_the_interview_refuses_and_names_the_line_to_move(self):
+        (self.root / ".env").write_text(
+            "VERBATIM_PROVIDER=anthropic\nANTHROPIC_API_KEY=sk-oops\n",
+            encoding="utf-8")
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("ANTHROPIC_API_KEY", page.text)
+        self.assertNotIn("sk-oops", page.text)
+        self.assertNotIn('action="/interview"', page.text)
+
+
+class TestStartingAndDiscarding(WebCase):
+    def test_starting_creates_the_directory_and_lands_on_it(self):
+        reply = self.client.post("/interview", follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        interview_id = reply.headers["location"].rsplit("/", 1)[-1]
+        here = self.root / interview.DIRECTORY / interview_id
+        self.assertTrue((here / interview.CONVERSATION).is_file())
+        self.assertTrue((here / interview.TRANSCRIPT).is_file())
+
+    def test_the_conversation_records_both_language_axes(self):
+        conversation = interview.load(self.root, self.open_interview())
+        self.assertEqual(conversation.interface_language, "en")
+        self.assertEqual(conversation.output_language, "en")
+        self.assertEqual(conversation.skill, interview.STEP_SKILL)
+
+    def test_an_open_interview_is_listed_on_the_hub(self):
+        interview_id = self.open_interview()
+        self.assertIn(interview_id, self.client.get("/interview").text)
+
+    def test_an_unknown_interview_is_404(self):
+        self.assertEqual(self.client.get("/interview/2020-01-01-0000").status_code, 404)
+
+    def test_an_id_that_is_not_a_timestamp_addresses_nothing(self):
+        for bad in ("nope", "%2e%2e%2f%2e%2e%2fprofile.md", ".hidden"):
+            self.assertEqual(self.client.get(f"/interview/{bad}").status_code,
+                             404, bad)
+
+    def test_discarding_removes_the_directory(self):
+        interview_id = self.open_interview()
+        reply = self.client.post(f"/interview/{interview_id}/discard",
+                                 follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertFalse((self.root / interview.DIRECTORY / interview_id).exists())
+
+
+class TestOneTurn(WebCase):
+    scripts = (says("Which agency, and when?"),)
+
+    def test_the_answer_streams_as_it_arrives(self):
+        reply = self.turn(self.open_interview(), "Four months on agencies.")
+        self.assertEqual(reply.status_code, 200)
+        self.assertTrue(reply.headers["content-type"].startswith("text/event-stream"))
+        self.assertEqual(spoken(reply.text), "Which agency, and when?")
+        self.assertIn("stop", kinds(reply.text))
+
+    def test_both_sides_land_on_disk(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.said(), "Four months on agencies.")
+        self.assertEqual(conversation.engine_turns(), ["Which agency, and when?"])
+
+    def test_the_transcript_is_readable_right_after(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        text = (self.root / interview.DIRECTORY / interview_id
+                / interview.TRANSCRIPT).read_text(encoding="utf-8")
+        self.assertLess(text.index("Four months on agencies."),
+                        text.index("Which agency, and when?"))
+
+    def test_the_running_total_is_reported_and_priced(self):
+        reply = self.turn(self.open_interview(), "Four months on agencies.")
+        usage = [f for f in frames(reply.text) if f["kind"] == "usage"][-1]
+        self.assertEqual(usage["input_tokens"], 100)
+        self.assertEqual(usage["output_tokens"], 10)
+        self.assertAlmostEqual(usage["price"], (100 * 5.0 + 10 * 25.0) / 1e6)
+
+    def test_the_total_is_kept_with_the_conversation(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.usage.input_tokens, 100)
+        self.assertEqual(conversation.usage.output_tokens, 10)
+
+    def test_the_system_block_is_rebuilt_from_the_bundle_every_turn(self):
+        self.turn(self.open_interview(), "Four months on agencies.")
+        system = self.transport.calls[0]["payload"]["system"]
+        self.assertIn("One question at a time", str(system))
+
+    def test_an_empty_first_answer_is_refused(self):
+        reply = self.turn(self.open_interview(), "   ")
+        self.assertEqual(reply.status_code, 422)
+
+
+class TestAnUnpricedTurn(WebCase):
+    # A model the price table has never verified. The provider stays the one
+    # these recordings are written for: what is under test is the price, not
+    # the parser.
+    environ = {"ANTHROPIC_API_KEY": "sk-test", "VERBATIM_MODEL": "llama-3.3-70b"}
+    scripts = (says("Which agency?"),)
+
+    def test_tokens_are_reported_and_the_price_is_null_not_zero(self):
+        reply = self.turn(self.open_interview(), "Four months on agencies.")
+        usage = [f for f in frames(reply.text) if f["kind"] == "usage"][-1]
+        self.assertGreater(usage["input_tokens"], 0)
+        self.assertIsNone(usage["price"])
+
+
+class TestToolTraffic(WebCase):
+    scripts = (asks(("toolu_01", "read_instance", {"path": "voice.md"})),
+               says("Which agency, and when?"))
+
+    def test_the_call_and_its_result_are_shown_not_hidden(self):
+        reply = self.turn(self.open_interview(), "Four months on agencies.")
+        self.assertIn("tool_call", kinds(reply.text))
+        self.assertIn("tool_result", kinds(reply.text))
+        call = [f for f in frames(reply.text) if f["kind"] == "tool_call"][0]
+        self.assertEqual(call["name"], "read_instance")
+        self.assertEqual(call["arguments"], {"path": "voice.md"})
+
+    def test_the_result_carries_what_the_tool_answered(self):
+        reply = self.turn(self.open_interview(), "Four months on agencies.")
+        result = [f for f in frames(reply.text) if f["kind"] == "tool_result"][0]
+        self.assertFalse(result["is_error"])
+        self.assertIn("Traits observed in the corpus", result["result"])
+
+    def test_tool_traffic_stays_out_of_the_transcript(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        text = (self.root / interview.DIRECTORY / interview_id
+                / interview.TRANSCRIPT).read_text(encoding="utf-8")
+        self.assertNotIn("read_instance", text)
+        self.assertEqual(interview.load(self.root, interview_id).said(),
+                         "Four months on agencies.")
+
+
+class TestTheDiskLeadsTheScreen(WebCase):
+    """The decision of this slice, tested where it happens.
+
+    Through a client this cannot be tested: by the time a test breaks out of
+    the response body the whole loop has already run, so its assertions hold
+    over a finished turn and prove nothing about an interrupted one. This
+    drives the route's own generator instead and looks at the disk between two
+    frames, which is exactly the moment a browser closes.
+    """
+
+    scripts = (asks(("toolu_01", "read_instance", {"path": "voice.md"}),
+                    ("toolu_02", "read_instance", {"path": "nope.md"})),
+               says("Which agency, and when?"))
+
+    def stream(self, interview_id, text):
+        from verbatim_app.routes import interview as screen
+        request = Bare(self.app)
+        return screen._run(request, screen._engine(request), interview_id, text,
+                           screen.lock_for(self.app, interview_id))
+
+    def blocks(self, conversation, kind):
+        return [block for message in conversation.messages
+                for block in message["content"] if block.get("type") == kind]
+
+    def assert_conversation_is_sendable(self, conversation, where):
+        asked = [block["id"] for block in self.blocks(conversation, "tool_use")]
+        answered = [block["tool_use_id"]
+                    for block in self.blocks(conversation, "tool_result")]
+        self.assertEqual(asked, answered, f"dangling call after {where}")
+        roles = [message["role"] for message in conversation.messages]
+        for one, two in zip(roles, roles[1:]):
+            self.assertNotEqual(one, two, f"two {one} in a row after {where}")
+        for message in conversation.messages:
+            self.assertTrue(message["content"], f"empty message after {where}")
+
+    def test_the_disk_is_current_at_every_single_frame(self):
+        interview_id = self.open_interview()
+        frames = self.stream(interview_id, "Four months on agencies.")
+        seen = 0
+        for raw in frames:
+            frame = json.loads(raw[len("data: "):])
+            seen += 1
+            # Read before the generator is ever resumed: this is the state a
+            # browser closing right now would leave behind.
+            conversation = interview.load(self.root, interview_id)
+            self.assert_conversation_is_sendable(conversation, frame["kind"])
+            if frame["kind"] == "tool_call":
+                self.assertIn(frame["id"],
+                              [b["id"] for b in self.blocks(conversation, "tool_use")],
+                              "the call reached the screen before the disk")
+                self.assertIn(frame["id"],
+                              [b["tool_use_id"]
+                               for b in self.blocks(conversation, "tool_result")])
+            if frame["kind"] == "tool_result":
+                answers = {b["tool_use_id"]: b["content"]
+                           for b in self.blocks(conversation, "tool_result")}
+                self.assertEqual(answers[frame["id"]], frame["result"],
+                                 "the result reached the screen before the disk")
+            if frame["kind"] == "stop":
+                self.assertEqual(conversation.engine_turns()[-1],
+                                 "Which agency, and when?")
+        self.assertGreater(seen, 5)
+
+    def test_stopping_between_two_frames_leaves_the_words_and_the_call(self):
+        interview_id = self.open_interview()
+        frames = self.stream(interview_id, "Four months on agencies.")
+        for raw in frames:
+            if '"tool_call"' in raw:
+                break
+        conversation = interview.load(self.root, interview_id)
+        frames.close()
+
+        self.assert_conversation_is_sendable(conversation, "the walk away")
+        self.assertEqual(conversation.said(), "Four months on agencies.")
+        self.assertEqual([b["id"] for b in self.blocks(conversation, "tool_use")],
+                         ["toolu_01", "toolu_02"])
+
+    def test_what_was_typed_reaches_disk_before_the_provider_is_called(self):
+        interview_id = self.open_interview()
+        seen = {}
+
+        def watching(url, headers, payload):
+            seen["said"] = interview.load(self.root, interview_id).said()
+            return iter(says("Which agency?"))
+
+        self.app.state.transport = watching
+        self.turn(interview_id, "Four months on agencies.")
+        self.assertEqual(seen["said"], "Four months on agencies.")
+
+
+class TestTheAcceptedFrame(WebCase):
+    """The one frame that says the words are on disk.
+
+    The screen holds what was typed until it arrives, so a refusal decided
+    before anything was written does not throw away somebody's answer, and a
+    failure after it does not make them type it twice.
+    """
+
+    scripts = (says("Which agency?"),)
+
+    def first_kinds(self, reply):
+        return kinds(reply.text)[:1]
+
+    def test_it_arrives_before_anything_else(self):
+        reply = self.turn(self.open_interview(), "Four months.")
+        self.assertEqual(self.first_kinds(reply), ["accepted"])
+
+    def test_the_words_are_on_disk_before_it_is_sent(self):
+        # The ordering is the whole point: a browser that commits and clears
+        # its box on a frame emitted before the save would lose them from both
+        # places the moment the save failed.
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        stream = screen._run(request, screen._engine(request), interview_id,
+                             "Four months on agencies.",
+                             screen.lock_for(self.app, interview_id))
+        first = json.loads(next(stream)[len("data: "):])
+        self.assertEqual(first["kind"], "accepted")
+        self.assertEqual(interview.load(self.root, interview_id).said(),
+                         "Four months on agencies.")
+        stream.close()
+
+    def test_it_arrives_before_the_provider_is_reached(self):
+        seen = {}
+
+        def watching(url, headers, payload):
+            seen["called"] = True
+            return iter(says("Which agency?"))
+
+        self.app.state.transport = watching
+        interview_id = self.open_interview()
+        frames = []
+        with self.client.stream("POST", f"/interview/{interview_id}/turn",
+                                data={"text": "Four months."}) as reply:
+            for line in reply.iter_lines():
+                if line.startswith("data: "):
+                    frames.append(json.loads(line[len("data: "):]))
+                    break
+        self.assertEqual(frames[0]["kind"], "accepted")
+
+    def test_a_refusal_before_it_means_nothing_was_written(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        held = screen.lock_for(self.app, interview_id)
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", held)
+        self.assertTrue(held.acquire(blocking=False))
+        try:
+            sent = [json.loads(raw[len("data: "):]) for raw in frames]
+        finally:
+            held.release()
+        self.assertNotIn("accepted", [frame["kind"] for frame in sent])
+        self.assertEqual(interview.load(self.root, interview_id).said(), "")
+
+    def test_a_failure_after_it_means_the_words_are_kept(self):
+        def broken(url, headers, payload):
+            raise RuntimeError("connection refused")
+            yield  # pragma: no cover
+
+        self.app.state.transport = broken
+        interview_id = self.open_interview()
+        reply = self.turn(interview_id, "Four months on agencies.")
+        sent = kinds(reply.text)
+        self.assertEqual(sent[0], "accepted")
+        self.assertIn("error", sent)
+        self.assertEqual(interview.load(self.root, interview_id).said(),
+                         "Four months on agencies.")
+
+
+class TestATurnThatAnsweredNothing(WebCase):
+    """A stream that stops without producing a single block.
+
+    An OpenAI compatible runtime answering `finish_reason: stop` with empty
+    content is the realistic case, and it leaves the person's own message last:
+    the model still owes a reply, and the screen has to say so rather than fall
+    silent.
+    """
+
+    #: end_turn, and not one content block with it.
+    scripts = ([
+        'data: {"type":"message_start","message":{"usage":'
+        '{"input_tokens":100,"output_tokens":1}}}',
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},'
+        '"usage":{"output_tokens":1}}',
+    ],)
+
+    def test_the_stop_frame_says_the_model_still_owes_a_reply(self):
+        interview_id = self.open_interview()
+        reply = self.turn(interview_id, "Four months.")
+        stop = [f for f in frames(reply.text) if f["kind"] == "stop"][0]
+        self.assertTrue(stop["owing"])
+
+    def test_the_screen_offers_to_ask_again_on_reload(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="resume"', page.text)
+        self.assertNotIn('id="resume" hidden', page.text)
+
+    def test_a_turn_that_did_answer_says_the_opposite(self):
+        self.app.state.transport = Replay(says("Which agency?"))
+        reply = self.turn(self.open_interview(), "Four months.")
+        stop = [f for f in frames(reply.text) if f["kind"] == "stop"][0]
+        self.assertFalse(stop["owing"])
+
+
+class TestTheCeiling(WebCase):
+    scripts = tuple(asks(("toolu_%02d" % n, "read_instance", {"path": "voice.md"}))
+                    for n in range(12))
+
+    def test_the_ceiling_frame_says_the_model_still_owes_a_reply(self):
+        reply = self.turn(self.open_interview(), "Four months.")
+        ceiling = [f for f in frames(reply.text) if f["kind"] == "ceiling"]
+        self.assertEqual(len(ceiling), 1)
+        self.assertTrue(ceiling[0]["owing"])
+        self.assertEqual(ceiling[0]["turns"], 12)
+
+
+class TestATurnThatFailed(WebCase):
+    """The case this screen exists for. A turn that never got its answer, then
+    somebody retypes: the conversation has to stay one a provider accepts."""
+
+    def broken(self, url, headers, payload):
+        raise RuntimeError("connection refused")
+        yield  # pragma: no cover
+
+    def roles(self, interview_id):
+        return [message["role"]
+                for message in interview.load(self.root, interview_id).messages]
+
+    def test_retyping_after_a_failed_turn_leaves_a_sendable_conversation(self):
+        self.app.state.transport = self.broken
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        self.assertEqual(self.roles(interview_id), ["user"])
+
+        self.app.state.transport = Replay(says("Which agency?"))
+        self.turn(interview_id, "Four months, actually four and a half.")
+        self.assertEqual(self.roles(interview_id), ["user", "assistant"])
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(
+            conversation.said(),
+            "Four months on agencies.\n\nFour months, actually four and a half.")
+
+    def test_the_provider_never_receives_two_user_messages_in_a_row(self):
+        self.app.state.transport = self.broken
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        watcher = Replay(says("Which agency?"))
+        self.app.state.transport = watcher
+        self.turn(interview_id, "And a half.")
+        sent = [message["role"]
+                for message in watcher.calls[0]["payload"]["messages"]]
+        for one, two in zip(sent, sent[1:]):
+            self.assertNotEqual(one, two, sent)
+
+    def test_the_screen_offers_to_ask_again(self):
+        # The control is always in the page so the script can show it when a
+        # turn fails, so what is under test is whether it is offered.
+        interview_id = self.open_interview()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="resume" hidden', page.text)
+
+        self.app.state.transport = self.broken
+        self.turn(interview_id, "Four months.")
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="resume"', page.text)
+        self.assertNotIn('id="resume" hidden', page.text)
+
+    def test_asking_again_sends_no_new_words(self):
+        self.app.state.transport = self.broken
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.app.state.transport = Replay(says("Which agency?"))
+        reply = self.turn(interview_id, "")
+        self.assertEqual(reply.status_code, 200)
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.said(), "Four months.")
+        self.assertEqual(conversation.engine_turns(), ["Which agency?"])
+
+
+class TestAnAnswerAfterAnInterruptedToolCall(WebCase):
+    scripts = (asks(("toolu_01", "read_instance", {"path": "voice.md"})),
+               says("Which agency?"))
+
+    def test_the_words_are_kept_and_the_tool_output_is_not(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", screen.lock_for(self.app, interview_id))
+        for raw in frames:
+            if '"tool_result"' in raw:
+                break
+        frames.close()
+
+        self.turn(interview_id, "A Lyon agency, in March.")
+        conversation = interview.load(self.root, interview_id)
+        roles = [message["role"] for message in conversation.messages]
+        for one, two in zip(roles, roles[1:]):
+            self.assertNotEqual(one, two, roles)
+        self.assertEqual(conversation.said(),
+                         "Four months.\n\nA Lyon agency, in March.")
+        self.assertNotIn("Traits observed", conversation.said())
+
+
+class RefusedDirectoryCase(WebCase):
+    """Something that is not a directory where the directory belongs.
+
+    Refusing it is right; refusing it with a traceback is not, and every screen
+    in this section goes through that path.
+    """
+
+    #: Set on the subclasses; the base class runs nothing of its own.
+    block = None
+
+    def setUp(self):
+        if self.block is None:
+            self.skipTest("base case")
+        super().setUp()
+        self.block()
+
+    def test_the_hub_is_a_screen_and_not_a_five_hundred(self):
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("is not a directory, or cannot be created", page.text)
+        self.assertNotIn('action="/interview"', page.text)
+
+    def test_starting_one_lands_back_on_that_screen(self):
+        reply = self.client.post("/interview", follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"], "/interview")
+
+    def test_the_other_screens_are_untouched(self):
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(self.client.get("/posts").status_code, 200)
+
+
+class TestALinkedInterviewsDirectory(RefusedDirectoryCase):
+    def block(self):
+        outside = Path(self.tmp) / "elsewhere"
+        outside.mkdir()
+        (self.root / interview.DIRECTORY).symlink_to(outside)
+
+
+class TestAFileWhereTheDirectoryBelongs(RefusedDirectoryCase):
+    def block(self):
+        (self.root / interview.DIRECTORY).write_text("not a directory",
+                                                     encoding="utf-8")
+
+
+class TestAnInstanceNobodyCanWriteTo(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_the_hub_says_so_instead_of_offering_a_button_that_fails(self):
+        import os
+        # The state that matters: the directory exists, so its own mkdir
+        # succeeds and only the interview's own can fail.
+        self.open_interview()
+        home = self.root / interview.DIRECTORY
+        os.chmod(home, 0o555)
+        try:
+            reply = self.client.post("/interview", follow_redirects=False)
+            self.assertEqual(reply.status_code, 303)
+            self.assertEqual(self.client.get("/interview").status_code, 200)
+        finally:
+            os.chmod(home, 0o755)
+
+
+class TestAnEnvNobodyCanRead(WebCase):
+    def test_another_encoding_is_a_screen(self):
+        (self.root / ".env").write_bytes(
+            "VERBATIM_MODEL=mistral-modèle\n".encode("latin-1"))
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("cannot be read", page.text)
+        self.assertNotIn('action="/interview"', page.text)
+        self.assertEqual(
+            self.client.post("/interview", follow_redirects=False).status_code,
+            303)
+
+    def test_a_mode_that_came_across_wrong_is_a_screen_too(self):
+        import os
+        path = self.root / ".env"
+        path.write_text("VERBATIM_MODEL=x\n", encoding="utf-8")
+        os.chmod(path, 0o000)
+        try:
+            self.assertEqual(self.client.get("/interview").status_code, 200)
+        finally:
+            os.chmod(path, 0o644)
+
+    def test_the_other_screens_are_untouched(self):
+        (self.root / ".env").write_bytes(b"VERBATIM_MODEL=\xff\n")
+        for path in ("/", "/profile", "/posts"):
+            self.assertEqual(self.client.get(path).status_code, 200, path)
+
+
+class TestAWronglyTypedBlockOnTheScreens(WebCase):
+    def test_one_bad_block_does_not_take_the_hub_down(self):
+        good = self.open_interview()
+        bad = self.open_interview()
+        path = self.root / interview.DIRECTORY / bad / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["messages"] = [{"role": "user",
+                            "content": [{"type": "text", "text": None}]}]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(f'href="/interview/{good}"', page.text)
+        self.assertIn(f'action="/interview/{bad}/discard"', page.text)
+        self.assertEqual(self.client.get(f"/interview/{bad}").status_code, 404)
+
+    def test_a_language_code_is_data_and_not_a_pattern(self):
+        profile = (self.root / "profile.md").read_text(encoding="utf-8")
+        (self.root / "profile.md").write_text(
+            profile.replace("interface_language: en", "interface_language: \\1"),
+            encoding="utf-8")
+        client = TestClient(create_app(self.root, environ=dict(self.environ),
+                                       transport=self.transport),
+                            base_url="http://127.0.0.1:8747")
+        self.assertEqual(client.get("/interview").status_code, 200)
+
+
+class TestAnInterviewNobodyCanRead(WebCase):
+    """A file half written by a sync client, a mode that came across wrong.
+
+    Refusing that one interview is right. Taking down the screen that lists
+    them is not, because that screen is where the only remaining action lives.
+    """
+
+    def spoil(self, how):
+        interview_id = self.open_interview()
+        path = (self.root / interview.DIRECTORY / interview_id
+                / interview.CONVERSATION)
+        how(path)
+        return interview_id
+
+    def test_bytes_that_are_not_text_do_not_take_the_hub_down(self):
+        interview_id = self.spoil(
+            lambda path: path.write_bytes(b'{"version": 1, \xff\xfe}'))
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(interview_id, page.text)
+
+    def test_a_file_that_cannot_be_opened_does_not_either(self):
+        import os
+        interview_id = self.spoil(lambda path: os.chmod(path, 0o000))
+        try:
+            page = self.client.get("/interview")
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(interview_id, page.text)
+        finally:
+            os.chmod(self.root / interview.DIRECTORY / interview_id
+                     / interview.CONVERSATION, 0o644)
+
+    def test_a_directory_that_cannot_be_listed_is_a_screen(self):
+        import os
+        self.open_interview()
+        home = self.root / interview.DIRECTORY
+        os.chmod(home, 0o000)
+        try:
+            page = self.client.get("/interview")
+            self.assertEqual(page.status_code, 200)
+            self.assertIn("is not a directory, or cannot be created", page.text)
+        finally:
+            os.chmod(home, 0o755)
+
+    def test_the_hub_is_where_it_can_be_discarded(self):
+        # The interview screen reads the same file and 404s on it, so the hub
+        # is the only place the action can live.
+        interview_id = self.spoil(
+            lambda path: path.write_text("{ not json", encoding="utf-8"))
+        page = self.client.get("/interview")
+        self.assertIn(f'action="/interview/{interview_id}/discard"', page.text)
+        self.assertNotIn(f'href="/interview/{interview_id}"', page.text)
+
+        reply = self.client.post(f"/interview/{interview_id}/discard",
+                                 follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(interview.listing(self.root), [])
+
+    def test_it_is_not_labelled_with_a_state_nobody_read(self):
+        self.spoil(lambda path: path.write_text("{ not json", encoding="utf-8"))
+        page = self.client.get("/interview")
+        self.assertNotIn("state-open", page.text)
+
+    def test_one_bad_interview_does_not_hide_the_good_ones(self):
+        good = self.open_interview()
+        self.spoil(lambda path: path.write_text("{ not json", encoding="utf-8"))
+        page = self.client.get("/interview")
+        self.assertIn(good, page.text)
+        self.assertIn(f'href="/interview/{good}"', page.text)
+
+
+class TestBothLanguageAxes(WebCase):
+    """The project's named trap, pinned at the seam where it can happen.
+
+    The example instance is interviewed and published in English, so a test
+    against it cannot tell the two axes apart. This one interviews in French
+    and publishes in English, which is the case the loader was fixed for.
+    """
+
+    scripts = (says("Quelle agence ?"), says("Et ensuite ?"))
+
+    def setUp(self):
+        super().setUp()
+        profile = (self.root / "profile.md").read_text(encoding="utf-8")
+        (self.root / "profile.md").write_text(
+            profile.replace("interface_language: en", "interface_language: fr")
+                   .replace("output_language_default: en",
+                            "output_language_default: en"),
+            encoding="utf-8")
+
+    def test_each_axis_is_read_from_its_own_key(self):
+        conversation = interview.load(self.root, self.open_interview())
+        self.assertEqual(conversation.interface_language, "fr")
+        self.assertEqual(conversation.output_language, "en")
+
+    def test_the_interview_language_decides_the_packs_of_this_step(self):
+        self.turn(self.open_interview(), "Quatre mois.")
+        system = str(self.transport.calls[0]["payload"]["system"])
+        self.assertIn("===== locales/fr/interview.md", system)
+        self.assertNotIn("===== locales/en/interview.md", system)
+
+    def test_a_profile_edited_mid_interview_does_not_switch_languages(self):
+        # references/instance.md promises it: the axes are kept per interview.
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Quatre mois.")
+        profile = (self.root / "profile.md").read_text(encoding="utf-8")
+        (self.root / "profile.md").write_text(
+            profile.replace("interface_language: fr", "interface_language: en"),
+            encoding="utf-8")
+
+        self.turn(interview_id, "Une agence lyonnaise.")
+        system = str(self.transport.calls[1]["payload"]["system"])
+        self.assertIn("===== locales/fr/interview.md", system)
+        self.assertNotIn("===== locales/en/interview.md", system)
+
+    def test_the_publication_language_reaches_the_block_too(self):
+        # A section whose citations are ambiguous resolves to both packs when
+        # the axes differ. Passing one language would carry only one.
+        from verbatim_app.routes import interview as screen
+        conversation = interview.load(self.root, self.open_interview())
+        conversation.sections = ("Hard rules",)
+        block = screen._block(Bare(self.app), conversation)
+        resolved = [citation.resolved for citation in block.citations]
+        self.assertIn("locales/fr/market.md", resolved)
+        self.assertIn("locales/en/market.md", resolved)
+
+
+class TestWhatATurnCosts(WebCase):
+    """A price is accumulated turn by turn at the rate that ran that turn, and
+    one unpriced turn takes the whole figure away rather than dropping itself
+    quietly out of it."""
+
+    scripts = (says("Which agency?"), says("And then?"))
+
+    def meter(self, interview_id):
+        page = self.client.get(f"/interview/{interview_id}").text
+        start = page.index('id="meter"')
+        return page[start:page.index("</p>", start)]
+
+    def test_a_fresh_interview_shows_no_figure_at_all(self):
+        # Zero dollars is true of every model before the first turn, priced or
+        # not, and it reads as a price for one that has none.
+        self.assertNotIn("USD", self.meter(self.open_interview()))
+
+    def test_the_figure_appears_once_something_is_spent(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.assertIn("USD", self.meter(interview_id))
+
+    def test_an_unpriced_model_shows_tokens_and_no_figure(self):
+        self.app.state.environ["VERBATIM_MODEL"] = "llama-3.3-70b"
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        meter = self.meter(interview_id)
+        self.assertIn("100 tokens in", meter)
+        self.assertNotIn("USD", meter)
+
+    def test_the_running_total_adds_up(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.turn(interview_id, "A Lyon agency.")
+        one_turn = (100 * 5.0 + 10 * 25.0) / 1e6
+        self.assertAlmostEqual(interview.load(self.root, interview_id).spent,
+                               2 * one_turn)
+
+    def test_changing_the_model_does_not_re_price_the_earlier_turns(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        after_one = interview.load(self.root, interview_id).spent
+
+        self.app.state.environ["VERBATIM_MODEL"] = "claude-haiku-4-5"
+        self.turn(interview_id, "A Lyon agency.")
+        conversation = interview.load(self.root, interview_id)
+        cheaper = (100 * 1.0 + 10 * 5.0) / 1e6
+        self.assertAlmostEqual(conversation.spent, after_one + cheaper)
+        self.assertEqual(conversation.model, "claude-haiku-4-5")
+
+    def test_one_unpriced_turn_takes_the_whole_figure_away(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.assertIsNotNone(interview.load(self.root, interview_id).spent)
+
+        self.app.state.environ["VERBATIM_MODEL"] = "llama-3.3-70b"
+        reply = self.turn(interview_id, "A Lyon agency.")
+        self.assertIsNone(interview.load(self.root, interview_id).spent)
+        usage = [f for f in frames(reply.text) if f["kind"] == "usage"][-1]
+        self.assertIsNone(usage["price"])
+        self.assertGreater(usage["input_tokens"], 0)
+
+    def test_the_figure_stays_gone_once_it_is_gone(self):
+        interview_id = self.open_interview()
+        self.app.state.environ["VERBATIM_MODEL"] = "llama-3.3-70b"
+        self.turn(interview_id, "Four months.")
+        self.app.state.environ["VERBATIM_MODEL"] = "claude-opus-5"
+        self.turn(interview_id, "A Lyon agency.")
+        self.assertIsNone(interview.load(self.root, interview_id).spent)
+
+
+class TestATurnAbandonedMidAnswer(WebCase):
+    """The case this whole slice is built around, counted properly.
+
+    The loop folds a turn's figures into `Agent.usage` only when that turn
+    ends, so a turn abandoned while its answer streams would contribute
+    nothing: the provider bills those tokens all the same, and a total that
+    quietly drops a turn is exactly what `spent` refuses to be.
+    """
+
+    scripts = (says("Which agency, and when?"), says("And then?"))
+
+    def walk_away(self, interview_id, text):
+        from verbatim_app.routes import interview as screen
+        request = Bare(self.app)
+        stream = screen._run(request, screen._engine(request), interview_id,
+                             text, screen.lock_for(self.app, interview_id))
+        shown = None
+        for raw in stream:
+            frame = json.loads(raw[len("data: "):])
+            if frame["kind"] == "usage":
+                shown = frame
+                break
+        stream.close()
+        return shown
+
+    def test_the_tokens_the_screen_was_shown_are_the_tokens_on_disk(self):
+        interview_id = self.open_interview()
+        shown = self.walk_away(interview_id, "Four months on agencies.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.usage.input_tokens, shown["input_tokens"])
+        self.assertEqual(conversation.usage.output_tokens, shown["output_tokens"])
+        self.assertGreater(conversation.usage.input_tokens, 0)
+
+    def test_what_it_cost_is_on_disk_too(self):
+        interview_id = self.open_interview()
+        shown = self.walk_away(interview_id, "Four months on agencies.")
+        self.assertAlmostEqual(interview.load(self.root, interview_id).spent,
+                               shown["price"])
+        self.assertGreater(shown["price"], 0)
+
+    def test_the_next_turn_adds_to_it_rather_than_replacing_it(self):
+        interview_id = self.open_interview()
+        self.walk_away(interview_id, "Four months on agencies.")
+        abandoned = interview.load(self.root, interview_id).usage
+        self.turn(interview_id, "")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.usage.input_tokens,
+                         abandoned.input_tokens + 100)
+        self.assertEqual(conversation.usage.output_tokens,
+                         abandoned.output_tokens + 10)
+
+    def test_a_complete_turn_counts_each_figure_exactly_once(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.usage.input_tokens, 100)
+        self.assertEqual(conversation.usage.output_tokens, 10)
+
+
+class TestWhatAFailureIsAllowedToSay(WebCase):
+    def test_only_the_exception_type_travels_to_the_screen(self):
+        # An arbitrary exception message is arbitrary text, and this is the
+        # same boundary tools.py spends a whole redaction pass on.
+        def leaking(url, headers, payload):
+            raise RuntimeError("connect to https://api.example/v1 with sk-live-secret")
+            yield  # pragma: no cover
+
+        self.app.state.transport = leaking
+        reply = self.turn(self.open_interview(), "Four months.")
+        failure = [f for f in frames(reply.text) if f["kind"] == "error"][0]
+        self.assertEqual(failure["code"], "engine-failed")
+        self.assertEqual(failure["technical"], "RuntimeError")
+        self.assertNotIn("sk-live-secret", reply.text)
+
+    def test_a_provider_echoing_a_key_back_does_not_put_it_on_the_screen(self):
+        # A gateway that quotes the Authorization header into a debug body is
+        # the same accident as a subprocess printing its own environment, and
+        # it gets the same guard.
+        from verbatim_app.agent import AgentError
+        self.app.state.environ["ANTHROPIC_API_KEY"] = "sk-live-abcdefghij"
+
+        def echoing(url, headers, payload):
+            raise AgentError("400: bad header Authorization: sk-live-abcdefghij")
+            yield  # pragma: no cover
+
+        self.app.state.transport = echoing
+        reply = self.turn(self.open_interview(), "Four months.")
+        self.assertNotIn("sk-live-abcdefghij", reply.text)
+        failure = [f for f in frames(reply.text) if f["kind"] == "error"][0]
+        self.assertIn("ANTHROPIC_API_KEY", failure["technical"])
+        self.assertIn("400", failure["technical"])
+
+    def test_a_provider_error_raised_inside_the_stream_keeps_its_words(self):
+        # The wire raises ProviderError on the stream's own error event, which
+        # is where a rate limit or a credit balance arrives. Folding it into
+        # the generic handler would throw away the one sentence that says what
+        # to do next.
+        from verbatim_app.providers import ProviderError
+
+        def refusing(url, headers, payload):
+            raise ProviderError("endpoint refused: rate limit, retry in 30s")
+            yield  # pragma: no cover
+
+        self.app.state.transport = refusing
+        reply = self.turn(self.open_interview(), "Four months.")
+        failure = [f for f in frames(reply.text) if f["kind"] == "error"][0]
+        self.assertNotIn("code", failure)
+        self.assertIn("rate limit", failure["technical"])
+
+    def test_a_provider_refusing_keeps_its_own_words(self):
+        from verbatim_app.agent import AgentError
+
+        def refusing(url, headers, payload):
+            raise AgentError("https://api.example answered 429: slow down")
+            yield  # pragma: no cover
+
+        self.app.state.transport = refusing
+        reply = self.turn(self.open_interview(), "Four months.")
+        failure = [f for f in frames(reply.text) if f["kind"] == "error"][0]
+        self.assertNotIn("code", failure)
+        self.assertIn("429", failure["technical"])
+
+
+class TestATurnWithoutAModel(WebCase):
+    environ = {}
+
+    def test_it_is_refused_before_anything_is_written(self):
+        # The interview is started with a model, then the key goes away.
+        self.app.state.environ.update(CONFIGURED)
+        interview_id = self.open_interview()
+        self.app.state.environ.clear()
+
+        reply = self.turn(interview_id, "Four months.")
+        self.assertEqual(reply.status_code, 503)
+        self.assertEqual(reply.json()["detail"], "not-configured")
+        self.assertEqual(interview.load(self.root, interview_id).said(), "")
+
+
+class TestARefusedTool(WebCase):
+    scripts = (asks(("toolu_01", "read_instance", {"path": ".env"})),
+               says("Right, not that one."))
+
+    def test_the_frame_says_the_tool_refused(self):
+        reply = self.turn(self.open_interview(), "Four months.")
+        result = [f for f in frames(reply.text) if f["kind"] == "tool_result"][0]
+        self.assertTrue(result["is_error"])
+        self.assertIn("engine configuration", result["result"])
+
+
+class TestTheTurnLock(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_a_body_that_is_never_read_does_not_walk_off_with_the_lock(self):
+        # A generator closed before it was ever advanced never runs its
+        # finally, so a lock taken in the handler would be held for the life
+        # of the process and that interview would answer 409 forever.
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", screen.lock_for(self.app, interview_id))
+        frames.close()
+        self.assertFalse(screen.lock_for(self.app, interview_id).locked())
+        self.assertEqual(self.turn(interview_id, "Four months.").status_code, 200)
+
+    def test_a_second_turn_while_one_runs_is_refused(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        held = screen.lock_for(self.app, interview_id)
+        self.assertTrue(held.acquire(blocking=False))
+        try:
+            reply = self.turn(interview_id, "Four months.")
+            self.assertEqual(reply.status_code, 409)
+            self.assertEqual(reply.json()["detail"], "turn-running")
+            self.assertEqual(interview.load(self.root, interview_id).said(), "")
+        finally:
+            held.release()
+
+    def test_the_loser_of_the_race_writes_nothing(self):
+        # The handler's peek is not the decision, so the generator has to
+        # refuse on its own without touching the conversation.
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        held = screen.lock_for(self.app, interview_id)
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", held)
+        self.assertTrue(held.acquire(blocking=False))
+        try:
+            sent = [json.loads(raw[len("data: "):]) for raw in frames]
+        finally:
+            held.release()
+        self.assertEqual([f["kind"] for f in sent], ["error"])
+        self.assertEqual(sent[0]["code"], "turn-running")
+        self.assertEqual(interview.load(self.root, interview_id).said(), "")
+
+    def test_discarding_forgets_the_lock(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        screen.lock_for(self.app, interview_id)
+        self.client.post(f"/interview/{interview_id}/discard")
+        self.assertNotIn(interview_id, self.app.state.turn_locks)
+
+
+class TestDiscardingMidTurn(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_the_response_ends_on_a_frame_rather_than_a_traceback(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", screen.lock_for(self.app, interview_id))
+        sent = []
+        for raw in frames:
+            sent.append(json.loads(raw[len("data: "):]))
+            if len(sent) == 1:
+                shutil.rmtree(self.root / interview.DIRECTORY / interview_id)
+        self.assertIn("error", [frame["kind"] for frame in sent])
+        self.assertFalse(screen.lock_for(self.app, interview_id).locked())
+
+
+class TestAClosedInterview(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def closed(self):
+        interview_id = self.open_interview()
+        interview.close(self.root, interview_id, post="2026-08-28-agency.md")
+        return interview_id
+
+    def test_a_closed_interview_refuses_a_turn(self):
+        interview_id = self.closed()
+        reply = self.turn(interview_id, "je continue quand meme")
+        self.assertEqual(reply.status_code, 409)
+        self.assertEqual(reply.json()["detail"], "closed")
+
+    def test_nothing_is_spent_and_nothing_is_written(self):
+        interview_id = self.closed()
+        self.turn(interview_id, "je continue quand meme")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.said(), "")
+        self.assertEqual(conversation.state, interview.CLOSED)
+        self.assertEqual(self.transport.calls, [])
+
+    def test_the_generator_refuses_too_when_it_closed_under_the_race(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Four months.", screen.lock_for(self.app, interview_id))
+        interview.close(self.root, interview_id, post="2026-08-28-agency.md")
+        sent = [json.loads(raw[len("data: "):]) for raw in frames]
+        self.assertEqual([f["kind"] for f in sent], ["error"])
+        self.assertEqual(sent[0]["code"], "closed")
+        self.assertEqual(self.transport.calls, [])
+
+    def test_the_screen_offers_no_form_and_says_what_it_became(self):
+        page = self.client.get(f"/interview/{self.closed()}")
+        self.assertNotIn('id="say"', page.text)
+        self.assertIn("2026-08-28-agency.md", page.text)
+
+
+class TestATruncatedStream(WebCase):
+    #: The stream ends mid answer: no message_delta, so no reason at all.
+    scripts = (says("Which agency")[:-1],)
+
+    def test_a_stream_that_never_said_why_it_stopped_is_truncated(self):
+        reply = self.turn(self.open_interview(), "Four months.")
+        stop = [f for f in frames(reply.text) if f["kind"] == "stop"][0]
+        self.assertEqual(stop["stop"], "truncated")
+
+
+class TestAProviderRefusing(WebCase):
+    def test_the_failure_reaches_the_screen_as_a_frame(self):
+        def broken(url, headers, payload):
+            raise RuntimeError("connection refused")
+            yield  # pragma: no cover
+        self.app.state.transport = broken
+        reply = self.turn(self.open_interview(), "Four months.")
+        self.assertEqual(reply.status_code, 200)  # headers already went out
+        self.assertIn("error", kinds(reply.text))
+
+    def test_what_the_person_typed_is_not_lost(self):
+        def broken(url, headers, payload):
+            raise RuntimeError("connection refused")
+            yield  # pragma: no cover
+        self.app.state.transport = broken
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        self.assertEqual(interview.load(self.root, interview_id).said(),
+                         "Four months on agencies.")
+
+
+class TestResuming(WebCase):
+    scripts = (says("Which agency?"), says("And what did they say?"))
+
+    def test_a_second_turn_continues_the_same_conversation(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.turn(interview_id, "A Lyon agency, in March.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.person_turns(),
+                         ["Four months.", "A Lyon agency, in March."])
+        self.assertEqual(len(conversation.engine_turns()), 2)
+
+    def test_the_total_adds_up_across_turns(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.turn(interview_id, "A Lyon agency, in March.")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.usage.input_tokens, 200)
+        self.assertEqual(conversation.usage.output_tokens, 20)
+
+    def test_the_whole_conversation_goes_back_to_the_provider(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        self.turn(interview_id, "A Lyon agency, in March.")
+        self.assertEqual(len(self.transport.calls[1]["payload"]["messages"]), 3)
+
+    def test_the_idea_bank_is_there_to_seed_an_answer(self):
+        # The three ways in, without the app inventing a single word: the
+        # angles are the person's own lines, out of ideas.md.
+        page = self.client.get(f"/interview/{self.open_interview()}")
+        self.assertIn("VISIBILITY", page.text)
+
+    def test_the_screen_shows_the_conversation_so_far(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months.")
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn("Four months.", page.text)
+        self.assertIn("Which agency?", page.text)
+
+
+class TestOneTurnAtATime(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_a_second_turn_while_one_runs_is_refused(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        held = screen.lock_for(self.app, interview_id)
+        self.assertTrue(held.acquire(blocking=False))
+        try:
+            reply = self.turn(interview_id, "Four months.")
+            self.assertEqual(reply.status_code, 409)
+        finally:
+            held.release()
+
+
+class TestTheGuards(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_the_turn_is_not_something_a_get_can_do(self):
+        # The whole reason this is a POST. A no-cors GET from a hostile page
+        # carries no Origin, so a GET that spent the person's tokens would be
+        # reachable from any tab they have open.
+        interview_id = self.open_interview()
+        reply = self.client.get(f"/interview/{interview_id}/turn")
+        self.assertEqual(reply.status_code, 405)
+
+    def test_a_cross_origin_post_is_refused(self):
+        interview_id = self.open_interview()
+        reply = self.client.post(f"/interview/{interview_id}/turn",
+                                 data={"text": "hello"},
+                                 headers={"origin": "https://evil.example"})
+        self.assertEqual(reply.status_code, 403)
+
+    def test_another_local_server_is_not_this_app(self):
+        # A hostname comparison would accept these: same host, different
+        # program. A form post from one is same-site and a navigation, so the
+        # Sec-Fetch exemption does not catch it either. Only the port does.
+        interview_id = self.open_interview()
+        for origin in ("http://localhost:3000", "http://127.0.0.1:9999",
+                       "https://127.0.0.1:8747"):
+            reply = self.client.post(
+                f"/interview/{interview_id}/turn", data={"text": "hello"},
+                headers={"origin": origin, "sec-fetch-site": "same-site",
+                         "sec-fetch-mode": "navigate"})
+            self.assertEqual(reply.status_code, 403, origin)
+        self.assertEqual(self.transport.calls, [])
+
+    def test_another_local_server_cannot_delete_an_interview(self):
+        interview_id = self.open_interview()
+        reply = self.client.post(
+            f"/interview/{interview_id}/discard",
+            headers={"origin": "http://localhost:3000",
+                     "sec-fetch-site": "same-site",
+                     "sec-fetch-mode": "navigate"})
+        self.assertEqual(reply.status_code, 403)
+        self.assertTrue((self.root / interview.DIRECTORY / interview_id).is_dir())
+
+    def test_this_app_own_origin_passes(self):
+        interview_id = self.open_interview()
+        reply = self.client.post(f"/interview/{interview_id}/turn",
+                                 data={"text": "Four months."},
+                                 headers={"origin": "http://127.0.0.1:8747"})
+        self.assertEqual(reply.status_code, 200)
+
+    def test_a_same_origin_get_without_an_origin_header_still_works(self):
+        # The check that had to be made rather than assumed: browsers omit
+        # Origin on same-origin GETs, so a guard requiring it would have
+        # refused the app's own screens.
+        page = self.client.get("/interview")
+        self.assertNotIn("origin", {k.lower() for k in page.request.headers})
+        self.assertEqual(page.status_code, 200)
+
+    def test_a_cross_site_fetch_is_refused_even_without_an_origin(self):
+        reply = self.client.get("/interview",
+                                headers={"sec-fetch-site": "cross-site",
+                                         "sec-fetch-mode": "no-cors"})
+        self.assertEqual(reply.status_code, 403)
+
+    def test_following_a_link_from_another_site_is_somebody_arriving(self):
+        reply = self.client.get("/interview",
+                                headers={"sec-fetch-site": "cross-site",
+                                         "sec-fetch-mode": "navigate"})
+        self.assertEqual(reply.status_code, 200)
+
+
+class TestNothingEnglishReachesAFrenchScreen(WebCase):
+    lang = "fr"
+    scripts = (says("Quelle agence ?"),)
+
+    def test_an_interview_that_is_not_there_says_so_in_the_pack(self):
+        reply = self.client.post("/interview/2020-01-01-0000/turn",
+                                 data={"text": "hello"})
+        self.assertEqual(reply.status_code, 404)
+        self.assertEqual(reply.json()["detail"], "gone")
+        self.assertNotIn("Not Found", reply.text)
+
+    def test_an_interview_discarded_under_its_own_turn_answers_with_a_code(self):
+        from verbatim_app.routes import interview as screen
+        interview_id = self.open_interview()
+        request = Bare(self.app)
+        frames = screen._run(request, screen._engine(request), interview_id,
+                             "Quatre mois.", screen.lock_for(self.app, interview_id))
+        sent = []
+        for raw in frames:
+            sent.append(json.loads(raw[len("data: "):]))
+            if len(sent) == 1:
+                shutil.rmtree(self.root / interview.DIRECTORY / interview_id)
+        failures = [frame for frame in sent if frame["kind"] == "error"]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0].get("code"), "gone")
+        # no English sentence and no absolute path travelling to a screen
+        self.assertNotIn("detail", failures[0])
+
+    def test_a_refused_instance_env_is_explained_by_the_pack(self):
+        (self.root / ".env").write_text(
+            "ANTHROPIC_API_KEY=sk-oops\n", encoding="utf-8")
+        page = self.client.get("/interview")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Cette instance porte des identifiants", page.text)
+        self.assertIn("ANTHROPIC_API_KEY", page.text)
+        self.assertNotIn("sk-oops", page.text)
+        self.assertNotIn("An instance is a directory people copy", page.text)
+
+    def test_a_bad_measurement_count_is_a_code_not_a_sentence(self):
+        reply = self.client.post("/posts/2026-08-25-agency-segment.md/measure",
+                                 data={"inbound_dms": "abc"})
+        self.assertEqual(reply.status_code, 422)
+        self.assertEqual(reply.json()["detail"], "not-a-count")
+
+
+class TestDiscardingSomethingAlreadyGone(WebCase):
+    def test_it_lands_on_the_hub_rather_than_on_raw_json(self):
+        reply = self.client.post("/interview/2020-01-01-0000/discard",
+                                 follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"], "/interview")
+
+
+class TestEveryCodeHasASentence(WebCase):
+    """A code the pack does not name renders as the code. Every code this
+    engine can produce is enumerated here, so adding one without a sentence
+    fails at the seam rather than on somebody's screen."""
+
+    CODES = ("turn-running", "closed", "not-configured", "nothing-to-send",
+             "gone", "engine-failed", "bundle-broken", "unknown")
+    REFUSALS = ("secrets-in-instance", "credential-in-endpoint",
+                "endpoint-in-clear", "endpoint-untrusted", "engine-refused",
+                "interviews-not-a-directory", "env-unreadable")
+
+    def test_the_browser_gets_a_sentence_for_every_code(self):
+        from verbatim_app.routes import interview as screen
+        table = json.loads(screen._frame_strings(self.app.state.t))
+        for code in self.CODES:
+            key = "error_" + code.replace("-", "_")
+            self.assertIn(key, table, code)
+            self.assertNotEqual(table[key], f"interview.{key}", code)
+
+    def test_the_screen_has_a_sentence_for_every_refusal(self):
+        strings = self.app.state.t
+        for code in self.REFUSALS:
+            key = "interview.refused_" + code.replace("-", "_")
+            self.assertNotEqual(strings(key), key, code)
+
+    def test_every_refusal_code_the_engine_raises_is_in_that_list(self):
+        # The list is written by hand, so this is what keeps it honest.
+        raised = set()
+        for name in ("providers.py", "routes/interview.py"):
+            source = (REPO / "app" / "verbatim_app" / name).read_text(
+                encoding="utf-8")
+            raised.update(re.findall(r'code="([a-z-]+)"', source))
+            raised.update(re.findall(r'refusal="([a-z-]+)"', source))
+        raised -= FRAME_CODES
+        self.assertTrue(raised)
+        self.assertEqual(raised - set(self.REFUSALS), set())
+
+    def test_the_screen_has_a_sentence_for_every_configuration_problem(self):
+        from verbatim_app.providers import Problem, Settings, problems
+        strings = self.app.state.t
+        found = set()
+        for settings in (Settings("nope", "m", "https://x", "k"),
+                         Settings("anthropic", "", "https://x", "k"),
+                         Settings("anthropic", "m", "", "k"),
+                         Settings("anthropic", "m", "https://x", None)):
+            found.update(problem.code for problem in problems(settings))
+        self.assertEqual(len(found), 4)
+        for code in found:
+            key = "interview.problem_" + code.replace("-", "_")
+            self.assertNotEqual(strings(key), key, code)
+
+
+class TestNothingConfiguredInFrench(WebCase):
+    environ = {}
+    lang = "fr"
+
+    def test_a_refused_start_never_shows_engine_prose(self):
+        # A plain form navigation renders the body as the whole page, so an
+        # error detail written in the engine is English on a French screen.
+        reply = self.client.post("/interview", follow_redirects=True)
+        self.assertEqual(reply.status_code, 200)
+        self.assertNotIn("no model is configured", reply.text)
+        self.assertIn("Aucun modèle configuré", reply.text)
+
+
+class TestEveryStopReasonHasASentence(WebCase):
+    """The engine folds an unrecognised reason into a bare token. A bare token
+    is the language leak in miniature, so every value a wire can emit has a
+    string, and adding a sixth without one fails here."""
+
+    def test_the_pack_names_every_reason_the_wires_can_emit(self):
+        from verbatim_app.providers import AnthropicWire, OpenAIWire
+        from verbatim_app.routes import interview as screen
+        table = json.loads(screen._frame_strings(self.app.state.t))
+        reasons = (set(AnthropicWire.STOPS.values())
+                   | set(OpenAIWire.STOPS.values())
+                   | {"other", "truncated"})
+        for reason in reasons - {"end_turn"}:
+            self.assertIn(f"stop_{reason}", table, reason)
+            self.assertNotEqual(table[f"stop_{reason}"], f"interview.stop_{reason}")
+
+
+class TestTheFrameStringsBlock(WebCase):
+    def test_a_pack_string_cannot_end_the_script_block_early(self):
+        from verbatim_app.routes import interview as screen
+        strings = self.app.state.t
+        strings.table["interview.thinking"] = "</script><script>alert(1)</script>"
+        rendered = screen._frame_strings(strings)
+        self.assertNotIn("</script", rendered)
+        self.assertIn("\\u003c", rendered)
+        self.assertEqual(json.loads(rendered)["thinking"],
+                         "</script><script>alert(1)</script>")
+
+    def test_the_page_carries_it_escaped(self):
+        self.app.state.t.table["interview.thinking"] = "</script>oops"
+        page = self.client.get(f"/interview/{self.open_interview()}")
+        self.assertNotIn("</script>oops", page.text)
+
+
+class TestTheStreamIsNotCached(WebCase):
+    scripts = (says("Which agency?"),)
+
+    def test_a_turn_is_never_served_from_a_cache(self):
+        reply = self.turn(self.open_interview(), "Four months.")
+        self.assertEqual(reply.headers["cache-control"], "no-store")
+
+
+class TestInFrench(WebCase):
+    scripts = (says("Quelle agence ?"),)
+
+    def setUp(self):
+        super().setUp()
+        self.client = TestClient(
+            create_app(self.root, lang="fr", environ=dict(self.environ),
+                       transport=self.transport),
+            base_url="http://127.0.0.1:8747")
+
+    def test_the_screen_speaks_the_pack_not_the_engine(self):
+        page = self.client.get("/interview")
+        self.assertIn("Ce qui répondrait", page.text)
+        self.assertNotIn("What would answer", page.text)
+
+    def test_the_frame_strings_the_browser_gets_are_the_pack_too(self):
+        page = self.client.get(f"/interview/{self.open_interview()}")
+        self.assertIn("En attente du modèle", page.text)
+        self.assertNotIn("Waiting for the model", page.text)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

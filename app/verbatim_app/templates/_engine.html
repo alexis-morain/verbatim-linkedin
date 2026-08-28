@@ -1,0 +1,44 @@
+<section class="engine">
+  <h2>{{ t('interview.engine') }}</h2>
+  {% if engine.refusal %}
+  <div class="gaps">
+    <p>{{ t('interview.refused_' + engine.refusal.replace('-', '_'),
+            detail=engine.refusal_names) }}</p>
+    {% if engine.refusal_names %}<p class="mono">{{ engine.refusal_names }}</p>{% endif %}
+  </div>
+  {% else %}
+  <dl class="facts">
+    <dt>{{ t('interview.provider') }}</dt>
+    <dd class="mono">{{ engine.settings.provider or t('interview.unset') }}</dd>
+    <dt>{{ t('interview.model') }}</dt>
+    <dd class="mono">{{ engine.settings.model or t('interview.unset') }}</dd>
+    <dt>{{ t('interview.endpoint') }}</dt>
+    <dd class="mono">{{ engine.settings.base_url or t('interview.unset') }}</dd>
+    <dt>{{ t('interview.rate') }}</dt>
+    <dd class="mono">{% if engine.rate %}{{ t('interview.rate_value', input='%.2f'|format(engine.rate[0]), output='%.2f'|format(engine.rate[1])) }}{% else %}{{ t('interview.no_price') }}{% endif %}</dd>
+    {% if engine.block_size %}
+    <dt>{{ t('interview.context') }}</dt>
+    <dd class="mono">{{ t('interview.context_value', count=engine.block_size) }}</dd>
+    {% endif %}
+  </dl>
+  {% if engine.block_error %}
+  {# A skill citing a file that is not in the tree. `check.sh` fails on it, so
+     a shipped bundle cannot reach here; the raw text stays because whoever
+     does reach it is editing the bundle and needs the path. #}
+  <div class="gaps">
+    <p>{{ t('interview.bundle_broken') }}</p>
+    <p class="mono">{{ engine.block_error }}</p>
+  </div>
+  {% endif %}
+  {% if engine.gaps %}
+  <div class="gaps">
+    <ul>
+      {% for gap in engine.gaps %}
+      <li><span class="mono">{{ gap.code }}</span>
+        {{ t('interview.problem_' + gap.code.replace('-', '_'), detail=gap.detail) }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endif %}
+</section>

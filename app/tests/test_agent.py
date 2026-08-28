@@ -358,6 +358,9 @@ class TestCeiling(unittest.TestCase):
         steps = list(agent.run("The step.", user("hello")))
         self.assertEqual(len(transport.calls), 3)
         self.assertEqual(steps[-1].kind, "ceiling")
+        # The figure and nothing else: a sentence here would be English on
+        # whatever screen renders it.
+        self.assertEqual(steps[-1].result, str(agent.max_turns))
         self.assertIn("3", steps[-1].result)
 
     def test_a_normal_conversation_never_reaches_the_ceiling(self):

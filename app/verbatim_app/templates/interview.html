@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ t('interview.title') }} {{ conversation.id }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<p><a href="/interview">{{ t('interview.back') }}</a></p>
+<h1>{{ t('interview.title') }} <span class="mono">{{ conversation.id }}</span></h1>
+
+{# A figure only once something has actually been spent. Before the first
+   turn the total is zero for every model, priced or not, and a zero over
+   somebody's real bill is the answer providers.py refuses to give. #}
+<p class="hint mono" id="meter">{{ t('interview.tokens',
+  input=conversation.usage.input_tokens,
+  output=conversation.usage.output_tokens) }}{% if spent is not none
+  and (conversation.usage.input_tokens or conversation.usage.output_tokens) %},
+  {{ t('interview.spent', amount='%.4f'|format(spent)) }}{% endif %}</p>
+
+{% if not engine.ready %}
+{% include "_engine.html" %}
+{% endif %}
+
+<div class="turns" id="turns">
+  {% for moment in moments %}
+    {% if moment.kind == 'said' %}
+    <div class="turn turn-said">
+      <p class="who mono">{{ t('interview.said') }}</p>
+      <div class="words">{{ moment.text }}</div>
+    </div>
+    {% elif moment.kind == 'asked' %}
+    <div class="turn turn-asked">
+      <p class="who mono">{{ t('interview.asked') }}</p>
+      <div class="words">{{ moment.text }}</div>
+    </div>
+    {% elif moment.kind == 'call' %}
+    <div class="turn tool mono">{{ t('interview.tool_call') }} {{ moment.name }} {{ moment.arguments | tojson }}</div>
+    {% else %}
+    <details class="turn tool"{% if moment.is_error %} open{% endif %}>
+      <summary class="mono">{% if moment.is_error %}{{ t('interview.tool_failed') }}{% else %}{{ t('interview.tool_result') }}{% endif %}</summary>
+      <pre class="mono">{{ moment.text }}</pre>
+    </details>
+    {% endif %}
+  {% endfor %}
+</div>
+
+{% if conversation.state == 'open' %}
+<p class="callout" id="awaiting"{% if not awaiting %} hidden{% endif %}>{{ t('interview.awaiting') }}</p>
+<button type="button" id="resume"{% if not awaiting %} hidden{% endif %}>{{ t('interview.resume') }}</button>
+<form id="say" method="post" action="/interview/{{ conversation.id }}/turn">
+  <label class="mono" for="text">{{ t('interview.your_turn') }}</label>
+  <textarea id="text" name="text" rows="4" autofocus></textarea>
+  <button type="submit">{{ t('interview.send') }}</button>
+</form>
+<noscript><p class="degraded">{{ t('interview.needs_js') }}</p></noscript>
+{% else %}
+<p class="empty">{{ t('interview.closed_notice', post=conversation.post) }}</p>
+{% endif %}
+
+{% if bank and bank.angles %}
+<h2>{{ t('interview.bank') }}</h2>
+<p class="hint">{{ t('interview.bank_hint') }}</p>
+<ul class="angles">
+  {% for angle in bank.angles %}
+  <li>
+    <button type="button" class="seed" data-text="{{ angle.text }}">
+      <span class="badge mono">P{{ angle.pillar }}</span>
+      <span class="badge badge-{{ (angle.label or '')|lower }} mono">{{ angle.label }}</span>
+      {{ angle.text }}
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h2>{{ t('interview.ending') }}</h2>
+<p class="hint">{{ t('interview.discard_hint', path=conversation.id) }}</p>
+<form method="post" action="/interview/{{ conversation.id }}/discard">
+  <button type="submit">{{ t('interview.discard') }}</button>
+</form>
+
+<script type="application/json" id="verbatim-strings">{{ strings | safe }}</script>
+<script src="/static/interview.js" defer></script>
+{% endblock %}

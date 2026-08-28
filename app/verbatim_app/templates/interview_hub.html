@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ t('interview.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('interview.title') }}</h1>
+<p class="hint">{{ t('interview.hint') }}</p>
+
+{% include "_engine.html" %}
+
+{% if engine.ready %}
+<form method="post" action="/interview">
+  <button type="submit">{{ t('interview.start') }}</button>
+</form>
+{% else %}
+<p class="empty">{{ t('interview.not_ready') }}</p>
+{% endif %}
+
+<h2>{{ t('interview.open') }}</h2>
+{% if entries %}
+<ul class="postlist">
+  {% for entry in entries %}
+  {% if entry.unreadable %}
+  {# No link: that screen reads the same file and 404s on it. Discarding is
+     the only thing left to do with this one, so it is the only thing offered,
+     here, where it is the only place it can be reached from. #}
+  <li>
+    <span><span class="mono">{{ entry.id }}</span> {{ t('interview.unreadable') }}</span>
+    <form method="post" action="/interview/{{ entry.id }}/discard">
+      <button type="submit" class="quiet">{{ t('interview.discard') }}</button>
+    </form>
+  </li>
+  {% else %}
+  <li>
+    <a href="/interview/{{ entry.id }}"><span class="mono">{{ entry.id }}</span>
+      {% if entry.opening %}{{ entry.opening | truncate(90) }}
+      {% else %}{{ t('interview.not_started') }}{% endif %}</a>
+    <span class="state state-{{ entry.state }}">{{ t('interview.state_' + entry.state) }},
+      {{ t('interview.turns', count=entry.turns) }}<br>
+      <span class="mono">{{ entry.updated }}</span></span>
+  </li>
+  {% endif %}
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">{{ t('interview.no_open') }}</p>
+{% endif %}
+{% endblock %}

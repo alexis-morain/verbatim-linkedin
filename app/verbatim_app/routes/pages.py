@@ -10,38 +10,25 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from ..instance import InstanceError
+from . import render as _render
+from ..instance import InstanceError, UnreadableError
 
 router = APIRouter()
-
-
-def _ctx(request: Request, **extra):
-    instance = request.app.state.instance
-    context = {
-        "request": request,
-        "gaps": instance.conformance(),
-        "status": instance.status(),
-        "pack_missing": len(request.app.state.t.missing),
-    }
-    context.update(extra)
-    return context
-
-
-def _render(request: Request, template: str, **extra):
-    return request.app.state.templates.TemplateResponse(
-        request, template, _ctx(request, **extra))
 
 
 def _int_or_none(raw: str):
     raw = raw.strip()
     if raw == "":
         return None
+    # A machine code, not a sentence. This screen is a plain form post, so a
+    # detail written here would be rendered as the whole page, in English,
+    # whatever language the person reads.
     try:
         value = int(raw)
     except ValueError:
-        raise HTTPException(status_code=422, detail=f"not a count: {raw!r}")
+        raise HTTPException(status_code=422, detail="not-a-count")
     if value < 0:
-        raise HTTPException(status_code=422, detail=f"not a count: {raw!r}")
+        raise HTTPException(status_code=422, detail="not-a-count")
     return value
 
 
@@ -101,11 +88,17 @@ def post_detail(request: Request, name: str, saved: int = 0):
     matches = [p for p in instance.posts() if p.filename == name]
     if not matches:
         raise HTTPException(status_code=404)
+    # A file that is there and will not read is a file to repair, not a file
+    # that is missing: 404 would send somebody looking for the wrong thing,
+    # and the row that links here is rendered whether or not it reads.
     try:
-        body = instance.post_body(name)
+        body, unreadable = instance.post_body(name), ""
+    except UnreadableError as broken:
+        body, unreadable = "", str(broken)
     except InstanceError:
         raise HTTPException(status_code=404)
-    return _render(request, "post.html", post=matches[0], body=body, saved=saved)
+    return _render(request, "post.html", post=matches[0], body=body,
+                   unreadable=unreadable, saved=saved)
 
 
 @router.post("/posts/{name}/measure")
@@ -124,6 +117,9 @@ def save_measure(request: Request, name: str,
             meeting_mentions=_int_or_none(meeting_mentions),
             note=note.strip() or None,
         )
+    except UnreadableError:
+        # Nothing was written, and saying so beats a page of English.
+        return RedirectResponse(f"/posts/{name}", status_code=303)
     except InstanceError:
         raise HTTPException(status_code=404)
     return RedirectResponse(f"/posts/{name}?saved=1", status_code=303)
@@ -136,8 +132,14 @@ def corpus(request: Request):
 
 @router.get("/corpus/{name}")
 def corpus_file(request: Request, name: str):
+    # corpus/ is where somebody's older writing lands, so a file exported from
+    # another tool in another encoding is the expected accident, not the exotic
+    # one. The index links every name it globs, so this is where that lands.
     try:
-        text = request.app.state.instance.corpus_text(name)
+        text, unreadable = request.app.state.instance.corpus_text(name), ""
+    except UnreadableError as broken:
+        text, unreadable = "", str(broken)
     except InstanceError:
         raise HTTPException(status_code=404)
-    return _render(request, "corpus_file.html", name=name, text=text)
+    return _render(request, "corpus_file.html", name=name, text=text,
+                   unreadable=unreadable)

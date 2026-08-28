@@ -25,6 +25,7 @@ because there was no list to diff against. This is the list.
   ideas.md                the angle bank
   corpus/                 published posts, as reference material
   posts/                  one file per post produced here, with its measurement
+  interviews/             conversations in progress, one directory each, optional
   linkedin-page.md        the public LinkedIn page as applied, optional
   .env                    engine configuration for this instance, optional
 ```
@@ -107,6 +108,92 @@ that are not part of the post.
 Aggregates, trends and counters are recomputed from these files at read time,
 never written back. If a cache ever exists it is regenerated, and when it
 disagrees with `posts/`, `posts/` is right.
+
+## interviews/
+
+One directory per interview in progress, named `YYYY-MM-DD-HHMM`, suffixed
+`-2`, `-3` when two start in the same minute. This is the one piece of
+instance state that is machinery before it is material: a conversation with a
+model, kept on disk so that closing the browser, or restarting the process,
+loses nothing somebody said.
+
+```
+interviews/2026-08-28-1432/
+  conversation.json     the resume state, and the truth
+  transcript.md         what a human reads, rendered from it on every write
+```
+
+`conversation.json` is the only file in an instance that is not markdown, for
+one reason: a tool call carries an id the next request has to echo back, and a
+format that cannot round trip that id produces a conversation the provider
+rejects. Its keys:
+
+| Key | What it says |
+|---|---|
+| `version` | the format's own number. A reader that does not know it refuses the file rather than guessing, so this is the first key a writer gets right |
+| `id` | the directory's name, repeated so a moved file still says what it is |
+| `state` | `open` or `closed`, the same value the transcript's front matter carries |
+| `post` | the post file it became, empty while open |
+| `skill` and `sections` | which step of which skill the system block is assembled from, so the block is rebuilt from the bundle rather than stored |
+| `interface_language`, `output_language` | the two language axes, kept per interview: changing the profile does not change the language of a conversation already under way |
+| `provider`, `model` | what answered on the last turn |
+| `started`, `updated` | timestamps, local time, seconds |
+| `usage` | the running token total, input and output |
+| `spent` | dollars, accumulated turn by turn at the rate of the model that ran that turn. `null` once any turn had no price, and empty in the transcript front matter: a total that silently drops a turn is worse than no total, and applying today's rate to yesterday's turns is worse still |
+| `messages` | the provider shaped message list, as it goes on the wire |
+
+It is rewritten after every step that changes the conversation, so what is on
+disk is a conversation a provider would accept at any moment, including the
+moment somebody walked away mid turn. Two consequences of that promise are
+worth naming, because both are shapes a naive writer produces:
+
+- **Two messages of the same role never follow each other.** An answer typed
+  after a turn that failed joins the turn that got no answer rather than
+  starting a second one, so a person retyping does not produce a conversation
+  their provider refuses.
+- **The block decides who spoke, not the message.** On a user role message a
+  `tool_result` block is a tool answering and a `text` block is the person.
+  They travel together whenever somebody answers after an interrupted tool
+  call, and only the `text` blocks are ever credited as what was said.
+
+`transcript.md` is rendered from `conversation.json` on every write and never
+parsed back. Its front matter carries `state` (`open` or `closed`), the
+dates, both languages, the model and the token total. Its body is a run of
+`## Asked` and `## Said` sections in the order they happened. They are not
+strictly alternating: a turn where the engine speaks, reads a file and speaks
+again leaves two `## Asked` in a row, because the reading is not transcript.
+
+**The anchoring source is the `Said` side, and a consumer reads it from
+`conversation.json`, never off the rendered file.** A quote is checked
+against what the person said, never against what the engine asked or what a
+tool returned: a model allowed to quote its own question can satisfy
+`references/anchoring.md` without the person ever having said anything.
+Reading roles out of structure rather than off markdown headings is what
+makes that hold, since text that looks like a heading is still text.
+
+Tool calls and their results stay in `conversation.json`. They are on screen
+while the interview runs, and they are not transcript: a tool result is a
+file the engine read, not a thing the person said.
+
+Nothing aggregates over this directory. Counters, ratios and the pillar
+balance run over `posts/` with `state: published`, exactly as before.
+
+An interview ends one of three ways:
+
+- **It becomes a post.** Front matter turns to `state: closed` and names the
+  post file. The engine does not delete the directory: those are the
+  person's own words, and the session notes in the post file are a summary
+  of them, not a replacement.
+- **It is discarded.** The person says so, and the directory goes, whole.
+- **It is left.** Nothing happens, which is the point. The directory stays
+  `state: open`, and the next consumer offers to resume or to discard it. No
+  timeout collects an interview: an unfinished conversation is not garbage.
+
+The directory is optional, and an instance driven from a terminal never grows
+one. Its absence is not a conformance gap. What it must not be is anything
+other than a directory: not a file, and above all not a symbolic link, at any
+level. An id addresses a directory inside the instance, and following a link
+out of one is how a discard leaves the instance.
 
 ## linkedin-page.md
 
