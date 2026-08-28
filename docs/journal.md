@@ -91,10 +91,15 @@ maintenant une ligne de sécurité. Le harnais de 5.5 n'est plus un confort.
 - `Verbatim.app` (construite par `scripts/macos-app.sh`, générique) : garde
   son propre clone du dépôt sous Application Support, `reset --hard
   origin/main` à chaque lancement, relance le serveur si la révision a
-  changé, ouvre le navigateur sur le port 8748 (le 8747 reste au dev).
-  Pousser sur GitHub est le processus de release. La clé se met dans
-  `~/.config/verbatim/env`, jamais dans l'instance. Installée et testée :
-  clone, install, page servie.
+  changé (moteur sur 127.0.0.1:8748, le 8747 reste au dev). Pousser sur
+  GitHub est le processus de release. La clé se met dans
+  `~/.config/verbatim/env`, jamais dans l'instance. D'abord livrée en
+  lanceur de navigateur, refaite en vraie app dans la même session sur
+  demande d'Alexis (`aaba7f3`) : une coquille WKWebView compilée au build
+  (`scripts/VerbatimShell.swift`), fenêtre propre, menu Edition pour le
+  copier-coller, liens externes rendus au navigateur, serveur éteint à la
+  fermeture. Installée et testée : clone, install, fenêtre au premier plan,
+  page servie.
 - La marque : une citation posée sur un trait de surligneur. Encre
   `#10151C`, marqueur `#F2E85C` (la couleur « prouve ça » du plan),
   guillemets serif en encre posés dessus. `assets/icon.svg` et
