@@ -1,20 +1,60 @@
-/* Verbatim. One deliberate look: warm paper, warm ink, a single saturated
-   ultramarine, square corners everywhere, no shadows. Serif for prose,
-   mono for anything that is data. Orange is reserved for the traceability
-   panel (a sentence with no anchor) and is not used for decoration. */
+/* Verbatim. One deliberate look, and the reasons are worth having in front of
+   whoever edits this file.
+
+   **Three typefaces, three speakers.** Serif is the person: a post, a quote of
+   theirs, a line of their corpus. The grotesque is the engine talking. Mono is
+   data, ids, figures, anything a machine produced. That rule is the strongest
+   device here and it costs nothing: it makes the promise of the product true
+   on screen instead of stated in a heading. No webfont, on purpose. This app
+   runs on somebody's machine, offline, and a font request would be the only
+   thing on the page that leaves it.
+
+   **A cold palette, one saturated accent.** Warm paper and warm ink were the
+   first pass and they read as generated, so they went. No pure neutral, no
+   second accent: the secondary is handled by the absence of colour, never by
+   another one. Every pair below is at 4.5:1 or better against its own
+   background, in both themes, and the figures are in the plan.
+
+   **The highlighter is the one exception, and it is a marker, not chrome.** A
+   claim of a post that nothing backs gets a wash of #F2E85C, the same wash in
+   both themes, because annotating somebody's text to say "prove this" is the
+   gesture this product is about. It is never used for decoration, a state, or
+   a hover.
+
+   Square corners everywhere, no shadow anywhere. One parti, held. */
 
 :root {
-  --paper: #f5f1e8;
-  --paper-2: #ece6d8;
-  --ink: #221e16;
-  --muted: #6b6353;
-  --line: #cdc4b0;
-  --accent: #223fbd;
-  --alarm: #a33111;
-  --ok: #2f6b2f;
+  --paper: #FBFCFD;
+  --paper-2: #EDF0F4;
+  --field: #F4F7FA;
+  --ink: #10151C;          /* 17.8:1 */
+  --muted: #58616E;        /* 6.1:1  */
+  --line: #D4DAE2;
+  --accent: #1B34C4;       /* 8.8:1  */
+  --alarm: #B4123F;        /* 6.6:1, a cold crimson: the orange is spent */
+  --ok: #17604A;           /* 7.3:1  */
+  --mark: #F2E85C;
+  --mark-ink: #10151C;     /* 14.4:1 on the wash, in both themes */
   --serif: "Iowan Old Style", "Palatino Nova", Palatino, "Book Antiqua", Georgia, serif;
   --sans: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
   --mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #10151C;
+    --paper-2: #171D26;
+    --field: #0B1017;
+    --ink: #E6EAF0;        /* 15.2:1 */
+    --muted: #98A3B3;      /* 7.2:1  */
+    --line: #2A323D;
+    --accent: #8AA0FF;     /* 7.5:1  */
+    --alarm: #FF8FA6;      /* 8.5:1  */
+    --ok: #5ED1A4;         /* 9.7:1  */
+    /* --mark and --mark-ink do not flip. The wash is the same yellow on both
+       themes and the ink laid on it stays dark, which is the only way it
+       reads as a marker somebody ran over the text rather than as a panel. */
+  }
 }
 
 * { box-sizing: border-box; }
@@ -86,13 +126,21 @@ body {
 
 /* ------------------------------------------------------------------ main */
 
-main {
-  padding: 2.25rem 3rem 4rem;
-  max-width: 72ch;
+/* The measure lives on what is read, not on the container. Prose stays at a
+   sane line length while the draft screen, the one with two columns, gets the
+   width its second column needs. */
+main { padding: 2.25rem 3rem 4rem; max-width: 74rem; }
+
+main > h1, main > h2, main > h3, main > p, main > ul, main > ol, main > dl,
+main > table, main > form, main > pre, main > .turns, main > .sheet,
+main > .engine, main > .gaps, main > .measure, main > noscript {
+  max-width: 68ch;
 }
 
-h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 1rem; }
-h2 { font-size: 1.15rem; margin: 2.25rem 0 0.75rem; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 1.25rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.2rem; margin: 3rem 0 0.75rem; }
+h3 { font-size: 0.95rem; font-family: var(--sans); font-weight: 700;
+     margin: 2rem 0 0.5rem; }
 
 a { color: var(--accent); }
 
@@ -176,7 +224,7 @@ textarea, input[type="text"], input[type="date"], input[type="number"] {
   width: 100%;
   border: 1px solid var(--ink);
   border-radius: 0;
-  background: #fffdf7;
+  background: var(--field);
   color: var(--ink);
   padding: 0.5rem 0.6rem;
 }
@@ -208,7 +256,7 @@ button:hover { background: var(--accent); border-color: var(--accent); }
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #fffdf7;
+  background: var(--field);
   border: 1px solid var(--line);
   padding: 1rem 1.25rem;
   overflow-x: auto;
@@ -224,10 +272,8 @@ button:hover { background: var(--accent); border-color: var(--accent); }
 }
 
 /* ------------------------------------------------------------- interview */
-/* Structure only. The palette pass is slice 5.5, with the two column screen
-   that justifies it. The one decision already taken and applied here: serif
-   is reserved for the person's own words, so everything the engine says is
-   in the grotesque or in mono. */
+/* Serif is reserved for the person's own words, so everything the engine says
+   is in the grotesque or in mono. */
 
 .engine { margin: 1.5rem 0; }
 .engine h2 { margin-top: 0; }
@@ -259,7 +305,7 @@ button:hover { background: var(--accent); border-color: var(--accent); }
 /* The validation sheet. Same rule as the turns: the lines meant to reach the
    post (the strong moment, the conviction, the first line proposals) are the
    person's material and sit in serif; the engine's restatement stays in the
-   grotesque. Structure only here too, the palette pass is slice 5.5. */
+   grotesque. */
 .sheet { margin: 1.75rem 0; border: 1px solid var(--line); padding: 1rem 1.25rem; }
 .sheet h2 { margin-top: 0; }
 .sheet-fields { margin: 1rem 0 0; }
@@ -295,3 +341,95 @@ button.quiet:hover { background: var(--alarm); color: var(--paper); border-color
 }
 .seed:hover { color: var(--accent); }
 .seed:hover .badge { border-color: var(--accent); }
+
+
+/* --------------------------------------------------------------- the draft */
+/* The screen this whole palette was held back for. Two columns, because the
+   post and what backs it are read against each other: a panel underneath the
+   text would be a report somebody scrolls to, and this one has to be the
+   thing they cannot miss. Below the breakpoint it stacks, post first. */
+
+.draft {
+  margin: 3.5rem 0 0;
+  border-top: 3px solid var(--ink);
+  padding-top: 1.25rem;
+}
+.draft h2 { margin-top: 0; }
+.draft > .hint, .draft > p, .draft > button { max-width: 68ch; }
+
+.draft-columns {
+  display: grid;
+  /* The post keeps a readable measure at the narrow end of the range;
+     the verdicts beside it are short and take the remainder. */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+  gap: 2.75rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+/* The post, in the person's typeface, at the size somebody reads a post at. */
+.post {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.post p { margin: 0 0 1rem; }
+
+/* The marker. A claim nothing backs gets the wash; a claim backed by a quote
+   that is not in the transcript gets the wash and a rule under it, because
+   an invented source is worse off than an honest silence. */
+mark.claim-unanchored, mark.claim-fabricated {
+  background: var(--mark);
+  color: var(--mark-ink);
+  padding: 0.05em 0.1em;
+}
+mark.claim-fabricated {
+  border-bottom: 2px solid var(--alarm);
+}
+
+.counts { color: var(--muted); }
+
+.problems { color: var(--alarm); padding-left: 1.1rem; }
+
+/* One anchor: the verdict, then the two texts it compares. The state is a
+   rule on the left of the list item, which is the one place in this design a
+   side border is allowed to mean something, since the whole list is verdicts
+   and nothing else. */
+.anchors { list-style: none; padding: 0; margin: 1rem 0 0; }
+.anchor {
+  border-left: 3px solid var(--line);
+  padding: 0 0 0 0.9rem;
+  margin: 0 0 1.5rem;
+}
+.anchor .badge { font-family: var(--mono); margin: 0 0 0.35rem; }
+.anchor .hint { margin: 0.1rem 0 0.5rem; font-size: 0.85rem; }
+.anchor dl { margin: 0; }
+.anchor dt { color: var(--muted); font-size: 0.72rem; margin-top: 0.6rem; }
+.anchor dd { margin: 0.1rem 0 0; overflow-wrap: anywhere; }
+.anchor .their-words { font-family: var(--serif); }
+
+.anchor-anchored { border-left-color: var(--ok); }
+.anchor-anchored .badge { border-color: var(--ok); color: var(--ok); }
+.anchor-fabricated { border-left-color: var(--alarm); }
+.anchor-fabricated .badge { background: var(--alarm); color: var(--paper);
+                            border-color: var(--alarm); }
+.anchor-dangling { border-left-color: var(--muted); }
+.anchor-dangling .badge { border-color: var(--muted); color: var(--muted); }
+
+.lint-findings { margin: 1.5rem 0 0; }
+.lint-findings h3 { margin-top: 0; }
+.lint-findings pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--field);
+  border: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+  .draft-columns { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+}

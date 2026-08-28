@@ -398,7 +398,12 @@ class Wire:
         raise NotImplementedError
 
     def payload(self, settings, system, messages, tools, *,
-                max_tokens) -> dict:
+                max_tokens, require: str = "") -> dict:
+        """The request body. `require` names the one tool this turn must
+        produce, and is the engine's only way of pointing a model at a tool
+        without writing it a sentence: a weak model that answers a validation
+        sheet in prose triggers no mechanism at all, and prose is exactly what
+        a weak model produces. Empty means the model chooses."""
         raise NotImplementedError
 
     def events(self, lines):
@@ -430,7 +435,8 @@ class AnthropicWire(Wire):
             found["x-api-key"] = settings.api_key
         return found
 
-    def payload(self, settings, system, messages, tools, *, max_tokens):
+    def payload(self, settings, system, messages, tools, *, max_tokens,
+                require: str = ""):
         body = {"model": settings.model, "max_tokens": max_tokens,
                 "stream": True, "messages": list(messages)}
         if system:
@@ -439,6 +445,8 @@ class AnthropicWire(Wire):
             body["tools"] = [{"name": t["name"],
                               "description": t.get("description", ""),
                               "input_schema": t["input_schema"]} for t in tools]
+            if require:
+                body["tool_choice"] = {"type": "tool", "name": require}
         return body
 
     def events(self, lines):
@@ -524,7 +532,8 @@ class OpenAIWire(Wire):
             found["Authorization"] = f"Bearer {settings.api_key}"
         return found
 
-    def payload(self, settings, system, messages, tools, *, max_tokens):
+    def payload(self, settings, system, messages, tools, *, max_tokens,
+                require: str = ""):
         body = {"model": settings.model, "max_tokens": max_tokens,
                 "stream": True,
                 "stream_options": {"include_usage": True},
@@ -535,6 +544,9 @@ class OpenAIWire(Wire):
                                            "description": t.get("description", ""),
                                            "parameters": t["input_schema"]}}
                              for t in tools]
+            if require:
+                body["tool_choice"] = {"type": "function",
+                                       "function": {"name": require}}
         return body
 
     def _messages(self, system, messages):

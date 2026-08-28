@@ -19,7 +19,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app.agent import ToolRefused  # noqa: E402
-from verbatim_app.tools import instance_tools  # noqa: E402
+from verbatim_app.interview import InterviewError  # noqa: E402
+from verbatim_app.tools import (  # noqa: E402
+    DRAFT_TOOL, SHEET_TOOL, draft_tool, instance_tools,
+)
 
 
 class ToolsCase(unittest.TestCase):
@@ -184,6 +187,43 @@ class TestPublishPlan(ToolsCase):
         plan = self.run_tool("publish_plan", text="A short post.")
         self.assertNotIn("hunter2-secret-value", plan)
         self.assertIn("[MY_API_KEY]", plan)
+
+
+class TestTheDraftTool(unittest.TestCase):
+    """The engine's half of the draft: offer, never decide. Bound to one
+    conversation, like the sheet tool, and it can no more archive a post
+    than the sheet tool can approve a sheet."""
+
+    def setUp(self):
+        self.offered = []
+
+        def write(arguments):
+            self.offered.append(arguments)
+        self.tool = draft_tool(write)
+
+    def test_it_is_named_the_way_the_wire_carries_it(self):
+        self.assertEqual(self.tool.name, DRAFT_TOOL)
+        self.assertNotEqual(DRAFT_TOOL, SHEET_TOOL)
+
+    def test_the_schema_asks_for_the_body_and_its_anchors(self):
+        schema = self.tool.input_schema
+        self.assertEqual(schema["required"], ["body"])
+        pair = schema["properties"]["anchors"]["items"]
+        self.assertEqual(sorted(pair["properties"]), ["post", "said"])
+
+    def test_an_offer_reaches_the_conversation(self):
+        answer = self.tool.run({"body": "Quatre mois pour rien.",
+                                "anchors": [{"post": "Quatre mois",
+                                             "said": "quatre mois"}]})
+        self.assertEqual(len(self.offered), 1)
+        self.assertEqual(self.offered[0]["body"], "Quatre mois pour rien.")
+        self.assertIsInstance(answer, str)
+
+    def test_a_refusal_reaches_the_model_as_a_tool_refusal(self):
+        def write(arguments):
+            raise InterviewError("the sheet is not approved yet")
+        with self.assertRaisesRegex(ToolRefused, "not approved"):
+            draft_tool(write).run({"body": "x"})
 
 
 if __name__ == "__main__":

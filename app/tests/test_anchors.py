@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app.anchors import (  # noqa: E402
-    Anchor, contains, split_output, uncovered, verify,
+    Anchor, contains, lines, split_output, uncovered, verify,
 )
 
 DRAFT = ("I sold my first audit before writing a single line of code.\n\n"
@@ -266,6 +266,22 @@ class TestUncovered(unittest.TestCase):
                           quote="il voulait le résultat"),)
         self.assertEqual(len(uncovered(DRAFT, anchors)), 2)
 
+    def test_a_fragment_that_swallows_the_claim_still_has_to_be_in_it(self):
+        """The case that hides if the draft side of the check goes missing.
+
+        A fragment longer than the claim contains it, so the coverage rule
+        would call the claim covered on that alone. It is the anchor that is
+        wrong here: it quotes a draft that was never written. Dropping the
+        `contains(draft, ...)` filter turns this dangling anchor into a claim
+        painted as anchored, and no other test in this file notices.
+        """
+        draft = "Le client a signe"
+        anchors = (Anchor(fragment="Le client a signe hier soir en fin de "
+                                   "journee",
+                          quote="il a signe hier soir"),)
+        self.assertEqual(uncovered(draft, anchors), ["Le client a signe"])
+        self.assertFalse(lines(draft, anchors)[0][0].covered)
+
     def test_no_anchors_means_every_sentence_is_uncovered(self):
         self.assertEqual(len(uncovered(DRAFT, ())), 2)
 
@@ -275,6 +291,38 @@ class TestUncovered(unittest.TestCase):
         verdicts = verify(DRAFT, anchors, TRANSCRIPT)
         self.assertEqual(verdicts[0].status, "dangling")
         self.assertFalse(verdicts[0].in_transcript)
+
+
+class TestLines(unittest.TestCase):
+    """The draft cut for a screen: one list per line, one piece per claim,
+    each piece carrying whether an anchor covers it. `uncovered` is derived
+    from this, so there is one coverage rule in the engine and not two."""
+
+    def test_a_covered_and_an_uncovered_piece_in_one_paragraph(self):
+        anchors = (Anchor(fragment="not for the tool",
+                          quote="il voulait le résultat"),)
+        drawn = lines("One. The client signed for the result, not for the "
+                      "tool.", anchors)
+        self.assertEqual([(piece.text, piece.covered) for piece in drawn[0]],
+                         [("One.", False),
+                          ("The client signed for the result, not for the "
+                           "tool.", True)])
+
+    def test_the_blank_line_between_paragraphs_survives(self):
+        drawn = lines(DRAFT, ())
+        self.assertEqual([len(row) for row in drawn], [1, 0, 1])
+
+    def test_every_word_of_the_draft_comes_back(self):
+        drawn = lines(DRAFT, ())
+        rebuilt = "\n".join(" ".join(piece.text for piece in row)
+                             for row in drawn)
+        self.assertEqual(rebuilt, DRAFT)
+
+    def test_uncovered_says_exactly_what_the_pieces_say(self):
+        anchors = split_output(BLOCK).anchors
+        from_pieces = [piece.text for row in lines(DRAFT, anchors)
+                       for piece in row if not piece.covered]
+        self.assertEqual(from_pieces, uncovered(DRAFT, anchors))
 
 
 if __name__ == "__main__":

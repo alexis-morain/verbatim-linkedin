@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 MARKER = "ANCHORS"
 
@@ -53,6 +53,27 @@ QUOTE_PAIRS = (('"', '"'), ("'", "'"), ("“", "”"), ("«", "»"), ("‘", "�
 
 
 @dataclass(frozen=True)
+class Piece:
+    """One claim of the draft, and which anchors cover it.
+
+    The positions rather than a bare flag, because a claim covered by a
+    fabricated quote is not a claim in good standing: whoever paints this
+    has to be able to ask what backs it, not only whether anything does.
+    `uncovered` asks the weaker question, which is the contract's.
+    """
+    text: str
+    #: The anchors covering this claim, themselves and not their positions:
+    #: a position would have to stay in step with a verdict list built
+    #: somewhere else, and two functions apart is exactly where that stops
+    #: being true.
+    by: tuple = ()
+
+    @property
+    def covered(self) -> bool:
+        return bool(self.by)
+
+
+@dataclass(frozen=True)
 class Anchor:
     fragment: str  # POST: a piece of the draft, copied exactly
     quote: str     # SAID: the interview sentence backing it, word for word
@@ -60,10 +81,17 @@ class Anchor:
 
 @dataclass(frozen=True)
 class Output:
-    """A model answer split into the draft and its anchors block."""
+    """A model answer split into the draft and its anchors block.
+
+    `block` says whether a block was found at all, which no other field can
+    answer: a block holding nothing readable and no block at all both come
+    back with empty anchors, and only one of the two is an answer somebody
+    meant as a draft.
+    """
     draft: str
     anchors: tuple
     problems: tuple
+    block: bool = False
 
 
 @dataclass(frozen=True)
@@ -87,15 +115,15 @@ def split_output(text: str) -> Output:
     No block means no anchors, which is an answer too: the caller sees an
     empty tuple and treats the whole draft as unanchored.
     """
-    lines = text.splitlines()
+    raw = text.splitlines()
     start = None
     passed_over = []
-    for index, line in enumerate(lines):
+    for index, line in enumerate(raw):
         kind = _marker(line)
         if kind == "exact":
             start = index
         elif kind == "decorated" and any(
-                STRAY.match(later.strip()) for later in lines[index + 1:]):
+                STRAY.match(later.strip()) for later in raw[index + 1:]):
             # A decorated spelling only counts when strictly readable
             # entries actually follow: a post is allowed to put the bare
             # word on a line of its own, prose below included, and eating
@@ -104,27 +132,27 @@ def split_output(text: str) -> Output:
         elif kind == "decorated":
             passed_over.append(index)
     if start is None:
-        problems = list(_strays(lines))
+        problems = list(_strays(raw))
         for index in passed_over:
             if any(RESIDUE.match(later.strip())
-                   for later in lines[index + 1:]):
+                   for later in raw[index + 1:]):
                 # Not read as a block, not passed over in silence either:
                 # the draft keeps every line, and the reader is told the
                 # marker shaped line left entry shaped residue behind it.
                 problems.append(
                     "a line that reads like an anchors marker is not "
                     "followed by readable entries: "
-                    f"{lines[index].strip()[:80]}")
+                    f"{raw[index].strip()[:80]}")
         return Output(draft=text, anchors=(), problems=tuple(problems))
-    draft = "\n".join(lines[:start]).rstrip()
-    anchors, problems = [], list(_strays(lines[:start]))
+    draft = "\n".join(raw[:start]).rstrip()
+    anchors, problems = [], list(_strays(raw[:start]))
     pending = None
     swallowed = False  # the last POST was already reported, eat its SAID
 
     def unpaired(fragment):
         problems.append(f"POST entry has no SAID quote: {fragment[:80]}")
 
-    for line in lines[start + 1:]:
+    for line in raw[start + 1:]:
         line = line.strip()
         if not line:
             continue
@@ -169,7 +197,7 @@ def split_output(text: str) -> Output:
     if pending is not None:
         unpaired(pending)
     return Output(draft=draft, anchors=tuple(anchors),
-                  problems=tuple(problems))
+                  problems=tuple(problems), block=True)
 
 
 def _marker(line: str):
@@ -186,14 +214,14 @@ def _marker(line: str):
     return "decorated" if bare.casefold() == "anchors" else None
 
 
-def _strays(lines) -> list:
+def _strays(raw) -> list:
     """Entry shaped lines sitting in the draft, outside any block. A marker
     the parser could not read leaves its entries stranded up here, and a
     stranded entry reported is a mangled block made visible instead of a
     post shipping with POST and SAID lines in its body."""
     return [f"entry shaped line outside the anchors block: "
             f"{line.strip()[:80]}"
-            for line in lines if STRAY.match(line.strip())]
+            for line in raw if STRAY.match(line.strip())]
 
 
 def _unquote(value: str) -> str:
@@ -240,31 +268,45 @@ def verify(draft: str, anchors, transcript: str) -> list:
 def sentences(draft: str) -> list:
     """The draft cut into rough sentences: line breaks first, then sentence
     punctuation. Rough is enough, this feeds a highlight, not a rewrite."""
+    return [piece.text for row in _rows(draft) for piece in row]
+
+
+def _rows(draft: str) -> list:
+    """The same cut, keeping the lines. A screen shows paragraphs, and a
+    draft flattened to a sentence list cannot be given back its shape."""
     found = []
     for line in draft.splitlines():
-        for piece in re.split(r"(?<=[.!?])\s+", line.strip()):
-            if piece.strip():
-                found.append(piece.strip())
+        found.append([Piece(text=piece.strip())
+                      for piece in re.split(r"(?<=[.!?])\s+", line.strip())
+                      if piece.strip()])
     return found
+
+
+def lines(draft: str, anchors) -> list:
+    """The draft as a screen shows it: one list per line, one piece per
+    claim, each piece saying whether an anchor covers it.
+
+    A claim is covered when a fragment that really is in the draft contains
+    it or sits inside it. A dangling fragment covers nothing, which is the
+    point of checking it against the draft first.
+
+    This is the one place coverage is decided. `uncovered` reads it rather
+    than deciding again: two implementations of the same rule drift, and the
+    direction they drift in is the one that flatters the engine.
+    """
+    fragments = [(anchor, normalize(anchor.fragment)) for anchor in anchors
+                 if anchorable(anchor.fragment)
+                 and contains(draft, anchor.fragment)]
+    drawn = []
+    for row in _rows(draft):
+        drawn.append([replace(piece, by=tuple(
+            anchor for anchor, fragment in fragments
+            if fragment in normalize(piece.text)
+            or normalize(piece.text) in fragment)) for piece in row])
+    return drawn
 
 
 def uncovered(draft: str, anchors) -> list:
-    """The unanchored claims: draft sentences no anchor fragment touches.
-
-    A sentence is covered when a fragment that really is in the draft
-    contains it or sits inside it. A dangling fragment covers nothing,
-    which is the point of checking it against the draft first.
-    """
-    fragments = [normalize(anchor.fragment) for anchor in anchors
-                 if anchorable(anchor.fragment)
-                 and contains(draft, anchor.fragment)]
-    found = []
-    for sentence in sentences(draft):
-        folded = normalize(sentence)
-        if not folded:
-            continue
-        if any(fragment in folded or folded in fragment
-               for fragment in fragments):
-            continue
-        found.append(sentence)
-    return found
+    """The unanchored claims: draft sentences no anchor fragment touches."""
+    return [piece.text for row in lines(draft, anchors)
+            for piece in row if not piece.covered]

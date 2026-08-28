@@ -141,6 +141,7 @@ rejects. Its keys:
 | `usage` | the running token total, input and output |
 | `spent` | dollars, accumulated turn by turn at the rate of the model that ran that turn. `null` once any turn had no price, and empty in the transcript front matter: a total that silently drops a turn is worse than no total, and applying today's rate to yesterday's turns is worse still |
 | `sheet` | the validation sheet, once the engine has proposed one. Absent until then, so an older reader sees a file it already knows |
+| `draft` | the post the engine wrote and the anchors it offered for it, once there is one. Absent until then, like `sheet` |
 | `messages` | the provider shaped message list, as it goes on the wire |
 
 It is rewritten after every step that changes the conversation, so what is on
@@ -174,6 +175,40 @@ the two timestamps (`proposed`, `approved`). Three rules:
   interview became a post and names the file. The sheet is not transcript
   either: it is the engine's restatement awaiting a decision, and the words
   it restates are already in the transcript.
+
+**`draft` is the post, and the anchors it claims for itself.** It appears once
+the engine has written one, which cannot happen before the sheet is approved:
+that guard is the sheet's whole purpose and this key is where it is paid.
+Four fields:
+
+| Field | What it says |
+|---|---|
+| `body` | the post as it would be published, signature block excluded: that one is concatenated from `profile.md`, never generated |
+| `anchors` | the pairs of `references/anchoring.md`, `post` for the claim and `said` for the interview sentence backing it, in the order the engine offered them |
+| `problems` | what was unreadable in the way this draft arrived, empty when it arrived structured |
+| `written` | timestamp, local time, seconds |
+
+Three rules, and the first is the one the screen is built on:
+
+- **No verdict is ever stored.** Anchored, unanchored, fabricated and dangling
+  are computed from `body`, `anchors` and the transcript every time somebody
+  looks. A stored verdict is a second source of truth that stops being true
+  the moment any of the three changes, and it would go stale in the direction
+  that flatters the engine.
+- **A new draft replaces the one before it.** Revisions are a free loop in the
+  skill, and a draft is not a decision anybody signed: the sheet is. What the
+  person keeps is kept by archiving it, which names a file under `posts/` and
+  closes the interview.
+- **A model can only offer a draft, exactly as it can only propose a sheet.**
+  The engine's tool writes this key and nothing else does.
+
+A draft normally arrives through that tool, one field per column above. A
+runtime that ignores a forced tool call, which local ones do, answers in prose
+instead, and the engine then reads the `ANCHORS` block out of the answer. That
+path is degraded on purpose and shows it: `body` then holds everything the
+model wrote before the block, hooks and notes included, so the panel marks
+sentences the post itself would never contain. Whatever could not be read
+lands in `problems` rather than in silence.
 
 `transcript.md` is rendered from `conversation.json` on every write and never
 parsed back. Its front matter carries `state` (`open` or `closed`), the

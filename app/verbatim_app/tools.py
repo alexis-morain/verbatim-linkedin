@@ -142,20 +142,34 @@ def _run(script: Path, args, stdin: str, cwd, environ,
             "try again, or with a shorter text") from None
 
 
-def _lint(bundle: Path, inst: Instance, arguments: dict, environ,
-          timeout: float) -> str:
-    body = _required(arguments, "body")
-    lang = _required(arguments, "lang")
+def lint_body(bundle_root, instance_root, body: str, lang: str, *,
+              environ=None, timeout: float = SUBPROCESS_TIMEOUT) -> str:
+    """The deterministic pass over a post body, the real `lib/lint.py`.
+
+    Public because the screen runs it too: the person's inline pass and the
+    model's tool have to be the same pass, or the findings somebody reads are
+    not the findings the engine answered to. The skill's rule holds on both
+    sides, it reports and the human decides.
+    """
+    environ = os.environ if environ is None else environ
+    bundle = Path(bundle_root)
     packs = available_langs(bundle)
     if lang not in packs:
         raise ToolRefused(f"there is no {lang!r} language pack; "
                           f"the packs are: {', '.join(packs)}")
     done = _run(bundle / "lib" / "lint.py", ["--lang", lang, "-"], body,
-                inst.root, environ, timeout)
+                instance_root, environ, timeout)
     answer = (done.stdout + ("\n" + done.stderr if done.stderr else "")).strip()
     if done.returncode not in (0, 1):
         raise ToolRefused(redact(answer, environ))
     return redact(answer, environ)
+
+
+def _lint(bundle: Path, inst: Instance, arguments: dict, environ,
+          timeout: float) -> str:
+    return lint_body(bundle, inst.root, _required(arguments, "body"),
+                     _required(arguments, "lang"), environ=environ,
+                     timeout=timeout)
 
 
 def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
@@ -169,7 +183,7 @@ def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
     return redact(done.stdout.strip(), environ)
 
 
-# -------------------------------------------------------------- the fifth one
+# ---------------------------------------------- the two that hold state
 
 SHEET_TOOL = "propose_sheet"
 
@@ -206,6 +220,55 @@ def sheet_tool(propose) -> Tool:
             },
             "required": ["angle", "elements", "moment", "conviction",
                          "first_lines"],
+        },
+        run=run)
+
+
+DRAFT_TOOL = "propose_draft"
+
+
+def draft_tool(write) -> Tool:
+    """The draft's tool, bound to one conversation the way `sheet_tool` is.
+
+    It offers a post and the anchors it claims for it, and that is all it can
+    do: archiving the draft into `posts/` is its own step, and the person's.
+    The engine points a model at this tool by requiring it for the turn
+    rather than by asking, since a model weak enough to answer in prose is
+    exactly the one the traceability panel exists for.
+    """
+    def run(arguments: dict) -> str:
+        try:
+            write(arguments)
+        except InterviewError as refusal:
+            raise ToolRefused(str(refusal)) from None
+        return ("the draft is on the person's screen, next to the anchors "
+                "it claims; they decide what happens to it")
+    return Tool(
+        name=DRAFT_TOOL,
+        description=(
+            "Put the post on the person's screen, with the anchors backing "
+            "it. 'body' is the post as it would be published, without the "
+            "signature block, which is concatenated from the profile and "
+            "never written here. Each anchor pairs 'post', a fragment of "
+            "the body copied exactly, with 'said', the interview sentence "
+            "backing it, quoted word for word in the language of the "
+            "interview. A claim nothing backs stays bare: bare is honest, "
+            "an invented quote is not."),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "body": {"type": "string"},
+                "anchors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"post": {"type": "string"},
+                                       "said": {"type": "string"}},
+                        "required": ["post", "said"],
+                    },
+                },
+            },
+            "required": ["body"],
         },
         run=run)
 

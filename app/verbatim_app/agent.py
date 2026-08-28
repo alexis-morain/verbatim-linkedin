@@ -121,16 +121,29 @@ class Agent:
         self.max_turns = max_turns
         self.usage = Usage()
 
-    def run(self, system: str, messages: list):
+    def run(self, system: str, messages: list, *, require: str = ""):
         """Drive the conversation to a stop, appending to `messages` as it goes.
 
         The caller owns the list, so a screen can persist it after any turn and
         pick the conversation back up from disk.
+
+        `require` names a tool the first request must produce. It is the
+        engine's only way of pointing a model at a tool without writing it a
+        sentence, and it applies to the first request alone: a requirement
+        left standing would have the model call the tool again on the very
+        turn that answers it, forever, at the person's expense.
         """
         declarations = [tool.declaration() for tool in self.tools.values()]
+        if require and require not in self.tools:
+            # Refused here rather than at the endpoint, where it is a 400 in
+            # the middle of a stream whose headers already left.
+            raise AgentError(
+                f"no tool called {require!r} to require; "
+                f"the tools are: {', '.join(sorted(self.tools)) or 'none'}")
         for turn in range(self.max_turns):
-            blocks, calls, stop = yield from self._turn(system, messages,
-                                                        declarations)
+            blocks, calls, stop = yield from self._turn(
+                system, messages, declarations,
+                require=require if turn == 0 else "")
             if not blocks:
                 # An empty content array is rejected on the next request, so a
                 # turn that produced nothing leaves nothing behind either.
@@ -160,11 +173,12 @@ class Agent:
         # written here would only ever be one of them.
         yield Step("ceiling", result=str(self.max_turns))
 
-    def _turn(self, system, messages, declarations):
+    def _turn(self, system, messages, declarations, *, require: str = ""):
         """One request. Yields as the answer arrives, returns what it held."""
         payload = self.wire.payload(self.settings, system=system,
                                     messages=messages, tools=declarations,
-                                    max_tokens=self.max_tokens)
+                                    max_tokens=self.max_tokens,
+                                    require=require)
         lines = self.transport(self.wire.url(self.settings),
                                self.wire.headers(self.settings), payload)
         text_parts, calls, stop = [], [], ""

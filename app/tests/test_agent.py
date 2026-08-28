@@ -467,5 +467,44 @@ class TestHttpTransport(unittest.TestCase):
         self.assertIn("invalid key", str(caught.exception))
 
 
+class TestARequiredTool(unittest.TestCase):
+    """The engine's only way of pointing a model at a tool without writing
+    it a sentence. A weak model answers a validation sheet in prose and
+    triggers nothing; a required tool leaves it no prose to write."""
+
+    def test_the_first_request_carries_the_requirement(self):
+        transport = Replay(asks(("toolu_1", "read_instance", {"name": "voice.md"})),
+                           says("Done."))
+        list(Agent(ANTHROPIC, tools=[echo_tool()], transport=transport)
+             .run("The step.", user("hello"), require="read_instance"))
+        self.assertEqual(transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "read_instance"})
+
+    def test_the_requirement_is_dropped_after_the_first_request(self):
+        # A requirement left in place is an infinite loop: the tool answers,
+        # the model is required to call it again, and the person pays for
+        # every round of it.
+        transport = Replay(asks(("toolu_1", "read_instance", {"name": "voice.md"})),
+                           says("Done."))
+        list(Agent(ANTHROPIC, tools=[echo_tool()], transport=transport)
+             .run("The step.", user("hello"), require="read_instance"))
+        self.assertNotIn("tool_choice", transport.calls[1]["payload"])
+
+    def test_nothing_is_required_by_default(self):
+        transport = Replay(says("Hello."))
+        list(Agent(ANTHROPIC, tools=[echo_tool()], transport=transport)
+             .run("The step.", user("hello")))
+        self.assertNotIn("tool_choice", transport.calls[0]["payload"])
+
+    def test_a_run_that_requires_an_unknown_tool_is_refused_here(self):
+        # Not at the endpoint, where it is a 400 mid stream with the headers
+        # already gone. A name this loop cannot serve is a bug in the caller.
+        transport = Replay(says("Hello."))
+        agent = Agent(ANTHROPIC, tools=[echo_tool()], transport=transport)
+        with self.assertRaises(AgentError):
+            list(agent.run("The step.", user("hello"), require="no_such_tool"))
+        self.assertEqual(transport.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2 if "-v" in sys.argv else 1)

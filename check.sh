@@ -51,18 +51,20 @@ prose="$(grep -rnoE '(^|[^_[:alnum:]])detail=[^,)]*' app/verbatim_app/routes --i
          | grep -vE 'detail="[a-z0-9-]+"$' || true)"
 if [ -z "$prose" ]; then ok "clean"; else bad "prose in an error detail:"; echo "$prose" | sed 's/^/     /'; fi
 
-step "the interview screen's script parses"
-# The one file in this bundle with no test behind it. A syntax check is not a
-# test and is not pretended to be one: it catches the edit that breaks every
-# scenario at once, and nothing finer. See docs/journal.md.
+step "the interview screen's script"
+# It carries security: the lines that move a sheet digest into the approval
+# form, and the ones that decide a turn is over. Node's own test runner over a
+# hand written DOM, no npm and no node_modules in a Python repository.
 if command -v node >/dev/null 2>&1; then
-  if node --check app/verbatim_app/static/interview.js >/dev/null 2>&1; then
-    ok "interview.js"
+  if node --test app/tests/interview.test.js >/dev/null 2>&1; then
+    ok "app/tests/interview.test.js"
   else
-    bad "interview.js"; node --check app/verbatim_app/static/interview.js 2>&1 | sed 's/^/     /'
+    bad "app/tests/interview.test.js"
+    node --test app/tests/interview.test.js 2>&1 | tail -20 | sed 's/^/     /'
   fi
 else
-  printf '   skip node not installed, interview.js was not parsed\n'
+  # announced degradation, not a silent pass
+  printf '   skip node not installed, the screen script was not tested\n'
 fi
 
 step "language packs"

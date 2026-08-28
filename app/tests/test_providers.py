@@ -467,6 +467,28 @@ class TestAnthropicWire(unittest.TestCase):
                                  max_tokens=10)
         self.assertNotIn("tools", body)
 
+    def test_a_required_tool_is_named_in_the_body(self):
+        # The mechanism that replaces asking a model nicely: the app says
+        # which tool this turn produces, in the wire's own words.
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[READ_TOOL], max_tokens=10,
+                                 require="read_instance")
+        self.assertEqual(body["tool_choice"],
+                         {"type": "tool", "name": "read_instance"})
+
+    def test_no_choice_key_when_nothing_is_required(self):
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[READ_TOOL], max_tokens=10)
+        self.assertNotIn("tool_choice", body)
+
+    def test_a_required_tool_without_tools_is_not_sent(self):
+        # A choice naming a tool the body does not declare is a 400 on every
+        # endpoint. Dropping the key beats sending a request nobody accepts.
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[], max_tokens=10,
+                                 require="read_instance")
+        self.assertNotIn("tool_choice", body)
+
     def test_text_deltas_arrive_in_order_with_usage_and_stop(self):
         events = list(self.wire.events(ANTHROPIC_TEXT))
         text = "".join(e.text for e in events if e.kind == "text")
@@ -570,6 +592,25 @@ class TestOpenAIWire(unittest.TestCase):
         body = self.wire.payload(self.settings, system="s", messages=[], tools=[],
                                  max_tokens=10)
         self.assertEqual(body["stream_options"], {"include_usage": True})
+
+    def test_a_required_tool_is_named_as_a_function(self):
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[READ_TOOL], max_tokens=10,
+                                 require="read_instance")
+        self.assertEqual(
+            body["tool_choice"],
+            {"type": "function", "function": {"name": "read_instance"}})
+
+    def test_no_choice_key_when_nothing_is_required(self):
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[READ_TOOL], max_tokens=10)
+        self.assertNotIn("tool_choice", body)
+
+    def test_a_required_tool_without_tools_is_not_sent(self):
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[], max_tokens=10,
+                                 require="read_instance")
+        self.assertNotIn("tool_choice", body)
 
     def test_a_tool_definition_is_wrapped_as_a_function(self):
         body = self.wire.payload(self.settings, system="s", messages=[], tools=[READ_TOOL],

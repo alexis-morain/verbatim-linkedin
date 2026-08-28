@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app import interview  # noqa: E402
+from verbatim_app.anchors import Anchor  # noqa: E402
 from verbatim_app.providers import Usage  # noqa: E402
 from verbatim_app.skills import system_block  # noqa: E402
 
@@ -986,6 +987,191 @@ class TestAMangledSheetOnDisk(InterviewCase):
     def test_an_explicit_null_reads_as_no_sheet(self):
         name = self.mangle()
         self.assertIsNone(interview.load(self.root, name).sheet)
+
+
+DRAFT = {"body": "Quatre mois pour rien.\n\nLe canal direct est le seul "
+                 "qui paie.",
+         "anchors": [{"post": "Le canal direct est le seul qui paie.",
+                      "said": "le canal direct est le seul qui paie"}]}
+
+
+def offer(**kwargs):
+    fields = dict(DRAFT)
+    fields.update(kwargs)
+    return fields
+
+
+def approved(root):
+    """An interview whose sheet is signed: the only state a draft is
+    written from."""
+    conversation = started(root)
+    interview.say(conversation, "le canal direct est le seul qui paie")
+    interview.propose(conversation, proposal(), now=WHEN)
+    interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+    return conversation
+
+
+class TestTheDraft(InterviewCase):
+    """The post the engine wrote, and the anchors it claims for it. The
+    engine offers, the disk keeps, and no verdict is ever stored: the panel
+    recomputes them from the body, the anchors and the transcript."""
+
+    def test_an_offer_lands_on_the_conversation(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        draft = conversation.draft
+        self.assertEqual(draft.body, DRAFT["body"])
+        self.assertEqual(draft.anchors,
+                         (Anchor(fragment=DRAFT["anchors"][0]["post"],
+                                 quote=DRAFT["anchors"][0]["said"]),))
+        self.assertEqual(draft.problems, ())
+        self.assertEqual(draft.written, "2026-08-28T14:41:02")
+
+    def test_nothing_is_drafted_before_the_sheet_is_approved(self):
+        conversation = started(self.root)
+        with self.assertRaisesRegex(interview.InterviewError, "approved"):
+            interview.write(conversation, offer())
+        self.assertIsNone(conversation.draft)
+        interview.propose(conversation, proposal(), now=WHEN)
+        with self.assertRaisesRegex(interview.InterviewError, "approved"):
+            interview.write(conversation, offer())
+        self.assertIsNone(conversation.draft)
+
+    def test_a_closed_interview_takes_no_draft(self):
+        conversation = approved(self.root)
+        conversation.state = interview.CLOSED
+        with self.assertRaises(interview.InterviewError):
+            interview.write(conversation, offer())
+
+    def test_a_new_draft_replaces_the_one_before_it(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=WHEN)
+        interview.write(conversation, offer(body="Autre chose."), now=LATER)
+        self.assertEqual(conversation.draft.body, "Autre chose.")
+        self.assertEqual(conversation.draft.written, "2026-08-28T14:41:02")
+
+    def test_the_draft_round_trips_through_the_disk(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.draft, conversation.draft)
+
+    def test_no_draft_means_no_key_on_disk(self):
+        conversation = approved(self.root)
+        interview.save(self.root, conversation, now=LATER)
+        raw = json.loads((self.directory(conversation)
+                          / interview.CONVERSATION).read_text(encoding="utf-8"))
+        self.assertNotIn("draft", raw)
+
+    def test_a_body_that_is_not_a_non_empty_string_is_refused(self):
+        for wrong in ("", "   ", None, 3, ["a"]):
+            conversation = approved(self.root)
+            with self.assertRaises(interview.InterviewError):
+                interview.write(conversation, offer(body=wrong))
+            self.assertIsNone(conversation.draft)
+
+    def test_anchors_are_optional_because_a_bare_claim_is_honest(self):
+        # anchoring.md: a claim with nothing to back it stays bare. An engine
+        # that refused an empty block would be asking for a decoration.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(anchors=[]), now=LATER)
+        self.assertEqual(conversation.draft.anchors, ())
+
+    def test_a_malformed_anchor_is_refused_rather_than_half_read(self):
+        for wrong in ("not a list", [{"post": "x"}], [{"said": "y"}],
+                      [{"post": 3, "said": "y"}], ["POST: x"], [None]):
+            conversation = approved(self.root)
+            with self.assertRaises(interview.InterviewError):
+                interview.write(conversation, offer(anchors=wrong))
+            self.assertIsNone(conversation.draft)
+
+    def test_the_problems_of_a_prose_answer_travel_with_the_draft(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(),
+                        problems=["ANCHORS was mangled"], now=LATER)
+        self.assertEqual(conversation.draft.problems, ("ANCHORS was mangled",))
+
+    def test_a_model_cannot_write_the_problems_of_its_own_reception(self):
+        # The panel heads this list with what the engine failed to read. A
+        # model that could fill it would be narrating its own arrival.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(problems=["nothing went wrong"]),
+                        now=LATER)
+        self.assertEqual(conversation.draft.problems, ())
+
+    def test_a_mangled_draft_on_disk_is_refused_whole(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        path = self.directory(conversation) / interview.CONVERSATION
+        for wrong in ("not a map", {"body": 3, "anchors": []},
+                      {"body": "ok", "anchors": [{"post": "a"}]},
+                      {"body": "ok", "anchors": "no"},
+                      {"body": "ok", "anchors": [], "problems": [3]}):
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw["draft"] = wrong
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            with self.assertRaises(interview.InterviewError):
+                interview.load(self.root, conversation.id)
+
+
+class TestTheDraftingStep(InterviewCase):
+    """What a drafting turn is handed. Not the interview's own message list:
+    a fresh request built from the material, which is what the skill asks
+    for when it says a revision restarts from the interview every time."""
+
+    def test_the_named_sections_exist_in_the_shipped_skill(self):
+        block = system_block(REPO, interview.STEP_SKILL, "fr",
+                             output_lang="en",
+                             sections=interview.DRAFT_SECTIONS)
+        self.assertIn("The signature block is not generated", block.text)
+
+    def test_the_material_is_the_interview_and_the_signed_sheet(self):
+        conversation = approved(self.root)
+        conversation.messages.insert(0, assistant("Qu'est-ce qui a changé ?"))
+        material = interview.material(conversation)
+        self.assertIn("Qu'est-ce qui a changé ?", material)
+        self.assertIn("le canal direct est le seul qui paie", material)
+        self.assertIn(SHEET["angle"], material)
+        self.assertIn("first_lines", material)
+
+    def test_the_material_carries_no_front_matter(self):
+        # It is the interview as a reader meets it, not the file: a token
+        # count and a price are not material anybody writes a post from.
+        material = interview.material(approved(self.root))
+        self.assertFalse(material.startswith("---"))
+        self.assertNotIn("output_tokens", material)
+
+    def test_there_is_no_material_before_the_sheet_is_signed(self):
+        conversation = started(self.root)
+        interview.say(conversation, "quelque chose")
+        with self.assertRaisesRegex(interview.InterviewError, "approved"):
+            interview.material(conversation)
+
+
+class TestWhatTheDraftIsCheckedAgainst(InterviewCase):
+    """The verdicts are not state. They are read off the body, the anchors
+    and what the person said, every single time somebody looks."""
+
+    def test_the_transcript_side_is_what_the_person_said_and_only_that(self):
+        conversation = approved(self.root)
+        conversation.messages.append(
+            assistant("le canal direct est le seul qui paie, non ?"))
+        interview.say(conversation, "oui")
+        interview.write(conversation, offer(), now=LATER)
+        # The quote is in the engine's question too. Reading the engine's
+        # side as a source would let a model anchor on its own words.
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["anchored"])
+        conversation.messages[0]["content"][0]["text"] = "autre chose"
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["fabricated"])
+
+    def test_no_draft_means_nothing_to_check(self):
+        self.assertEqual(interview.checked(approved(self.root)), [])
 
 
 if __name__ == "__main__":

@@ -80,6 +80,12 @@
 {% if conversation.state == 'open' and sheet and sheet.state == 'approved' %}
 <p class="empty">{{ t('interview.sheet_closed_notice') }}</p>
 {% elif conversation.state == 'open' %}
+{# Asking for the sheet is the person's call: they are the one who knows the
+   interview has enough material. The turn behind this button requires the
+   tool, which is what makes the mechanism fire on a model that would
+   otherwise answer the sheet in prose. #}
+<p class="hint">{{ t('interview.sheet_ask_hint') }}</p>
+<button type="button" id="ask-sheet" data-url="/interview/{{ conversation.id }}/sheet/propose">{{ t('interview.sheet_ask') }}</button>
 <p class="callout" id="awaiting"{% if not awaiting %} hidden{% endif %}>{{ t('interview.awaiting') }}</p>
 <button type="button" id="resume"{% if not awaiting %} hidden{% endif %}>{{ t('interview.resume') }}</button>
 <form id="say" method="post" action="/interview/{{ conversation.id }}/turn">
@@ -90,6 +96,76 @@
 <noscript><p class="degraded">{{ t('interview.needs_js') }}</p></noscript>
 {% else %}
 <p class="empty">{{ t('interview.closed_notice', post=conversation.post) }}</p>
+{% endif %}
+
+{% if sheet and sheet.state == 'approved' %}
+<section class="draft" id="draft">
+  <h2>{{ t('interview.draft') }}</h2>
+  <p class="hint">{{ t('interview.draft_hint') }}</p>
+  {% if conversation.state == 'open' %}
+  <button type="button" id="write-draft" data-url="/interview/{{ conversation.id }}/draft">{{ t('interview.draft_rewrite')
+    if trace else t('interview.draft_write') }}</button>
+  {% endif %}
+  {% if not trace %}
+  <p class="empty">{{ t('interview.draft_none') }}</p>
+  {% else %}
+  <p class="hint mono">{{ t('interview.draft_written', stamp=trace.written) }}</p>
+  <div class="draft-columns">
+  <div class="draft-post">
+
+  {# The post in the person's own typeface, with every claim no anchor backs
+     marked in it. The marking is decided server side, in anchors.lines, so a
+     reload and a live frame paint the same verdict. #}
+  <article class="post their-words">
+    {% for row in trace.lines %}{% if row %}<p>{% for piece in row %}{% if piece.status == 'anchored' %}{{ piece.text }}{% else %}<mark class="claim-{{ piece.status }}" title="{{ t('interview.anchor_' ~ piece.status ~ '_hint') }}">{{ piece.text }}</mark>{% endif %} {% endfor %}</p>{% endif %}{% endfor %}
+  </article>
+
+  <form method="post" action="/interview/{{ conversation.id }}/draft/lint">
+    <p class="hint">{{ t('interview.lint_hint') }}</p>
+    <button type="submit">{{ t('interview.lint_run') }}</button>
+  </form>
+  {% if findings %}
+  <section class="lint-findings" id="lint-findings">
+    <h3>{{ t('interview.lint_findings') }}</h3>
+    {% if lint_failed %}<p class="callout">{{ t('interview.lint_failed') }}</p>{% endif %}
+    <pre class="mono">{{ findings }}</pre>
+  </section>
+  {% endif %}
+
+  </div>
+  <div class="draft-trace">
+  <h3>{{ t('interview.trace') }}</h3>
+  <p class="hint">{{ t('interview.trace_hint') }}</p>
+  <p class="mono counts">{{ t('interview.trace_counts', **trace.counts) }}</p>
+  {% if trace.problems %}
+  <p class="hint">{{ t('interview.trace_problems') }}</p>
+  <ul class="problems mono">
+    {% for problem in trace.problems %}<li>{{ problem }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if not trace.verdicts %}
+  <p class="callout">{{ t('interview.trace_none') }}</p>
+  {% elif not trace.counts.unanchored and trace.counts.anchored == trace.verdicts|length %}
+  <p class="callout">{{ t('interview.trace_clean') }}</p>
+  {% endif %}
+  <ul class="anchors">
+    {% for verdict in trace.verdicts %}
+    <li class="anchor anchor-{{ verdict.status }}">
+      <p class="badge mono">{{ t('interview.anchor_' ~ verdict.status) }}</p>
+      <p class="hint">{{ t('interview.anchor_' ~ verdict.status ~ '_hint') }}</p>
+      <dl>
+        <dt class="mono">{{ t('interview.trace_post') }}</dt>
+        <dd class="their-words">{{ verdict.post }}</dd>
+        <dt class="mono">{{ t('interview.trace_said') }}</dt>
+        <dd class="their-words">{{ verdict.said }}</dd>
+      </dl>
+    </li>
+    {% endfor %}
+  </ul>
+  </div>
+  </div>
+  {% endif %}
+</section>
 {% endif %}
 
 {% if bank and bank.angles %}

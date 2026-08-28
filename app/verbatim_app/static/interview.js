@@ -24,9 +24,12 @@
   var T = JSON.parse(strings.textContent);
   var box = form ? document.getElementById("text") : null;
   var button = form ? form.querySelector("button") : null;
+  var ask = document.getElementById("ask-sheet");
+  var write = document.getElementById("write-draft");
   var current = null;
   var pending = null;   /* what was typed, until the turn is known to be real */
   var committed = false;  /* whether this turn's words reached disk */
+  var landed = false;   /* whether this turn put a draft on the conversation */
 
   function fill(text, values) {
     return String(text).replace(/\{(\w+)\}/g, function (whole, key) {
@@ -95,6 +98,12 @@
     current = null;
     if (frame.kind === "sheet") {
       sheet(frame);
+    } else if (frame.kind === "draft") {
+      /* Noted, not painted. The panel is a server rendering, marks and
+         verdicts included, and painting a second one here would be a second
+         implementation of the thing this product is named after. The stream
+         is left to finish, then the page is asked again. */
+      landed = true;
     } else if (frame.kind === "tool_call") {
       note(T.tool_call + " " + frame.name + " "
            + JSON.stringify(frame.arguments));
@@ -216,17 +225,29 @@
     run(text);
   }
 
+  function busy(yes) {
+    [box, button, again, ask, write].forEach(function (node) {
+      if (node) { node.disabled = yes; }
+    });
+  }
+
   function run(text) {
     /* An empty body is a resume: the words are already on disk and the model
        still owes a reply, so there is nothing to show and nothing to clear. */
-    box.disabled = true;
-    button.disabled = true;
-    if (again) { again.disabled = true; }
+    return stream(form.action, text);
+  }
+
+  function stream(url, text, reload) {
+    /* One turn, whichever button started it. The three of them differ by
+       where they post and by what the server does with it; a screen that
+       carried three copies of this would grow three ways of failing. */
+    busy(true);
     pending = text ? text : null;
     committed = false;
+    landed = false;
     current = null;   /* a cut answer must not swallow the next one */
     var waiting = note(T.thinking);
-    fetch(form.action, {
+    return fetch(url, {
       method: "POST",
       headers: {"content-type": "application/x-www-form-urlencoded"},
       body: new URLSearchParams({text: text}).toString()
@@ -242,10 +263,16 @@
       if (committed) { owing(true); }
     }).then(function () {
       pending = null;
-      box.disabled = false;
-      button.disabled = false;
-      if (again) { again.disabled = false; }
-      box.focus();
+      if (reload && landed) {
+        /* Asked again rather than patched: what came back is a whole panel,
+           and the server is the one that decides what backs what. The reload
+           happens at the end of the stream and never inside it, so nothing
+           the person paid for is cut off mid turn. */
+        location.reload();
+        return;
+      }
+      busy(false);
+      if (box) { box.focus(); }
     });
   }
 
@@ -268,6 +295,20 @@
   if (again) {
     again.addEventListener("click", function () {
       run("");
+    });
+  }
+
+  if (ask) {
+    /* The person decides the interview has enough material in it. The turn
+       behind this requires the tool rather than asking for it, which is what
+       makes the sheet happen on a model that would otherwise write about it. */
+    ask.addEventListener("click", function () {
+      stream(ask.getAttribute("data-url"), "");
+    });
+  }
+  if (write) {
+    write.addEventListener("click", function () {
+      stream(write.getAttribute("data-url"), "", true);
     });
   }
 

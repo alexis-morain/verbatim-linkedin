@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .anchors import Anchor, verify
 from .instance import atomic_write
 from .providers import Usage
 
@@ -66,6 +67,13 @@ SAID, ASKED, CALL, RESULT = "said", "asked", "call", "result"
 STEP_SKILL = "linkedin-post"
 STEP_SECTIONS = ("Before anything", "The interview",
                  "The break: format and angle", "The validation sheet")
+
+#: The step that writes. Its own list, because drafting is its own request:
+#: the skill says a revision restarts from the interview material rather than
+#: rewriting blind, so the engine builds that request from `material` every
+#: time instead of appending to the conversation the questions happened in.
+DRAFT_SECTIONS = ("Before anything", "Writing", "The deterministic pass",
+                  "Hard rules")
 
 #: The contract's name format, and the whole path guard: an id that is not a
 #: timestamp cannot address anything, inside this directory or out of it.
@@ -123,6 +131,23 @@ class Sheet:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
+@dataclass(frozen=True)
+class Draft:
+    """The post the engine wrote, and the anchors it claims for it.
+
+    No verdict is stored beside them. Anchored, fabricated and dangling are
+    read off `body`, `anchors` and the transcript by `checked`, every time
+    somebody looks: a stored verdict stops being true the moment any of the
+    three moves, and it goes stale in the direction that flatters the engine.
+    """
+    body: str
+    anchors: tuple = ()
+    #: What could not be read in the way this draft arrived. Empty when it
+    #: came through the tool; a runtime that answered in prose fills it.
+    problems: tuple = ()
+    written: str = ""
+
+
 @dataclass
 class Conversation:
     id: str
@@ -143,6 +168,7 @@ class Conversation:
     #: yesterday's turns is worse still.
     spent: float | None = 0.0
     sheet: Sheet | None = None
+    draft: Draft | None = None
     messages: list = field(default_factory=list)
 
     # -- what the person said, and nothing else
@@ -377,6 +403,108 @@ def sheet_approved(conversation: Conversation) -> bool:
             and conversation.sheet.state == APPROVED)
 
 
+def _anchor_pairs(arguments: dict) -> tuple:
+    """The anchors of a proposal, refused whole rather than half read.
+
+    An empty list is fine and is not a slip: `references/anchoring.md` says a
+    claim with nothing to back it stays bare, and an engine that demanded a
+    pair per claim would be asking a weak model to decorate.
+    """
+    entries = arguments.get("anchors", [])
+    if not isinstance(entries, list):
+        raise InterviewError(
+            "'anchors' is a list of {post, said} pairs, or absent")
+    found = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise InterviewError("each anchor is a {post, said} pair")
+        fragment, quote = entry.get("post"), entry.get("said")
+        if not isinstance(fragment, str) or not fragment.strip() \
+                or not isinstance(quote, str) or not quote.strip():
+            raise InterviewError(
+                "each anchor needs 'post', a fragment of the draft, and "
+                "'said', the interview sentence backing it, both non-empty")
+        found.append(Anchor(fragment=fragment.strip(), quote=quote.strip()))
+    return tuple(found)
+
+
+def write(conversation: Conversation, arguments: dict, *, problems=(),
+          now: datetime | None = None) -> Draft:
+    """The engine's draft, offered the way the sheet is proposed.
+
+    Refused before the sheet is approved, which is the whole point of the
+    sheet: the skill says nothing is written until it is signed, and this is
+    where that sentence becomes a machine. Raised messages address the model,
+    since they travel back as the tool result.
+
+    `problems` is the caller's, never the model's, and it is a keyword for
+    that reason alone. It says what could not be read in the way this draft
+    arrived, so a model that could write it would be narrating its own
+    reception, in a panel headed by what the engine failed to understand.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            "this interview is closed; nothing about it changes any more")
+    if not sheet_approved(conversation):
+        raise InterviewError(
+            "the validation sheet of this interview is not approved yet, so "
+            "nothing is drafted; propose a sheet and wait for the person")
+    body = arguments.get("body")
+    if not isinstance(body, str) or not body.strip():
+        raise InterviewError(
+            "the draft needs 'body', the post as it would be published")
+    draft = Draft(body=body.strip(), anchors=_anchor_pairs(arguments),
+                  problems=tuple(problems),
+                  written=(now or datetime.now()).strftime(STAMP))
+    conversation.draft = draft
+    return draft
+
+
+def material(conversation: Conversation) -> str:
+    """What a drafting turn is handed: the interview as a human reads it,
+    then the sheet the person signed.
+
+    Both are state, rendered. Neither is an instruction: what to do with them
+    is the skill's `Writing` section, loaded from the bundle like every other
+    word this engine sends.
+
+    This is handed over as one fresh user message rather than by continuing
+    the interview's own message list, and that is the point. A message the
+    engine wrote into that list would be credited to the person by `timeline`,
+    which is the anchoring source: a model could then anchor a claim on text
+    the engine put in its mouth. The material travels, the source does not
+    move.
+    """
+    if not sheet_approved(conversation):
+        raise InterviewError(
+            f"the sheet of {conversation.id} is not approved, so there is "
+            "nothing to draft from")
+    sheet = conversation.sheet
+    parts = [f"## {heading}\n\n{_not_a_heading(text.strip())}"
+             for heading, text in _sides(conversation)]
+    # The sheet's own keys, the ones its tool declares. Structure, not prose:
+    # a label written here would be a label in one language on every screen.
+    parts.append("## Sheet\n\n" + json.dumps(
+        {"angle": sheet.angle, "elements": list(sheet.elements),
+         "moment": sheet.moment, "conviction": sheet.conviction,
+         "first_lines": list(sheet.first_lines), "state": sheet.state},
+        ensure_ascii=False, indent=2))
+    return "\n\n".join(parts)
+
+
+def checked(conversation: Conversation) -> list:
+    """The verdict on every anchor of the current draft, computed now.
+
+    The transcript side is `said()` and nothing else: the engine's own
+    questions and every tool result stay out of it, or a model could satisfy
+    anchoring by quoting the question it just asked.
+    """
+    if conversation.draft is None:
+        return []
+    return verify(conversation.draft.body, conversation.draft.anchors,
+                  conversation.said())
+
+
 def start(instance_root, *, skill: str, sections, interface_language: str,
           output_language: str, provider: str, model: str,
           now: datetime | None = None) -> Conversation:
@@ -548,6 +676,16 @@ def _as_json(conversation: Conversation) -> str:
             "proposed": sheet.proposed,
             "approved": sheet.approved,
         }
+    if conversation.draft is not None:
+        # Absent until there is one, exactly like `sheet` above.
+        draft = conversation.draft
+        data["draft"] = {
+            "body": draft.body,
+            "anchors": [{"post": anchor.fragment, "said": anchor.quote}
+                        for anchor in draft.anchors],
+            "problems": list(draft.problems),
+            "written": draft.written,
+        }
     data["messages"] = conversation.messages
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -618,6 +756,7 @@ def _build(data: dict, interview_id: str) -> Conversation:
                     int(usage.get("output_tokens") or 0)),
         spent=spent,
         sheet=_check_sheet(data.get("sheet")),
+        draft=_check_draft(data.get("draft")),
         messages=data["messages"])
 
 
@@ -652,6 +791,34 @@ def _check_sheet(data) -> Sheet | None:
         state=data["state"],
         proposed=str(data.get("proposed", "")),
         approved=str(data.get("approved", "")))
+
+
+def _check_draft(data) -> Draft | None:
+    """The draft, refused when it does not hold one.
+
+    Refused whole rather than half read, like the sheet: a body that is not a
+    string reaches the screen that paints it, and an anchor missing its quote
+    would silently become a claim backed by nothing.
+    """
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("draft")
+    if not isinstance(data.get("body"), str) or not data["body"].strip():
+        raise ValueError("draft")
+    if not isinstance(data.get("written", ""), str):
+        raise ValueError("draft")
+    problems = data.get("problems", [])
+    if not isinstance(problems, list) or not all(
+            isinstance(entry, str) for entry in problems):
+        raise ValueError("draft")
+    try:
+        anchors = _anchor_pairs(data)
+    except InterviewError:
+        raise ValueError("draft") from None
+    return Draft(body=data["body"], anchors=anchors,
+                 problems=tuple(problems),
+                 written=str(data.get("written", "")))
 
 
 def _check_message(message) -> None:

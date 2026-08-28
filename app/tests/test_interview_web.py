@@ -31,7 +31,7 @@ CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
 #: Codes an SSE frame carries. They get an `error_` sentence, not a
 #: `refused_` one, and TestEveryCodeHasASentence covers them separately.
 FRAME_CODES = {"turn-running", "closed", "gone", "engine-failed",
-               "bundle-broken", "sheet-approved"}
+               "bundle-broken", "sheet-approved", "sheet-not-approved"}
 
 
 def frames(text: str) -> list:
@@ -1378,7 +1378,7 @@ class TestEveryCodeHasASentence(WebCase):
 
     CODES = ("turn-running", "closed", "not-configured", "nothing-to-send",
              "gone", "engine-failed", "bundle-broken", "sheet-approved",
-             "unknown")
+             "sheet-not-approved", "unknown")
     REFUSALS = ("secrets-in-instance", "credential-in-endpoint",
                 "endpoint-in-clear", "endpoint-untrusted", "engine-refused",
                 "interviews-not-a-directory", "env-unreadable")
@@ -1764,6 +1764,320 @@ class TestAnApprovedSheetEndsTheQuestions(SheetCase):
         interview_id = self.with_sheet()
         page = self.client.get(f"/interview/{interview_id}")
         self.assertIn('id="say"', page.text)
+
+
+DRAFT_ARGS = {
+    "body": "Quatre mois pour rien.\n\nJ'ai écrit pour des agences, et le "
+            "canal direct est le seul qui paie.",
+    "anchors": [{"post": "le canal direct est le seul qui paie",
+                 "said": "le canal direct est le seul qui paie"}],
+}
+
+
+class DraftCase(SheetCase):
+    """The material a draft is written from: something said, a signed sheet."""
+
+    def signed(self):
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation,
+                      "le canal direct est le seul qui paie, j'ai arrêté "
+                      "les agences")
+        interview.propose(conversation, dict(SHEET_ARGS))
+        interview.approve(conversation, conversation.sheet.digest())
+        interview.save(self.root, conversation)
+        return interview_id
+
+    def draft(self, interview_id):
+        return self.client.post(f"/interview/{interview_id}/draft")
+
+
+class TestAskingForASheet(SheetCase):
+    """The person asks for the sheet, and the turn requires the tool. That
+    requirement is the whole mechanism: a model too weak to reach for a tool
+    on its own answers in prose, and prose triggers nothing at all."""
+
+    scripts = (asks(("c1", "propose_sheet", SHEET_ARGS)),
+               says("Here it is."))
+
+    def ask(self, interview_id):
+        return self.client.post(f"/interview/{interview_id}/sheet/propose")
+
+    def said(self):
+        """An interview with something in it. A sheet asked for before
+        anybody has spoken is a sheet the model has to invent."""
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "four months on agencies, nothing signed")
+        interview.save(self.root, conversation)
+        return interview_id
+
+    def test_nothing_said_means_nothing_to_make_a_sheet_from(self):
+        reply = self.ask(self.open_interview())
+        self.assertEqual(reply.status_code, 422)
+        self.assertEqual(self.transport.calls, [])
+
+    def test_the_first_request_requires_the_sheet_tool(self):
+        interview_id = self.said()
+        self.ask(interview_id)
+        self.assertEqual(self.transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "propose_sheet"})
+
+    def test_the_requirement_is_gone_from_the_turn_that_answers_it(self):
+        interview_id = self.said()
+        self.ask(interview_id)
+        self.assertNotIn("tool_choice", self.transport.calls[1]["payload"])
+
+    def test_the_sheet_lands_and_the_frame_fills_the_panel(self):
+        interview_id = self.said()
+        reply = self.ask(interview_id)
+        self.assertIn("sheet", kinds(reply.text))
+        self.assertEqual(
+            interview.load(self.root, interview_id).sheet.state, "proposed")
+
+    def test_an_approved_sheet_is_not_asked_for_again(self):
+        interview_id = self.with_sheet(approved=True)
+        self.assertEqual(self.ask(interview_id).status_code, 409)
+        self.assertEqual(self.transport.calls, [])
+
+
+class TestTheDraftTurn(DraftCase):
+    scripts = (asks(("c1", "propose_draft", DRAFT_ARGS)),
+               says("Written."))
+
+    def test_nothing_is_drafted_before_the_sheet_is_signed(self):
+        interview_id = self.open_interview()
+        reply = self.draft(interview_id)
+        self.assertEqual(reply.status_code, 409)
+        self.assertEqual(reply.json()["detail"], "sheet-not-approved")
+        self.assertEqual(self.transport.calls, [])
+
+    def test_the_turn_requires_the_draft_tool(self):
+        self.draft(self.signed())
+        self.assertEqual(self.transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "propose_draft"})
+
+    def test_the_request_is_built_from_the_material_not_from_the_interview(self):
+        # A revision restarts from the interview material, says the skill.
+        # The engine therefore hands over one fresh message rather than
+        # appending to the list the questions happened in.
+        interview_id = self.signed()
+        self.draft(interview_id)
+        sent = self.transport.calls[0]["payload"]["messages"]
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["role"], "user")
+        material = sent[0]["content"][0]["text"]
+        self.assertIn("le canal direct est le seul qui paie", material)
+        self.assertIn(SHEET_ARGS["angle"], material)
+
+    def test_the_drafting_turn_writes_nothing_into_the_interview(self):
+        # The anchoring source is what the person said. A turn that appended
+        # to that list would let the engine put words in their mouth.
+        interview_id = self.signed()
+        before = interview.load(self.root, interview_id)
+        self.draft(interview_id)
+        after = interview.load(self.root, interview_id)
+        self.assertEqual(after.messages, before.messages)
+        self.assertEqual(after.said(), before.said())
+
+    def test_the_draft_reaches_the_disk(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        draft = interview.load(self.root, interview_id).draft
+        self.assertEqual(draft.body, DRAFT_ARGS["body"])
+        self.assertEqual(len(draft.anchors), 1)
+        self.assertTrue(draft.written)
+
+    def test_the_step_that_drafts_is_the_writing_step(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        system = self.transport.calls[0]["payload"]["system"]
+        self.assertIn("The signature block is not generated", system)
+
+    def test_what_the_turn_cost_is_added_to_the_interview(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        self.assertGreater(conversation.usage.input_tokens, 0)
+
+    def test_the_draft_frame_carries_the_panel(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id)
+        sequence = kinds(reply.text)
+        self.assertIn("draft", sequence)
+        self.assertEqual(sequence.index("draft"),
+                         sequence.index("tool_result") + 1)
+        frame = [f for f in frames(reply.text) if f["kind"] == "draft"][0]
+        self.assertEqual(frame["body"], DRAFT_ARGS["body"])
+        self.assertEqual([verdict["status"] for verdict in frame["verdicts"]],
+                         ["anchored"])
+        self.assertEqual(frame["counts"]["unanchored"], 1)
+        # The pieces the panel paints, and their coverage: the highlight is
+        # decided here, never in the browser.
+        painted = [piece for row in frame["lines"] for piece in row]
+        self.assertIn(True, [piece["covered"] for piece in painted])
+        self.assertIn(False, [piece["covered"] for piece in painted])
+
+    def test_a_second_draft_replaces_the_first(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        self.transport.scripts = list(
+            (asks(("c2", "propose_draft", dict(DRAFT_ARGS, body="Autre."))),
+             says("Rewritten.")))
+        self.draft(interview_id)
+        self.assertEqual(
+            interview.load(self.root, interview_id).draft.body, "Autre.")
+
+
+PROSE = ("Quatre mois pour rien.\n\n"
+         "J'ai écrit pour des agences, et le canal direct est le seul "
+         "qui paie.\n\n"
+         "ANCHORS\n"
+         "POST: le canal direct est le seul qui paie\n"
+         "SAID: le canal direct est le seul qui paie\n"
+         "POST: an entry with no quote under it\n")
+
+
+class TestARuntimeThatIgnoresTheRequiredTool(DraftCase):
+    """Local runtimes do exactly this. The contract says the engine then
+    reads the anchors block out of the prose, that the path is degraded, and
+    that what could not be read is reported rather than swallowed."""
+
+    scripts = (says(PROSE),)
+
+    def test_the_block_is_read_out_of_the_prose(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id)
+        draft = interview.load(self.root, interview_id).draft
+        self.assertIsNotNone(draft)
+        self.assertNotIn("ANCHORS", draft.body)
+        self.assertEqual(len(draft.anchors), 1)
+        self.assertIn("draft", kinds(reply.text))
+
+    def test_what_could_not_be_read_travels_with_it(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        problems = interview.load(self.root, interview_id).draft.problems
+        self.assertTrue(problems)
+        self.assertIn("no SAID quote", problems[0])
+
+
+class TestProseWithNoBlockIsNotADraft(DraftCase):
+    """Chatter is not a post. Storing it as one would put the engine's own
+    talking in front of somebody with a traceability panel drawn round it."""
+
+    scripts = (says("I would rather ask one more question first."),)
+
+    def test_nothing_lands_and_the_page_is_not_asked_again(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id)
+        self.assertIsNone(interview.load(self.root, interview_id).draft)
+        self.assertNotIn("draft", kinds(reply.text))
+
+
+class TestTheGuardUnderTheLock(DraftCase):
+    """The handler refuses an unapproved sheet, and so does the generator.
+    The copy the handler read is only as fresh as the moment it lost the
+    race for the lock, so the one that matters is this one."""
+
+    scripts = (says("should never run"),)
+
+    def test_the_running_turn_refuses_on_its_own_reading(self):
+        from verbatim_app.routes.interview import _engine, _run, lock_for
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "something")
+        interview.save(self.root, conversation)
+        request = Bare(self.app)
+        engine = _engine(request)
+        sent = frames("".join(_run(request, engine, interview_id, "",
+                                   lock_for(self.app, interview_id),
+                                   require="propose_draft", drafting=True)))
+        self.assertEqual([frame["kind"] for frame in sent], ["error"])
+        self.assertEqual(sent[0]["code"], "sheet-not-approved")
+        self.assertEqual(self.transport.calls, [])
+
+
+class TestTheTraceabilityPanel(DraftCase):
+    """The screen the product is named after. Three alarm states, equal in
+    weight, and no verdict read off anything stored."""
+
+    scripts = (asks(("c1", "propose_draft", dict(
+        DRAFT_ARGS,
+        anchors=[{"post": "le canal direct est le seul qui paie",
+                  "said": "le canal direct est le seul qui paie"},
+                 {"post": "Quatre mois pour rien.",
+                  "said": "j'ai perdu quatre mois entiers"},
+                 {"post": "une phrase absente du brouillon",
+                  "said": "le canal direct est le seul qui paie"}]))),
+               says("Written."))
+
+    def test_the_three_states_are_all_on_the_screen(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertEqual(page.status_code, 200)
+        for state in ("anchored", "fabricated", "dangling"):
+            self.assertIn(f"anchor-{state}", page.text, state)
+        # And in the body itself: a claim backed by an invented quote is
+        # marked there too, or the loudest alarm would show as clean text.
+        self.assertIn("claim-fabricated", page.text)
+
+    def test_two_claims_with_the_same_words_do_not_swap_verdicts(self):
+        # The claim and its verdict are decided by two different functions.
+        # This is the test that would catch them drifting out of step.
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        from verbatim_app.routes.interview import panel
+        painted = panel(conversation)
+        by_text = {piece["text"]: piece["status"]
+                   for row in painted["lines"] for piece in row}
+        self.assertEqual(
+            by_text["Quatre mois pour rien."], "fabricated")
+        self.assertEqual(
+            by_text["J'ai écrit pour des agences, et le canal direct est "
+                    "le seul qui paie."], "anchored")
+
+    def test_a_verdict_follows_the_transcript_rather_than_the_disk(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["anchored", "fabricated", "dangling"])
+
+
+class TestTheInlineLintPass(DraftCase):
+    scripts = (asks(("c1", "propose_draft", dict(
+        DRAFT_ARGS, body="Quatre mois pour rien - et rien d'autre."))),
+               says("Written."))
+
+    def test_the_findings_come_back_on_the_screen(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        page = self.client.post(f"/interview/{interview_id}/draft/lint")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("lint-findings", page.text)
+
+    def test_a_lint_that_will_not_run_says_so_in_the_pack_first(self):
+        # The refusal comes back from a tool, written for a model, in English.
+        # On a screen it needs the pack to say what kind of thing it is.
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        conversation.output_language = "zz"
+        interview.save(self.root, conversation)
+        page = self.client.post(f"/interview/{interview_id}/draft/lint")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("did not run", page.text)
+        self.assertIn("zz", page.text)
+
+    def test_there_is_nothing_to_lint_without_a_draft(self):
+        interview_id = self.signed()
+        reply = self.client.post(f"/interview/{interview_id}/draft/lint",
+                                 follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
 
 
 if __name__ == "__main__":

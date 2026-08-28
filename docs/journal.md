@@ -1,5 +1,134 @@
 # Journal
 
+## 2026-08-28 (soir, cinquième session). Tranche 5.5 : le brouillon et la traçabilité
+
+L'écran qui fait exister le nom du produit. 557 tests app plus 31 tests JS,
+`check.sh` vert. Revue à contexte frais : CONFIRMED sur les sept
+affirmations au premier tour, sept trouvailles, cinq corrigées et deux
+tranchées par écrit.
+
+### Le harnais de test JS, d'abord
+
+C'était la dette bloquante : `static/interview.js` portait deux lignes de
+sécurité (le condensé de fiche déplacé dans le formulaire d'approbation) que
+personne ne testait. Le harnais est en stdlib Node seule, `node --test` plus
+`vm` sur un faux DOM écrit à la main, zéro `npm`, zéro `node_modules` dans un
+dépôt Python. `interview.js` n'a pas été touché pour se laisser tester : il
+est chargé tel quel dans un contexte `vm`. Sabotage vérifié deux fois, par le
+constructeur du harnais et par moi : les deux lignes retirées, trois tests
+rougissent. `check.sh` lance maintenant la suite au lieu du `node --check`,
+qui ne prétendait pas être un test et ne l'était pas.
+
+### Le mécanisme qui remplace la supplique
+
+`CLAUDE.md` notait le trou : rien ne pointait le modèle vers `propose_sheet`.
+Un modèle faible lit « produis la fiche » et répond en prose, ce qui ne
+déclenche rien du tout, et laisse quelqu'un croire que la garde a tourné.
+
+La réponse n'est pas une phrase de plus dans le prompt, c'est `tool_choice` :
+la personne clique « demander la fiche », et ce tour-là **exige** l'outil.
+Aucun mot n'est ajouté nulle part, et le choix de demander reste à la
+personne, qui est la seule à savoir si l'entretien a assez de matière. Même
+mécanique pour la rédaction, avec `propose_draft`.
+
+L'exigence ne vaut que pour la première requête d'un run. Laissée en place,
+elle ferait rappeler l'outil sur le tour qui vient d'y répondre, en boucle,
+aux frais de la personne. Un test le tient sur les deux wires.
+
+### Le tour de rédaction ne continue pas l'entretien
+
+Le point le plus intéressant de la tranche, et il a failli partir de travers.
+Un tour de rédaction a besoin d'un message `user` en queue de liste. Écrire
+ce message dans la liste de l'entretien aurait été un piège : `timeline()`
+crédite tout bloc `text` d'un message `user` à la personne, et c'est cette
+liste qui sert de source d'ancrage. Le moteur aurait pu mettre des mots dans
+la bouche de quelqu'un, puis les citer comme source.
+
+Donc la rédaction est une requête neuve, construite par `interview.material()`
+à partir du transcript rendu et de la fiche signée, jetée avec le générateur.
+Ce n'est pas une contorsion pour éviter un bug : c'est exactement ce que le
+skill demande, « une révision repart toujours de la matière de l'entretien,
+jamais d'une réécriture à l'aveugle ». Ce que la rédaction laisse derrière
+elle est la clé `draft`, rien d'autre.
+
+### Aucun verdict n'est stocké
+
+`draft` porte le corps, les ancres, les problèmes de lecture et une date.
+Ancrée, sans ancrage, fabriquée, dans le vide sont recalculés à chaque
+lecture. Un verdict stocké cesse d'être vrai dès que l'un des trois termes
+bouge, et il vieillit dans la direction qui flatte le moteur. Même raison que
+le compteur de piliers recalculé sur `posts/`.
+
+Une seule règle de couverture dans le moteur : `anchors.lines()` est la
+primitive, `uncovered()` en dérive. La leçon des rounds 6 à 9 de la revue 5.3
+appliquée à l'avance.
+
+### Une citation fabriquée ne laisse pas le corps propre
+
+Trouvé en regardant l'écran, pas en lisant le code. Une ancre fabriquée
+couvre quand même sa phrase, donc le corps du post s'affichait sans marque
+pendant que le panneau criait « fabriquée » : l'alarme la plus forte rangée
+derrière la lecture la plus faible de `uncovered`. Un `Piece` porte
+maintenant *quelles* ancres le couvrent, pas seulement qu'il est couvert, et
+le corps marque les deux états. `uncovered()` garde la question faible, qui
+est celle du contrat.
+
+### La passe de design
+
+Faite ici, comme le plan le prévoyait, quand l'écran à deux colonnes qui la
+justifie existe. Palette froide, deux thèmes, tous les jetons vérifiés au
+calcul et pas à l'oeil : corps 17,8 en clair et 15,2 en sombre, secondaire
+6,1 et 7,2, accent 8,8 et 7,5. L'orange a perdu sa réservation, l'alarme est
+un cramoisi froid (6,6 et 8,5). Le surligneur `#F2E85C` ne bascule pas d'un
+thème à l'autre : c'est un marqueur passé sur le texte de quelqu'un, pas une
+couleur de chrome. Trois familles, trois locuteurs : la personne en serif, le
+moteur en grotesque, la machine en mono. Aucune webfont, l'app tourne hors
+ligne et une requête de police serait la seule chose de la page qui en sort.
+
+### Ce que la revue a rapporté
+
+Sept trouvailles, aucune exploitable, cinq réparées :
+
+- **Le contrat promettait un repli que le code ne tenait pas.** J'avais écrit
+  dans `instance.md` qu'un runtime ignorant l'outil forcé répond en prose et
+  que le moteur lit alors le bloc `ANCHORS` de la réponse. Le code ne le
+  faisait pas, et `split_output` n'avait aucun appelant en production. Le
+  repli existe maintenant, avec sa garde : de la prose sans bloc n'est pas un
+  post, c'est un modèle qui parle, et l'avaler mettrait le bavardage du
+  moteur devant quelqu'un avec un panneau de traçabilité dessiné autour.
+- **`problems` était écrivable par le modèle.** La clé disait « ce qui n'a pas
+  pu être lu dans la façon dont ce brouillon est arrivé » : un modèle qui la
+  remplit raconte sa propre réception. C'est devenu un argument nommé du
+  côté appelant, absent du schéma de l'outil.
+- **Trois gardes sans test**, dont la garde du brouillon dans `anchors.lines`,
+  qu'on pouvait retirer sans qu'un seul des 551 tests rougisse : un fragment
+  plus long que la phrase la contient, donc une ancre dans le vide peignait
+  la phrase comme ancrée. Exactement le motif « une garde ajoutée seule ». Le
+  cas exact du relecteur est maintenant un test, et le sabotage est vérifié.
+- **Le harnais JS avait un trou de couverture** : le test qui vérifie que tous
+  les boutons se désactivent construisait un écran où le bouton d'écriture
+  n'existait pas.
+
+Deux trouvailles tranchées sans code, et la raison est écrite dans le
+fichier concerné plutôt qu'ici seulement. `panel()` ne passe pas par
+`redact` : ce que `redact` biffe, ce sont les valeurs de variables secrètes
+de l'environnement, et un modèle ne peut pas les atteindre (`.env` est refusé
+par nom à la lecture). Redacter là garderait un chemin qui n'existe pas et
+abîmerait un post qui cite légitimement une valeur publiée. Et les refus
+d'outils rendus dans le fil restent en anglais : c'est la conversation
+machine montrée telle quelle, pas une phrase que le moteur adresse à
+quelqu'un. Le seul cas qui s'adressait vraiment à une personne, le refus de
+la passe de lint, a gagné sa phrase de pack.
+
+### Ce que la tranche ne fait pas
+
+Le skill demande huit livrables à la rédaction ; l'outil en prend deux, le
+corps et les ancres. Les accroches sont déjà décidées à la fiche
+(`first_lines`, approuvées par la personne). Les deux idées de photo et les
+trois conseils, eux, tombent : ils appartiennent à la révision, tranche 5.6,
+et ne sont pas perdus en silence, ils sont écrits ici. `interview.close()`
+n'a toujours pas d'appelant, ce sera l'archivage.
+
 ## 2026-08-28 (soir, quatrième session). Tranche 5.4 : la fiche de validation
 
 Commits `4ac1633` (la tranche) et `73a2386` (la marque, le favicon, le
