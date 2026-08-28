@@ -256,6 +256,18 @@ button:hover { background: var(--accent); border-color: var(--accent); }
 .tool pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0 0; }
 .tool-failed { border-color: var(--alarm); color: var(--alarm); }
 
+/* The validation sheet. Same rule as the turns: the lines meant to reach the
+   post (the strong moment, the conviction, the first line proposals) are the
+   person's material and sit in serif; the engine's restatement stays in the
+   grotesque. Structure only here too, the palette pass is slice 5.5. */
+.sheet { margin: 1.75rem 0; border: 1px solid var(--line); padding: 1rem 1.25rem; }
+.sheet h2 { margin-top: 0; }
+.sheet-fields { margin: 1rem 0 0; }
+.sheet-fields dt { color: var(--muted); font-size: 0.78rem; margin-top: 0.9rem; }
+.sheet-fields dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; }
+.sheet-fields ul { margin: 0; padding-left: 1.2rem; }
+.sheet .their-words { font-family: var(--serif); }
+
 button.quiet {
   font-family: var(--mono);
   font-size: 0.78rem;

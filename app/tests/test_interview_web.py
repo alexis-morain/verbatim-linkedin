@@ -31,7 +31,7 @@ CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
 #: Codes an SSE frame carries. They get an `error_` sentence, not a
 #: `refused_` one, and TestEveryCodeHasASentence covers them separately.
 FRAME_CODES = {"turn-running", "closed", "gone", "engine-failed",
-               "bundle-broken"}
+               "bundle-broken", "sheet-approved"}
 
 
 def frames(text: str) -> list:
@@ -1377,7 +1377,8 @@ class TestEveryCodeHasASentence(WebCase):
     fails at the seam rather than on somebody's screen."""
 
     CODES = ("turn-running", "closed", "not-configured", "nothing-to-send",
-             "gone", "engine-failed", "bundle-broken", "unknown")
+             "gone", "engine-failed", "bundle-broken", "sheet-approved",
+             "unknown")
     REFUSALS = ("secrets-in-instance", "credential-in-endpoint",
                 "endpoint-in-clear", "endpoint-untrusted", "engine-refused",
                 "interviews-not-a-directory", "env-unreadable")
@@ -1497,6 +1498,272 @@ class TestInFrench(WebCase):
         page = self.client.get(f"/interview/{self.open_interview()}")
         self.assertIn("En attente du modèle", page.text)
         self.assertNotIn("Waiting for the model", page.text)
+
+
+SHEET_ARGS = {
+    "angle": "Four months lost to agency work",
+    "elements": ["four months on agencies", "two clients signed since"],
+    "moment": "j'ai passé quatre mois à écrire pour des agences",
+    "conviction": "le canal direct est le seul qui paie",
+    "first_lines": ["Quatre mois pour rien.", "J'ai arrêté les agences."],
+}
+
+
+class SheetCase(WebCase):
+    def with_sheet(self, approved=False):
+        """A sheet put on disk directly: these tests are about the guard and
+        the click, not about the wire that carries a proposal."""
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.propose(conversation, dict(SHEET_ARGS))
+        if approved:
+            interview.approve(conversation, conversation.sheet.digest())
+        interview.save(self.root, conversation)
+        return interview_id
+
+    def approve(self, interview_id, digest=None):
+        """POST the click. The digest defaults to the disk's, which is what
+        a fresh page would carry; a test about staleness passes its own."""
+        if digest is None:
+            sheet = interview.load(self.root, interview_id).sheet
+            digest = sheet.digest() if sheet else ""
+        return self.client.post(f"/interview/{interview_id}/sheet/approve",
+                                data={"sheet": digest},
+                                follow_redirects=False)
+
+
+class TestAProposalOnTheWire(SheetCase):
+    """The model calls propose_sheet; the sheet reaches disk, then the frame
+    that fills the panel."""
+
+    scripts = (asks(("c1", "propose_sheet", SHEET_ARGS)),
+               says("Shall we go with this sheet?"))
+
+    def test_the_model_is_offered_the_sheet_tool(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        offered = [tool["name"]
+                   for tool in self.transport.calls[0]["payload"]["tools"]]
+        self.assertIn("propose_sheet", offered)
+
+    def test_the_proposal_reaches_the_disk(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        sheet = interview.load(self.root, interview_id).sheet
+        self.assertEqual(sheet.state, "proposed")
+        self.assertEqual(sheet.angle, SHEET_ARGS["angle"])
+        self.assertEqual(sheet.first_lines, tuple(SHEET_ARGS["first_lines"]))
+
+    def test_the_sheet_frame_follows_the_tool_result(self):
+        interview_id = self.open_interview()
+        reply = self.turn(interview_id, "Four months on agencies.")
+        sequence = kinds(reply.text)
+        self.assertIn("sheet", sequence)
+        self.assertEqual(sequence.index("sheet"),
+                         sequence.index("tool_result") + 1)
+        frame = [f for f in frames(reply.text) if f["kind"] == "sheet"][0]
+        self.assertEqual(frame["state"], "proposed")
+        self.assertEqual(frame["angle"], SHEET_ARGS["angle"])
+        self.assertEqual(frame["elements"], SHEET_ARGS["elements"])
+        self.assertEqual(frame["moment"], SHEET_ARGS["moment"])
+        self.assertEqual(frame["conviction"], SHEET_ARGS["conviction"])
+        self.assertEqual(frame["first_lines"], SHEET_ARGS["first_lines"])
+
+    def test_the_screen_renders_the_sheet_and_the_approve_form(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "Four months on agencies.")
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(SHEET_ARGS["angle"], page.text)
+        # The apostrophe is escaped on its way into markup, so the assertion
+        # holds the part of the quote that has none.
+        self.assertIn("quatre mois à écrire pour des agences", page.text)
+        self.assertIn(f"/interview/{interview_id}/sheet/approve", page.text)
+        self.assertIn('id="say"', page.text)
+
+
+class TestARefusedProposal(SheetCase):
+    """A proposal the store refuses answers the model and stores nothing."""
+
+    scripts = (asks(("c1", "propose_sheet",
+                     dict(SHEET_ARGS, elements=[]))),
+               says("Let me gather the elements first."))
+
+    def test_nothing_lands_and_the_tool_says_why(self):
+        interview_id = self.open_interview()
+        reply = self.turn(interview_id, "Four months on agencies.")
+        self.assertIsNone(interview.load(self.root, interview_id).sheet)
+        sequence = kinds(reply.text)
+        self.assertNotIn("sheet", sequence)
+        result = [f for f in frames(reply.text)
+                  if f["kind"] == "tool_result"][0]
+        self.assertTrue(result["is_error"])
+        self.assertIn("elements", result["result"])
+
+
+class TestTheClick(SheetCase):
+    """Approval is the person's click, and the only writer of `approved`."""
+
+    def test_the_click_approves_and_comes_back_to_the_screen(self):
+        interview_id = self.with_sheet()
+        reply = self.approve(interview_id)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"],
+                         f"/interview/{interview_id}")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.sheet.state, "approved")
+        self.assertTrue(conversation.sheet.approved)
+        self.assertEqual(conversation.state, "open")
+
+    def test_a_second_click_is_the_same_decision(self):
+        interview_id = self.with_sheet()
+        self.approve(interview_id)
+        stamped = interview.load(self.root, interview_id).sheet.approved
+        self.assertEqual(self.approve(interview_id).status_code, 303)
+        self.assertEqual(interview.load(self.root, interview_id).sheet.approved,
+                         stamped)
+
+    def test_a_click_with_no_sheet_changes_nothing(self):
+        interview_id = self.open_interview()
+        self.assertEqual(self.approve(interview_id).status_code, 303)
+        self.assertIsNone(interview.load(self.root, interview_id).sheet)
+
+    def test_a_click_on_a_discarded_interview_goes_to_the_hub(self):
+        interview_id = self.with_sheet()
+        self.client.post(f"/interview/{interview_id}/discard")
+        reply = self.approve(interview_id, digest="")
+        self.assertEqual(reply.headers["location"], "/interview")
+
+    def test_the_click_loses_to_a_running_turn_and_loses_nothing(self):
+        # An approval written beside a running turn would be overwritten by
+        # that turn's next save: an approval lost in silence. Losing the lock
+        # instead leaves the sheet proposed, the screen says a turn is
+        # running, and the click can happen again.
+        from verbatim_app.routes import interview as screen
+        interview_id = self.with_sheet()
+        lock = screen.lock_for(self.app, interview_id)
+        self.assertTrue(lock.acquire(blocking=False))
+        try:
+            reply = self.approve(interview_id)
+        finally:
+            lock.release()
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"],
+                         f"/interview/{interview_id}?notice=turn-running")
+        self.assertEqual(interview.load(self.root, interview_id).sheet.state,
+                         "proposed")
+        told = self.client.get(
+            f"/interview/{interview_id}?notice=turn-running")
+        self.assertIn("already has a turn running", told.text)
+
+
+class TestTheSignatureNamesWhatWasRead(SheetCase):
+    """The refuted finding of the first review round: the click used to
+    approve whatever sheet was on disk, not the sheet the person read. A
+    replacement can land between the screen being drawn and the click, and
+    the party writing replacements is the model, the very party the sheet
+    guards against."""
+
+    def test_a_stale_click_approves_nothing_and_says_why(self):
+        interview_id = self.with_sheet()
+        stale = interview.load(self.root, interview_id).sheet.digest()
+        conversation = interview.load(self.root, interview_id)
+        interview.propose(conversation,
+                          dict(SHEET_ARGS, angle="A different angle"))
+        interview.save(self.root, conversation)
+        reply = self.approve(interview_id, digest=stale)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"],
+                         f"/interview/{interview_id}?notice=sheet-changed")
+        after = interview.load(self.root, interview_id).sheet
+        self.assertEqual(after.state, "proposed")
+        self.assertEqual(after.angle, "A different angle")
+
+    def test_a_click_with_no_digest_approves_nothing(self):
+        interview_id = self.with_sheet()
+        reply = self.client.post(
+            f"/interview/{interview_id}/sheet/approve",
+            follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(interview.load(self.root, interview_id).sheet.state,
+                         "proposed")
+
+    def test_the_page_carries_the_digest_it_shows(self):
+        interview_id = self.with_sheet()
+        digest = interview.load(self.root, interview_id).sheet.digest()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(f'id="sheet-digest" value="{digest}"', page.text)
+
+    def test_the_sheet_frame_carries_its_digest(self):
+        # The script moves this value into the form when it fills the panel,
+        # so the live path signs what is displayed too.
+        conversation = interview.Conversation(
+            id="2026-08-28-1500", skill="linkedin-post", sections=(),
+            interface_language="en", output_language="en",
+            provider="anthropic", model="m", started="", updated="")
+        sheet = interview.propose(conversation, dict(SHEET_ARGS))
+        from verbatim_app.routes.interview import _sheet_fields
+        self.assertEqual(_sheet_fields(sheet)["digest"], sheet.digest())
+
+    def test_the_notice_shows_the_sentence_and_only_for_known_codes(self):
+        interview_id = self.with_sheet()
+        told = self.client.get(
+            f"/interview/{interview_id}?notice=sheet-changed")
+        self.assertIn("nothing was approved", told.text)
+        quiet = self.client.get(
+            f"/interview/{interview_id}?notice=<script>x</script>")
+        self.assertNotIn("nothing was approved", quiet.text)
+        self.assertNotIn("<script>x</script>", quiet.text)
+
+    def test_a_replacement_with_identical_content_still_signs(self):
+        # Content is the identity: the same five fields proposed again are
+        # the same decision, whatever the timestamps say.
+        interview_id = self.with_sheet()
+        stale = interview.load(self.root, interview_id).sheet.digest()
+        conversation = interview.load(self.root, interview_id)
+        interview.propose(conversation, dict(SHEET_ARGS))
+        interview.save(self.root, conversation)
+        self.approve(interview_id, digest=stale)
+        self.assertEqual(interview.load(self.root, interview_id).sheet.state,
+                         "approved")
+
+
+class TestAnApprovedSheetEndsTheQuestions(SheetCase):
+    """The skill's rule made mechanical: no interview turn runs past an
+    approved sheet. The interview stays open, because closed means it became
+    a post."""
+
+    def test_the_turn_is_refused(self):
+        interview_id = self.with_sheet(approved=True)
+        reply = self.turn(interview_id, "One more thing.")
+        self.assertEqual(reply.status_code, 409)
+        self.assertEqual(reply.json()["detail"], "sheet-approved")
+
+    def test_the_generator_rechecks_under_the_lock(self):
+        # The handler's refusal reads a copy only as fresh as losing the race
+        # left it, so the turn itself decides again, like `closed` does.
+        from verbatim_app.routes import interview as screen
+        interview_id = self.with_sheet(approved=True)
+        request = Bare(self.app)
+        stream = screen._run(request, screen._engine(request), interview_id,
+                             "One more thing.",
+                             screen.lock_for(self.app, interview_id))
+        first = json.loads(next(stream)[len("data: "):])
+        self.assertEqual(first, {"kind": "error", "code": "sheet-approved"})
+        stream.close()
+        self.assertEqual(
+            interview.load(self.root, interview_id).person_turns(), [])
+
+    def test_the_screen_says_so_instead_of_offering_the_box(self):
+        interview_id = self.with_sheet(approved=True)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertNotIn('id="say"', page.text)
+        self.assertIn('id="sheet-approved-notice"', page.text)
+        self.assertNotIn('id="sheet-approved-notice" hidden', page.text)
+
+    def test_a_proposed_sheet_does_not_end_them(self):
+        interview_id = self.with_sheet()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="say"', page.text)
 
 
 if __name__ == "__main__":

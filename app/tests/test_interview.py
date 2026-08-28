@@ -784,5 +784,209 @@ class TestTheStep(InterviewCase):
         self.assertNotIn("locales/en/interview.md", resolved)
 
 
+SHEET = {"angle": "Four months lost to agency work",
+         "elements": ["four months on agencies", "two clients signed since"],
+         "moment": "j'ai passé quatre mois à écrire pour des agences",
+         "conviction": "le canal direct est le seul qui paie",
+         "first_lines": ["Quatre mois pour rien.", "J'ai arrêté les agences."]}
+
+
+def proposal(**kwargs):
+    fields = dict(SHEET)
+    fields.update(kwargs)
+    return fields
+
+
+class TestTheSheet(InterviewCase):
+    """The validation sheet, `references/instance.md` under interviews/. The
+    engine proposes, only the person approves, and the approved sheet is what
+    stops the questions."""
+
+    def test_a_proposal_lands_on_the_conversation(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=LATER)
+        sheet = conversation.sheet
+        self.assertEqual(sheet.state, "proposed")
+        self.assertEqual(sheet.angle, SHEET["angle"])
+        self.assertEqual(sheet.elements, tuple(SHEET["elements"]))
+        self.assertEqual(sheet.moment, SHEET["moment"])
+        self.assertEqual(sheet.conviction, SHEET["conviction"])
+        self.assertEqual(sheet.first_lines, tuple(SHEET["first_lines"]))
+        self.assertEqual(sheet.proposed, "2026-08-28T14:41:02")
+        self.assertEqual(sheet.approved, "")
+
+    def test_the_sheet_round_trips_through_the_disk(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.sheet, conversation.sheet)
+
+    def test_no_sheet_means_no_key_on_disk(self):
+        # The contract says absent until proposed, so an older reader sees a
+        # file it already knows.
+        conversation = started(self.root)
+        raw = json.loads((self.directory(conversation)
+                          / interview.CONVERSATION).read_text(encoding="utf-8"))
+        self.assertNotIn("sheet", raw)
+
+    def test_a_proposed_sheet_is_replaced_by_the_next_proposal(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        interview.propose(conversation, proposal(angle="The direct channel"),
+                          now=LATER)
+        self.assertEqual(conversation.sheet.angle, "The direct channel")
+        self.assertEqual(conversation.sheet.state, "proposed")
+
+    def test_an_approved_sheet_cannot_be_replaced(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          now=LATER)
+        with self.assertRaisesRegex(interview.InterviewError, "frozen"):
+            interview.propose(conversation, proposal(angle="Another one"))
+        self.assertEqual(conversation.sheet.angle, SHEET["angle"])
+
+    def test_a_closed_interview_takes_no_proposal(self):
+        conversation = started(self.root)
+        conversation.state = interview.CLOSED
+        with self.assertRaises(interview.InterviewError):
+            interview.propose(conversation, proposal())
+
+    def test_every_field_is_required_and_non_empty(self):
+        for name in ("angle", "moment", "conviction"):
+            for wrong in ("", "   ", None, 3):
+                conversation = started(self.root)
+                with self.assertRaises(interview.InterviewError):
+                    interview.propose(conversation,
+                                      proposal(**{name: wrong}))
+                self.assertIsNone(conversation.sheet, name)
+
+    def test_the_lists_refuse_empties_and_non_lists(self):
+        for name in ("elements", "first_lines"):
+            for wrong in ([], ["ok", ""], ["ok", 3], "not a list", None):
+                conversation = started(self.root)
+                with self.assertRaises(interview.InterviewError):
+                    interview.propose(conversation,
+                                      proposal(**{name: wrong}))
+                self.assertIsNone(conversation.sheet, name)
+
+    def test_the_first_line_takes_two_proposals_at_most(self):
+        # The skill says two proposals, or theirs. Three is a menu.
+        conversation = started(self.root)
+        with self.assertRaisesRegex(interview.InterviewError, "at most 2"):
+            interview.propose(conversation,
+                              proposal(first_lines=["a", "b", "c"]))
+
+    def test_whitespace_is_trimmed_off_every_entry(self):
+        conversation = started(self.root)
+        interview.propose(conversation,
+                          proposal(angle="  padded  ",
+                                   elements=[" one ", "two"]))
+        self.assertEqual(conversation.sheet.angle, "padded")
+        self.assertEqual(conversation.sheet.elements, ("one", "two"))
+
+    def test_approving_freezes_and_stamps(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        self.assertTrue(interview.approve(conversation,
+                                          conversation.sheet.digest(),
+                                          now=LATER))
+        self.assertEqual(conversation.sheet.state, "approved")
+        self.assertEqual(conversation.sheet.approved, "2026-08-28T14:41:02")
+        self.assertTrue(interview.sheet_approved(conversation))
+
+    def test_approving_twice_changes_nothing(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          now=LATER)
+        self.assertFalse(interview.approve(conversation,
+                                           conversation.sheet.digest(),
+                                           now=datetime(2026, 8, 28, 15, 0)))
+        self.assertEqual(conversation.sheet.approved, "2026-08-28T14:41:02")
+
+    def test_an_approval_signs_the_sheet_it_was_read_from(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        stale = conversation.sheet.digest()
+        interview.propose(conversation, proposal(angle="Another angle"),
+                          now=LATER)
+        with self.assertRaises(interview.SheetChanged):
+            interview.approve(conversation, stale)
+        self.assertEqual(conversation.sheet.state, "proposed")
+
+    def test_the_digest_is_the_content_and_nothing_else(self):
+        # Two proposals with the same five fields are the same decision,
+        # whatever the timestamps say; one changed word is another sheet.
+        one = started(self.root)
+        interview.propose(one, proposal(), now=WHEN)
+        two = started(self.root)
+        interview.propose(two, proposal(), now=LATER)
+        self.assertEqual(one.sheet.digest(), two.sheet.digest())
+        interview.propose(two, proposal(conviction="something else"),
+                          now=LATER)
+        self.assertNotEqual(one.sheet.digest(), two.sheet.digest())
+
+    def test_there_is_nothing_to_approve_before_a_proposal(self):
+        conversation = started(self.root)
+        with self.assertRaisesRegex(interview.InterviewError, "no sheet"):
+            interview.approve(conversation, "")
+
+    def test_a_closed_interview_takes_no_approval(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal())
+        digest = conversation.sheet.digest()
+        conversation.state = interview.CLOSED
+        with self.assertRaises(interview.InterviewError):
+            interview.approve(conversation, digest)
+
+    def test_no_sheet_is_not_approved(self):
+        self.assertFalse(interview.sheet_approved(started(self.root)))
+
+    def test_a_proposed_sheet_is_not_approved(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal())
+        self.assertFalse(interview.sheet_approved(conversation))
+
+
+class TestAMangledSheetOnDisk(InterviewCase):
+    """A hand edited sheet the guard cannot read is refused with the file,
+    exactly like a mangled message: a state the reader does not know would
+    otherwise pass as `not approved` and quietly reopen the questions."""
+
+    def mangle(self, **sheet):
+        conversation = started(self.root)
+        path = self.directory(conversation) / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["sheet"] = sheet if sheet else None
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        return conversation.id
+
+    def test_an_unknown_state_is_refused(self):
+        name = self.mangle(**dict(SHEET, state="maybe", proposed="",
+                                  approved=""))
+        with self.assertRaises(interview.InterviewError):
+            interview.load(self.root, name)
+
+    def test_a_field_of_the_wrong_shape_is_refused(self):
+        name = self.mangle(state="proposed", angle=3,
+                           elements=["ok"], moment="m", conviction="c",
+                           first_lines=["f"], proposed="", approved="")
+        with self.assertRaises(interview.InterviewError):
+            interview.load(self.root, name)
+
+    def test_a_list_holding_a_number_is_refused(self):
+        name = self.mangle(state="proposed", angle="a",
+                           elements=["ok", 3], moment="m", conviction="c",
+                           first_lines=["f"], proposed="", approved="")
+        with self.assertRaises(interview.InterviewError):
+            interview.load(self.root, name)
+
+    def test_an_explicit_null_reads_as_no_sheet(self):
+        name = self.mangle()
+        self.assertIsNone(interview.load(self.root, name).sheet)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -140,6 +140,7 @@ rejects. Its keys:
 | `started`, `updated` | timestamps, local time, seconds |
 | `usage` | the running token total, input and output |
 | `spent` | dollars, accumulated turn by turn at the rate of the model that ran that turn. `null` once any turn had no price, and empty in the transcript front matter: a total that silently drops a turn is worse than no total, and applying today's rate to yesterday's turns is worse still |
+| `sheet` | the validation sheet, once the engine has proposed one. Absent until then, so an older reader sees a file it already knows |
 | `messages` | the provider shaped message list, as it goes on the wire |
 
 It is rewritten after every step that changes the conversation, so what is on
@@ -155,6 +156,24 @@ worth naming, because both are shapes a naive writer produces:
   `tool_result` block is a tool answering and a `text` block is the person.
   They travel together whenever somebody answers after an interrupted tool
   call, and only the `text` blocks are ever credited as what was said.
+
+**`sheet` is the validation sheet of `linkedin-post`, and its `state` is the
+guard.** The skill says nothing is written until the sheet is approved; this
+key is where that rule lives on disk. It holds the five fields of the sheet
+exactly as the skill defines them (`angle`, `elements`, `moment`,
+`conviction`, `first_lines`), a `state` that is `proposed` or `approved`, and
+the two timestamps (`proposed`, `approved`). Three rules:
+
+- **Approving is the person's decision, made on their screen.** Nothing a
+  model can reach writes `approved`: the engine's tool can only propose.
+- **A `proposed` sheet is replaceable, an `approved` sheet is frozen.** If
+  something on the sheet is wrong, the person says so and the next proposal
+  replaces it; once approved, the sheet is what the draft answers to.
+- **An approved sheet ends the questions, not the interview.** No further
+  interview turn runs, but `state` stays `open`, because `closed` means the
+  interview became a post and names the file. The sheet is not transcript
+  either: it is the engine's restatement awaiting a decision, and the words
+  it restates are already in the transcript.
 
 `transcript.md` is rendered from `conversation.json` on every write and never
 parsed back. Its front matter carries `state` (`open` or `closed`), the

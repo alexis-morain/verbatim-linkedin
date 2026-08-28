@@ -1,6 +1,6 @@
 """The tool set the loop hands to a model, built for one instance.
 
-Four tools, each with a hard boundary, and every refusal says what to do
+Five tools, each with a hard boundary, and every refusal says what to do
 instead of only what went wrong, because its text is the tool result the
 model reads next.
 
@@ -34,6 +34,7 @@ from pathlib import Path
 
 from .agent import Tool, ToolRefused
 from .instance import Instance, InstanceError, WRITABLE
+from .interview import InterviewError
 from .providers import SECRET_MARKERS
 
 SUBPROCESS_TIMEOUT = 120.0
@@ -166,6 +167,47 @@ def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
         raise ToolRefused(redact(
             (done.stderr or done.stdout).strip(), environ))
     return redact(done.stdout.strip(), environ)
+
+
+# -------------------------------------------------------------- the fifth one
+
+SHEET_TOOL = "propose_sheet"
+
+
+def sheet_tool(propose) -> Tool:
+    """The validation sheet's tool, bound to one conversation, not to the
+    instance: `propose` is `interview.propose` closed over the conversation
+    the turn is running on. It can only ever propose. Approval is the
+    person's click on their screen, and no argument to this tool reaches
+    that value, the same shape of boundary as `publish_plan` and its
+    missing `--confirm`."""
+    def run(arguments: dict) -> str:
+        try:
+            propose(arguments)
+        except InterviewError as refusal:
+            raise ToolRefused(str(refusal)) from None
+        return ("the sheet is on the person's screen; approval happens "
+                "there, never in this conversation")
+    return Tool(
+        name=SHEET_TOOL,
+        description=(
+            "Put the validation sheet on the person's screen for approval. "
+            "One field per line of the sheet; first_lines takes one or two "
+            "proposals. A new proposal replaces a sheet not yet approved."),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "angle": {"type": "string"},
+                "elements": {"type": "array", "items": {"type": "string"}},
+                "moment": {"type": "string"},
+                "conviction": {"type": "string"},
+                "first_lines": {"type": "array",
+                                "items": {"type": "string"}},
+            },
+            "required": ["angle", "elements", "moment", "conviction",
+                         "first_lines"],
+        },
+        run=run)
 
 
 # ------------------------------------------------------------------- factory

@@ -182,6 +182,12 @@ def begin(request: Request):
     return RedirectResponse(f"/interview/{conversation.id}", status_code=303)
 
 
+#: Notices a redirect may carry back to the screen. A whitelist, because the
+#: query string is anybody's to write and an unknown value must render as
+#: nothing rather than reach the string table.
+NOTICES = ("sheet-changed", "turn-running")
+
+
 @router.get("/interview/{interview_id}")
 def screen(request: Request, interview_id: str):
     conversation = _conversation(request, interview_id)
@@ -191,11 +197,13 @@ def screen(request: Request, interview_id: str):
     except InstanceError:
         bank = None
     engine = _engine(request)
+    asked = request.query_params.get("notice", "")
     return _render(request, "interview.html",
                    conversation=conversation,
                    moments=interview.timeline(conversation),
                    spent=conversation.spent,
                    awaiting=_awaiting_answer(conversation),
+                   notice=asked if asked in NOTICES else "",
                    engine=engine, bank=bank,
                    strings=_frame_strings(request.app.state.t))
 
@@ -216,6 +224,55 @@ def discard(request: Request, interview_id: str):
     return RedirectResponse("/interview", status_code=303)
 
 
+@router.post("/interview/{interview_id}/sheet/approve")
+def approve_sheet(request: Request, interview_id: str, sheet: str = Form("")):
+    """The person's click, the only writer of `approved`.
+
+    Taken under the turn lock: a running turn is saving this conversation,
+    and an approval written beside it would be overwritten by the turn's next
+    save, an approval lost in silence. Losing the lock loses nothing: the
+    screen comes back showing the sheet still proposed, and the click can
+    happen again once the turn is done.
+
+    `sheet` is the digest of the sheet as the page showed it. The disk can be
+    newer than the screen, one tab or two, and an approval that lands on a
+    replacement the person never read would put their signature under the
+    model's unreviewed text. A mismatch approves nothing and the screen says
+    why, showing what is actually there now.
+    """
+    root = request.app.state.instance.root
+    try:
+        interview.load(root, interview_id)
+    except interview.InterviewError:
+        # Discarded from another tab. The hub is the screen that says so.
+        return RedirectResponse("/interview", status_code=303)
+    lock = lock_for(request.app, interview_id)
+    if lock.acquire(blocking=False):
+        try:
+            try:
+                conversation = interview.load(root, interview_id)
+                if interview.approve(conversation, sheet):
+                    interview.save(root, conversation)
+            except interview.SheetChanged:
+                # The code travels in the URL, the sentence lives in the pack.
+                return RedirectResponse(
+                    f"/interview/{interview_id}?notice=sheet-changed",
+                    status_code=303)
+            except interview.InterviewError:
+                # No sheet, or a closed interview: the screen already shows
+                # what is actually there, and a plain form navigation gets a
+                # screen, not a sentence written here.
+                pass
+        finally:
+            lock.release()
+        return RedirectResponse(f"/interview/{interview_id}", status_code=303)
+    # The lock lost to a running turn. Approving nothing is right; saying
+    # nothing about it would send the person a page that looks identical to
+    # the one they clicked, minus their click.
+    return RedirectResponse(f"/interview/{interview_id}?notice=turn-running",
+                            status_code=303)
+
+
 @router.post("/interview/{interview_id}/turn")
 def turn(request: Request, interview_id: str, text: str = Form("")):
     """Validate here, write inside the stream.
@@ -233,6 +290,10 @@ def turn(request: Request, interview_id: str, text: str = Form("")):
     conversation = _conversation(request, interview_id)
     if conversation.state != interview.OPEN:
         raise HTTPException(status_code=409, detail="closed")
+    if interview.sheet_approved(conversation):
+        # The skill's rule made mechanical: an approved sheet ends the
+        # questions. Drafting reads the sheet; it does not reopen the turn.
+        raise HTTPException(status_code=409, detail="sheet-approved")
     if not text.strip() and not _awaiting_answer(conversation):
         raise HTTPException(status_code=422, detail="nothing-to-send")
     lock = lock_for(request.app, interview_id)
@@ -262,6 +323,16 @@ def _running(so_far, model: str, this_turn):
         return None
     cost = price(model, this_turn)
     return None if cost is None else so_far + cost
+
+
+def _sheet_fields(sheet) -> dict:
+    """What the browser fills the sheet panel with. Values only: the labels
+    are on the page already, rendered from the language pack."""
+    return dict(state=sheet.state, angle=sheet.angle,
+                elements=list(sheet.elements), moment=sheet.moment,
+                conviction=sheet.conviction,
+                first_lines=list(sheet.first_lines),
+                digest=sheet.digest())
 
 
 def _frame(kind: str, **fields) -> str:
@@ -309,6 +380,11 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock):
         if conversation.state != interview.OPEN:
             yield _frame("error", code="closed")
             return
+        if interview.sheet_approved(conversation):
+            # Re-checked under the lock, like `closed` above: the copy the
+            # handler refused on is only as fresh as losing the race left it.
+            yield _frame("error", code="sheet-approved")
+            return
         if text.strip():
             interview.say(conversation, text)
         conversation.provider = engine.settings.provider
@@ -322,11 +398,15 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock):
         keep()
         yield _frame("accepted")
 
-        from ..tools import instance_tools
+        from ..tools import SHEET_TOOL, instance_tools, sheet_tool
         block = _block(request, conversation)
-        agent = Agent(engine.settings,
-                      instance_tools(root, request.app.state.bundle,
-                                     environ=request.app.state.environ),
+        tools = instance_tools(root, request.app.state.bundle,
+                               environ=request.app.state.environ)
+        # Bound to this conversation, not to the instance: the proposal lands
+        # on the object the turn is saving, so the next `keep` writes it.
+        tools.append(sheet_tool(
+            lambda arguments: interview.propose(conversation, arguments)))
+        agent = Agent(engine.settings, tools,
                       transport=request.app.state.transport or http_transport())
         for step in agent.run(block.text, conversation.messages):
             if step.kind == "text":
@@ -353,6 +433,9 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock):
                 yield _frame("tool_result", id=step.call.id,
                              name=step.call.name, result=step.result,
                              is_error=step.is_error)
+                if step.call.name == SHEET_TOOL and not step.is_error:
+                    # Already on disk: the save above ran after the tool did.
+                    yield _frame("sheet", **_sheet_fields(conversation.sheet))
             elif step.kind == "stop":
                 # Whether the model still owes a reply is read off the
                 # conversation, never inferred from the reason it stopped: a
@@ -405,7 +488,7 @@ FRAME_KEYS = (
     "interview.error_turn_running", "interview.error_closed",
     "interview.error_not_configured", "interview.error_nothing_to_send",
     "interview.error_gone", "interview.error_engine_failed",
-    "interview.error_bundle_broken",
+    "interview.error_bundle_broken", "interview.error_sheet_approved",
     "interview.error_unknown", "interview.tokens", "interview.spent",
 )
 

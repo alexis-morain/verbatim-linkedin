@@ -27,6 +27,7 @@ Standard library only, like the rest of the engine seam.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -47,6 +48,11 @@ TRANSCRIPT = "transcript.md"
 OPEN = "open"
 CLOSED = "closed"
 
+#: The validation sheet's two states. `proposed` is replaceable, `approved`
+#: is frozen, and only a person's click ever writes the second one.
+PROPOSED = "proposed"
+APPROVED = "approved"
+
 #: What one moment of a conversation is, once the wire shape is read for what
 #: it means. `said` and `asked` are people talking; `call` and `result` are the
 #: engine reaching for a file. The screen shows all four, the transcript keeps
@@ -59,7 +65,7 @@ SAID, ASKED, CALL, RESULT = "said", "asked", "call", "result"
 #: than reaching somebody's first question.
 STEP_SKILL = "linkedin-post"
 STEP_SECTIONS = ("Before anything", "The interview",
-                 "The break: format and angle")
+                 "The break: format and angle", "The validation sheet")
 
 #: The contract's name format, and the whole path guard: an id that is not a
 #: timestamp cannot address anything, inside this directory or out of it.
@@ -76,7 +82,46 @@ class InterviewError(Exception):
     pass
 
 
+class SheetChanged(InterviewError):
+    """The sheet on disk is not the sheet the person read. Its own type
+    because the answer is a different screen: read again, then decide."""
+
+
 # ------------------------------------------------------------------ the state
+
+@dataclass
+class Sheet:
+    """The validation sheet, `references/instance.md` under interviews/.
+
+    The five fields are the skill's, spelled the same. The guard is `state`:
+    nothing drafts until it is `approved`, a `proposed` sheet is replaced by
+    the next proposal, an `approved` one is frozen. Approving is the person's
+    click on their screen, which is why nothing in `propose` can write it.
+    """
+    angle: str
+    elements: tuple
+    moment: str
+    conviction: str
+    first_lines: tuple
+    state: str = PROPOSED
+    proposed: str = ""
+    approved: str = ""
+
+    def digest(self) -> str:
+        """What identifies this sheet: its content, nothing else.
+
+        An approval must sign the sheet the person read, and the form that
+        carries the click can be older than the disk: a turn still streaming
+        can replace a proposed sheet behind a screen already drawn. So the
+        page carries this digest and `approve` refuses a mismatch. Content
+        only, no timestamp: two proposals with the same five fields are the
+        same decision, and a turn can propose twice inside one second.
+        """
+        payload = json.dumps(
+            [self.angle, list(self.elements), self.moment, self.conviction,
+             list(self.first_lines)], ensure_ascii=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
 
 @dataclass
 class Conversation:
@@ -97,6 +142,7 @@ class Conversation:
     #: drops a turn is worse than no total, and applying today's rate to
     #: yesterday's turns is worse still.
     spent: float | None = 0.0
+    sheet: Sheet | None = None
     messages: list = field(default_factory=list)
 
     # -- what the person said, and nothing else
@@ -249,6 +295,88 @@ def say(conversation: Conversation, text: str) -> None:
     conversation.messages.append({"role": "user", "content": [block]})
 
 
+def _sheet_line(arguments: dict, name: str) -> str:
+    value = arguments.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise InterviewError(f"the sheet needs {name!r}, a non-empty string")
+    return value.strip()
+
+
+def _sheet_lines(arguments: dict, name: str, most: int = 0) -> tuple:
+    value = arguments.get(name)
+    if not isinstance(value, list) or not value or not all(
+            isinstance(entry, str) and entry.strip() for entry in value):
+        raise InterviewError(
+            f"the sheet needs {name!r}, a non-empty list of non-empty strings")
+    if most and len(value) > most:
+        raise InterviewError(f"{name!r} takes at most {most} entries")
+    return tuple(entry.strip() for entry in value)
+
+
+def propose(conversation: Conversation, arguments: dict,
+            now: datetime | None = None) -> Sheet:
+    """The engine's half of the sheet: propose, never decide.
+
+    Raised messages address the model, because they travel back as the tool
+    result. A proposal on a conversation whose sheet is already approved is
+    refused rather than replacing it: the approved sheet is what the person
+    signed, and the guard would be worth nothing if the next turn could swap
+    what sits under their signature.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            "this interview is closed; nothing about it changes any more")
+    if conversation.sheet is not None and conversation.sheet.state == APPROVED:
+        raise InterviewError(
+            "the sheet of this interview is approved and frozen; "
+            "it cannot be replaced")
+    sheet = Sheet(
+        angle=_sheet_line(arguments, "angle"),
+        elements=_sheet_lines(arguments, "elements"),
+        moment=_sheet_line(arguments, "moment"),
+        conviction=_sheet_line(arguments, "conviction"),
+        first_lines=_sheet_lines(arguments, "first_lines", most=2),
+        proposed=(now or datetime.now()).strftime(STAMP))
+    conversation.sheet = sheet
+    return sheet
+
+
+def approve(conversation: Conversation, digest: str,
+            now: datetime | None = None) -> bool:
+    """The person's half: freeze the sheet. Returns whether anything changed,
+    so a double click is a repeat of the same decision, not an error. The
+    caller saves; approval is not worth anything until it is on disk.
+
+    `digest` is the identity of the sheet as the person read it, required
+    positionally so no caller can approve blind: a proposal can replace the
+    sheet between the screen being drawn and the click landing, and the party
+    writing replacements is the model, the very party the sheet guards
+    against. A signature that can land on unread text is not a signature.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            f"interview {conversation.id} is closed; its sheet is settled")
+    if conversation.sheet is None:
+        raise InterviewError(
+            f"interview {conversation.id} has no sheet to approve")
+    if digest != conversation.sheet.digest():
+        raise SheetChanged(
+            f"the sheet of {conversation.id} is not the one this approval "
+            "was read from")
+    if conversation.sheet.state == APPROVED:
+        return False
+    conversation.sheet.state = APPROVED
+    conversation.sheet.approved = (now or datetime.now()).strftime(STAMP)
+    return True
+
+
+def sheet_approved(conversation: Conversation) -> bool:
+    """The guard every consumer asks about: no interview turn runs past an
+    approved sheet, and nothing drafts before one."""
+    return (conversation.sheet is not None
+            and conversation.sheet.state == APPROVED)
+
+
 def start(instance_root, *, skill: str, sections, interface_language: str,
           output_language: str, provider: str, model: str,
           now: datetime | None = None) -> Conversation:
@@ -389,7 +517,7 @@ def discard(instance_root, interview_id: str) -> None:
 # ----------------------------------------------------------------- the format
 
 def _as_json(conversation: Conversation) -> str:
-    return json.dumps({
+    data = {
         "version": VERSION,
         "id": conversation.id,
         "skill": conversation.skill,
@@ -405,8 +533,23 @@ def _as_json(conversation: Conversation) -> str:
         "usage": {"input_tokens": conversation.usage.input_tokens,
                   "output_tokens": conversation.usage.output_tokens},
         "spent": conversation.spent,
-        "messages": conversation.messages,
-    }, ensure_ascii=False, indent=2) + "\n"
+    }
+    if conversation.sheet is not None:
+        # Absent until proposed, per the contract: a conversation without a
+        # sheet stays a file an older reader already knows byte for byte.
+        sheet = conversation.sheet
+        data["sheet"] = {
+            "state": sheet.state,
+            "angle": sheet.angle,
+            "elements": list(sheet.elements),
+            "moment": sheet.moment,
+            "conviction": sheet.conviction,
+            "first_lines": list(sheet.first_lines),
+            "proposed": sheet.proposed,
+            "approved": sheet.approved,
+        }
+    data["messages"] = conversation.messages
+    return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
 
 def _from_json(raw: str, interview_id: str) -> Conversation:
@@ -474,7 +617,41 @@ def _build(data: dict, interview_id: str) -> Conversation:
         usage=Usage(int(usage.get("input_tokens") or 0),
                     int(usage.get("output_tokens") or 0)),
         spent=spent,
+        sheet=_check_sheet(data.get("sheet")),
         messages=data["messages"])
+
+
+def _check_sheet(data) -> Sheet | None:
+    """The sheet, refused when it does not hold one.
+
+    Strict on shape and on `state`, for the same reason `_check_message` is:
+    the guard reads `state`, and a hand edited value it does not know would
+    otherwise pass as `not approved` and quietly reopen the questions. Length
+    rules are proposal time rules and are not re-litigated here.
+    """
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("sheet")
+    if data.get("state") not in (PROPOSED, APPROVED):
+        raise ValueError("sheet")
+    for name in ("angle", "moment", "conviction", "proposed", "approved"):
+        if not isinstance(data.get(name, ""), str):
+            raise ValueError("sheet")
+    for name in ("elements", "first_lines"):
+        entries = data.get(name)
+        if not isinstance(entries, list) or not all(
+                isinstance(entry, str) for entry in entries):
+            raise ValueError("sheet")
+    return Sheet(
+        angle=str(data.get("angle", "")),
+        elements=tuple(data["elements"]),
+        moment=str(data.get("moment", "")),
+        conviction=str(data.get("conviction", "")),
+        first_lines=tuple(data["first_lines"]),
+        state=data["state"],
+        proposed=str(data.get("proposed", "")),
+        approved=str(data.get("approved", "")))
 
 
 def _check_message(message) -> None:

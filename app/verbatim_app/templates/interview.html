@@ -40,7 +40,46 @@
   {% endfor %}
 </div>
 
-{% if conversation.state == 'open' %}
+{% set sheet = conversation.sheet %}
+{# The sheet skeleton is on the page even before a sheet exists: the labels
+   come from the language pack server side, and the script only ever fills
+   values into slots and reveals the panel. Approval is a plain form POST,
+   the one writer of `approved`. #}
+<section class="sheet" id="sheet"{% if not sheet %} hidden{% endif %}>
+  <h2>{{ t('interview.sheet') }}</h2>
+  {% if notice == 'sheet-changed' %}
+  <p class="callout">{{ t('interview.sheet_changed') }}</p>
+  {% elif notice == 'turn-running' %}
+  <p class="callout">{{ t('interview.error_turn_running') }}</p>
+  {% endif %}
+  <p class="hint">{{ t('interview.sheet_hint') }}</p>
+  <dl class="sheet-fields">
+    <dt class="mono">{{ t('interview.sheet_angle') }}</dt>
+    <dd id="sheet-angle">{{ sheet.angle if sheet }}</dd>
+    <dt class="mono">{{ t('interview.sheet_elements') }}</dt>
+    <dd><ul id="sheet-elements">{% if sheet %}{% for element in sheet.elements %}<li>{{ element }}</li>{% endfor %}{% endif %}</ul></dd>
+    <dt class="mono">{{ t('interview.sheet_moment') }}</dt>
+    <dd id="sheet-moment" class="their-words">{{ sheet.moment if sheet }}</dd>
+    <dt class="mono">{{ t('interview.sheet_conviction') }}</dt>
+    <dd id="sheet-conviction" class="their-words">{{ sheet.conviction if sheet }}</dd>
+    <dt class="mono">{{ t('interview.sheet_first_lines') }}</dt>
+    <dd><ul id="sheet-first-lines" class="their-words">{% if sheet %}{% for line in sheet.first_lines %}<li>{{ line }}</li>{% endfor %}{% endif %}</ul></dd>
+  </dl>
+  {% if conversation.state == 'open' %}
+  <form id="sheet-approve" method="post" action="/interview/{{ conversation.id }}/sheet/approve"{% if not sheet or sheet.state != 'proposed' %} hidden{% endif %}>
+    {# The identity of the sheet as this page shows it. The disk can be newer
+       than the screen, and an approval only ever signs what was read. #}
+    <input type="hidden" name="sheet" id="sheet-digest" value="{{ sheet.digest() if sheet }}">
+    <p class="hint">{{ t('interview.sheet_approve_hint') }}</p>
+    <button type="submit">{{ t('interview.sheet_approve') }}</button>
+  </form>
+  {% endif %}
+  <p class="callout" id="sheet-approved-notice"{% if not sheet or sheet.state != 'approved' %} hidden{% endif %}>{{ t('interview.sheet_approved_notice') }}</p>
+</section>
+
+{% if conversation.state == 'open' and sheet and sheet.state == 'approved' %}
+<p class="empty">{{ t('interview.sheet_closed_notice') }}</p>
+{% elif conversation.state == 'open' %}
 <p class="callout" id="awaiting"{% if not awaiting %} hidden{% endif %}>{{ t('interview.awaiting') }}</p>
 <button type="button" id="resume"{% if not awaiting %} hidden{% endif %}>{{ t('interview.resume') }}</button>
 <form id="say" method="post" action="/interview/{{ conversation.id }}/turn">

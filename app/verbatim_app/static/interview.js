@@ -93,7 +93,9 @@
       return;
     }
     current = null;
-    if (frame.kind === "tool_call") {
+    if (frame.kind === "sheet") {
+      sheet(frame);
+    } else if (frame.kind === "tool_call") {
       note(T.tool_call + " " + frame.name + " "
            + JSON.stringify(frame.arguments));
     } else if (frame.kind === "tool_result") {
@@ -122,6 +124,40 @@
          refusal decided before that wrote nothing to answer. */
       if (!frame.code || frame.code === "engine-failed") { owing(true); }
     }
+  }
+
+  function refill(node, entries) {
+    if (!node) { return; }
+    while (node.firstChild) { node.removeChild(node.firstChild); }
+    (entries || []).forEach(function (entry) {
+      var item = document.createElement("li");
+      item.textContent = entry;
+      node.appendChild(item);
+    });
+  }
+
+  function sheet(frame) {
+    /* Values into slots, nothing else: the panel and its labels are on the
+       page already, rendered from the language pack. The approve form is the
+       page's own, a plain POST; nothing here writes an approval. */
+    var panel = document.getElementById("sheet");
+    if (!panel) { return; }
+    var slots = {"sheet-angle": frame.angle, "sheet-moment": frame.moment,
+                 "sheet-conviction": frame.conviction};
+    Object.keys(slots).forEach(function (id) {
+      var node = document.getElementById(id);
+      if (node) { node.textContent = slots[id]; }
+    });
+    refill(document.getElementById("sheet-elements"), frame.elements);
+    refill(document.getElementById("sheet-first-lines"), frame.first_lines);
+    /* The form signs what is displayed. Filling the panel without moving
+       the digest would recreate, on the live path, exactly the stale
+       signature the digest exists to refuse. */
+    var digest = document.getElementById("sheet-digest");
+    if (digest) { digest.value = frame.digest || ""; }
+    var approve = document.getElementById("sheet-approve");
+    if (approve) { approve.hidden = frame.state !== "proposed"; }
+    panel.hidden = false;
   }
 
   function commit() {
