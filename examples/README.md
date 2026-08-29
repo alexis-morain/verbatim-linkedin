@@ -18,7 +18,7 @@ structure.
 | `pillars.md` | Pillars written as postures with effect labels, and a ratio derived from a stated objective. |
 | `ideas.md` | Angles with funnel labels and named material, not subjects. |
 | `corpus/` | One published post, as reference material. |
-| `posts/` | One generated post with its measurement front matter filled in at J+7. |
+| `posts/` | Three posts: one measured at J+7, one published and not measured yet, one still a draft with its session notes under it. |
 
 ## What to notice
 
@@ -36,3 +36,9 @@ the file.
 
 **One measurement line is empty on purpose**, in `posts/`, with a note saying
 why. A record that pretends to be complete is worse than one that admits a gap.
+
+**One post is still a draft**, which is where archiving leaves every post: it
+is filed, it is counted nowhere, and publishing is a separate step. Read what
+sits under `Session notes, not published:` in that file. Those are the anchors
+and the interview sentences behind them, they are not part of the post, and
+what a publishing tier receives is cut at that line.

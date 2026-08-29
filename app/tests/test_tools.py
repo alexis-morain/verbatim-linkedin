@@ -21,8 +21,12 @@ sys.path.insert(0, str(REPO / "app"))
 from verbatim_app.agent import ToolRefused  # noqa: E402
 from verbatim_app.interview import InterviewError  # noqa: E402
 from verbatim_app.tools import (  # noqa: E402
-    DRAFT_TOOL, SHEET_TOOL, draft_tool, instance_tools,
+    EXIT_UNFINISHED, PUBLISH_TIMEOUT, DRAFT_TOOL, SHEET_TOOL, ToolUnfinished,
+    draft_tool, instance_tools, publish_plan_text, publish_send,
 )
+
+sys.path.insert(0, str(REPO / "lib"))
+import publish  # noqa: E402
 
 
 class ToolsCase(unittest.TestCase):
@@ -31,6 +35,13 @@ class ToolsCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "examples", self.root)
+        # examples/ is a real instance and people point the app at it, which
+        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # invisible in a diff and permanent on that machine: without this the
+        # fixture inherits somebody's conversation and three tests go red with
+        # nothing in the failure naming the cause. Found by a reviewer whose
+        # checkout had one.
+        shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         (self.root / ".env").write_text(
             "VERBATIM_PROVIDER=openai\nVERBATIM_MODEL=zephyr-test\n",
@@ -187,6 +198,147 @@ class TestPublishPlan(ToolsCase):
         plan = self.run_tool("publish_plan", text="A short post.")
         self.assertNotIn("hunter2-secret-value", plan)
         self.assertIn("[MY_API_KEY]", plan)
+
+
+class TestTheScreensPublishSeam(unittest.TestCase):
+    """The screen runs the same script as the tool, and it is the only caller
+    that may pass --confirm. A human click is the authority the tool does not
+    have, so these two functions live next to each other and only one of them
+    is ever wrapped as a Tool."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="verbatim-publish-")
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.root = Path(self.tmp) / "instance"
+        self.root.mkdir(parents=True)
+        self.environ = dict(os.environ)
+        for name in ("LINKEDIN_PUBLISH", "POSTIZ_INTEGRATION_ID",
+                     "POSTIZ_INTEGRATION_NAME", "LINKEDIN_PUBLISH_CMD"):
+            self.environ.pop(name, None)
+
+    def plan(self, text, **kwargs):
+        return publish_plan_text(REPO, self.root, text,
+                                 environ=self.environ, **kwargs)
+
+    def send(self, text, **kwargs):
+        return publish_send(REPO, self.root, text,
+                            environ=self.environ, **kwargs)
+
+    def postiz(self):
+        self.environ["LINKEDIN_PUBLISH"] = "postiz"
+        self.environ["POSTIZ_INTEGRATION_ID"] = "chan-123"
+        self.environ["POSTIZ_INTEGRATION_NAME"] = "Personal profile"
+
+    # -- the plan
+
+    def test_the_plan_names_the_tier_and_the_target(self):
+        self.postiz()
+        plan = self.plan("A short post.")
+        self.assertIn("chan-123", plan)
+        self.assertIn("Personal profile", plan)
+
+    def test_a_scheduled_time_is_in_the_plan_it_is_confirmed_against(self):
+        plan = self.plan("A short post.", when="2026-09-01T07:30")
+        self.assertIn("2026-09-01T07:30", plan)
+
+    def test_a_tier_that_is_not_configured_refuses_with_the_scripts_words(self):
+        self.environ["LINKEDIN_PUBLISH"] = "postiz"
+        with self.assertRaises(ToolRefused) as caught:
+            self.plan("A short post.")
+        self.assertIn("POSTIZ_INTEGRATION_ID", str(caught.exception))
+
+    # -- the send
+
+    def test_the_copy_tier_gives_back_the_post_and_opens_no_socket(self):
+        done = self.send("A short post.\n\nDone.")
+        self.assertIn("A short post.", done.payload)
+        self.assertIn("paste", done.note)
+
+    def test_a_scheduler_never_receives_raw_text(self):
+        # The named trap: consecutive paragraphs render with no gap, and a
+        # decomposed accent arrives as a letter with something beside it.
+        self.postiz()
+        done = self.send("Premie\u0301re ligne.\n\nDeuxie\u0300me.",
+                         when="2026-09-01T07:30:00")
+        self.assertIn("<p>", done.payload)
+        self.assertIn("<p></p>", done.payload)
+        self.assertIn("Premi\u00e9re", done.payload)
+        self.assertNotIn("e\u0301", done.payload)
+        self.assertIn("2026-09-01T07:30:00", done.payload)
+
+    def test_the_command_tier_actually_runs_the_command(self):
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "tr a-z A-Z"
+        done = self.send("shout this.")
+        self.assertIn("SHOUT THIS.", done.payload)
+
+    def test_a_command_that_fails_is_a_refusal_not_a_silent_pass(self):
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "exit 3"
+        with self.assertRaises(ToolRefused):
+            self.send("A short post.")
+
+    def test_a_post_past_the_platform_limit_never_reaches_a_tier(self):
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "false"
+        with self.assertRaises(ToolRefused) as caught:
+            self.send("x" * 3200)
+        self.assertIn("3000", str(caught.exception))
+
+    def test_the_app_gives_the_script_longer_than_the_script_gives_a_command(self):
+        # The inner deadline has to fire first, so the command gets the whole
+        # time the script promised it and the script gets to say what
+        # happened. Equal deadlines are not enough: the outer clock starts
+        # first, so it wins a tie. Found in review.
+        self.assertGreater(PUBLISH_TIMEOUT, publish.COMMAND_TIMEOUT)
+
+    def test_the_exit_code_the_two_sides_agree_on(self):
+        # `lib/` is run as a subprocess, never imported into the app, so the
+        # number lives in both files. This is what stops them drifting: a
+        # drift here turns "the tier took it and failed" back into "nothing
+        # was sent", which is the sentence that was wrong to begin with.
+        self.assertEqual(EXIT_UNFINISHED, publish.EXIT_UNFINISHED)
+        self.assertNotEqual(publish.EXIT_UNFINISHED, publish.EXIT_REFUSED)
+
+    def test_a_tier_that_was_reached_and_failed_is_not_a_plain_refusal(self):
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "cat >/dev/null; exit 7"
+        with self.assertRaises(ToolUnfinished) as caught:
+            self.send("A short post.")
+        # Still a refusal, so every caller that handles one keeps working;
+        # what the subclass adds is that nobody knows what was already done.
+        self.assertIsInstance(caught.exception, ToolRefused)
+
+    def test_a_tier_that_was_never_usable_is_a_plain_refusal(self):
+        self.environ["LINKEDIN_PUBLISH"] = "postiz"
+        with self.assertRaises(ToolRefused) as caught:
+            self.send("A short post.")
+        self.assertNotIsInstance(caught.exception, ToolUnfinished)
+
+    def test_a_killed_subprocess_is_its_own_outcome_too(self):
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "sleep 5"
+        with self.assertRaises(ToolUnfinished) as caught:
+            self.send("A short post.", timeout=0.6)
+        self.assertIn("killed", str(caught.exception))
+
+    def test_a_killed_style_pass_still_says_to_try_again(self):
+        # The style pass sends nothing anywhere, so the advice that fits a
+        # killed publish is the wrong advice here, and the reverse.
+        from verbatim_app.tools import lint_body
+        with self.assertRaises(ToolRefused) as caught:
+            lint_body(REPO, self.root, "A post.", "en",
+                      environ=self.environ, timeout=0.001)
+        self.assertNotIsInstance(caught.exception, ToolUnfinished)
+        self.assertIn("try again", str(caught.exception))
+
+    def test_a_secret_value_never_reaches_the_screen_either(self):
+        self.environ["MY_API_KEY"] = "hunter2-secret-value"
+        self.environ["LINKEDIN_PUBLISH"] = "command"
+        self.environ["LINKEDIN_PUBLISH_CMD"] = "echo hunter2-secret-value"
+        done = self.send("A short post.")
+        self.assertNotIn("hunter2-secret-value", done.payload)
+        self.assertIn("[MY_API_KEY]", done.payload)
 
 
 class TestTheDraftTool(unittest.TestCase):

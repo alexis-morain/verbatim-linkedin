@@ -80,6 +80,13 @@ class WebCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-interview-web-")
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "examples", self.root)
+        # examples/ is a real instance and people point the app at it, which
+        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # invisible in a diff and permanent on that machine: without this the
+        # fixture inherits somebody's conversation and three tests go red with
+        # nothing in the failure naming the cause. Found by a reviewer whose
+        # checkout had one.
+        shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         self.transport = Replay(*self.scripts)
         self.app = create_app(self.root, lang=self.lang,
@@ -2253,7 +2260,8 @@ class TestArchiving(ArchiveCase):
                           page.text)
         self.assertEqual(
             interview.load(self.root, interview_id).state, interview.OPEN)
-        self.assertEqual(list((self.root / "posts").glob("2026-08-29-*")), [])
+        self.assertEqual(
+            list((self.root / "posts").glob("2026-08-29-agences-*")), [])
 
     def test_a_name_already_taken_stops_the_step(self):
         interview_id = self.drafted()
@@ -2280,7 +2288,8 @@ class TestArchiving(ArchiveCase):
         page = self.file_it(interview_id)
         self.assertIn(shown(self.app.state.t("interview.archive_signature_missing")),
                       page.text)
-        self.assertEqual(list((self.root / "posts").glob("2026-08-29-*")), [])
+        self.assertEqual(
+            list((self.root / "posts").glob("2026-08-29-agences-*")), [])
 
     def test_the_consumed_angle_moves_into_used(self):
         interview_id = self.drafted()

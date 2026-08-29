@@ -30,7 +30,13 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from . import interview
-from .instance import Instance, InstanceError, NameTaken, UnreadableError
+#: `STATES` is the three states of `references/measure.md`, imported rather
+#: than repeated: archiving starts a post at `draft` and the publishing step
+#: moves it, so the vocabulary belongs to the module that owns the front
+#: matter contract rather than to either step.
+from .instance import (
+    STATES, Instance, InstanceError, NameTaken, UnreadableError,
+)
 
 #: The formats of `references/formats.md`, slugged the way the example posts
 #: spell them. Pinned by a test against the reference rather than parsed out of
@@ -41,11 +47,6 @@ FORMATS = ("counter-intuitive-number", "the-breakdown", "the-post-mortem",
 
 #: The three objective labels, same file.
 LABELS = ("VISIBILITY", "TRUST", "ACTION")
-
-#: The three states of `references/measure.md`. Every count in the system runs
-#: over `published` alone, which is why a fourth one invented here would be a
-#: post counted nowhere.
-STATES = ("draft", "scheduled", "published")
 
 #: Three pillars, and the contract says three. A fourth index would be a post
 #: filed against a pillar the ratio does not know about.
@@ -161,6 +162,30 @@ def compose(conversation, filing: Filing, *, signature: str = "") -> str:
     ])
     return "\n".join([front, "", text, "", "---", "", NOTES_MARKER, "",
                       _notes(conversation), ""])
+
+
+def post_only(body: str) -> str:
+    """The post, cut out of a post file's body at the session notes seam.
+
+    Publishing reads a file this module wrote, and everything below the seam
+    is emphatically not the post: the sheet, every anchor the engine claimed
+    and the interview sentence backing each one, which is the rawest material
+    an instance holds. A tier handed the file body would put all of it in a
+    feed.
+
+    Cut at the marker, never at the rule above it: a post is allowed to
+    contain a line of dashes, and `NOTES_MARKER` is the seam the contract
+    fixes. The first occurrence wins, so a post that somehow contained the
+    marker itself publishes less rather than publishing notes.
+
+    A body with no seam comes back whole. That is a post file written by hand
+    or by a version older than the notes, and refusing it would be refusing to
+    publish somebody's own file over a section this module invented.
+    """
+    if NOTES_MARKER not in body:
+        return body.strip()
+    post = body.split(NOTES_MARKER, 1)[0].rstrip()
+    return re.sub(r"\n-{3,}\s*\Z", "", post).strip()
 
 
 def archive(instance: Instance, interview_id: str, filing: Filing, *,

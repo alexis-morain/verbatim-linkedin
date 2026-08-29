@@ -35,6 +35,19 @@ MAX_CHARS = 3000
 # used for a warning, never for a refusal. See references/platform.md.
 FOLD_CHARS = 200
 
+# How long the command tier is given. Named because the app that drives this
+# script has its own deadline over the whole subprocess, and that one has to
+# be the longer of the two: whichever fires first is the one whose message a
+# person reads, and this one at least knows a command was dispatched.
+COMMAND_TIMEOUT = 120
+
+# What a link looks like in a post body: an explicit scheme, or a bare www
+# host. Deliberately narrow. A bare domain in ordinary prose, "we run on
+# postgres.org here", is common enough that widening this would cry
+# disclosure over posts carrying no link at all, and a warning that fires on
+# everything is a warning nobody reads.
+LINK = re.compile(r"(?:\bhttps?://|(?<![\w.])www\.)[^\s<>()]+", re.IGNORECASE)
+
 
 class ConfigError(Exception):
     """The publishing tier is not usable as configured."""
@@ -45,7 +58,30 @@ class PostError(Exception):
 
 
 class PublishError(Exception):
-    """The configured tier was reached and it failed."""
+    """The configured tier was reached and it failed.
+
+    Its own exit code, below, and that is the whole point of it. A caller has
+    to be able to tell this from a tier that was never usable: nothing was
+    dispatched there, and here something was. Whether it published before it
+    failed is not knowable from here, and a caller that answered this with
+    "nothing was sent" would be lying at the only moment it matters.
+
+    **It is deliberately the safe side of an imprecise line.** A command tier
+    runs through a shell, so a program that does not exist comes back as exit
+    127 and lands here too, and the caller then says a post may be out that
+    could not have been. The alternative is to read 127 and 126 as "never
+    ran", which is wrong for `real-publisher; typo` and would put the
+    dangerous lie back. Erring towards "go and look" is the choice; the
+    shell's own message travels with it and usually says which case it is.
+    """
+
+
+#: Nothing was dispatched: the tier is not usable as configured, or the post
+#: is not publishable.
+EXIT_REFUSED = 2
+
+#: The tier was reached and it failed. Whether anything went out is unknown.
+EXIT_UNFINISHED = 3
 
 
 @dataclass
@@ -112,7 +148,6 @@ def check(text: str) -> str:
     return body
 
 
-
 def to_scheduler_html(text: str) -> str:
     """Turn a post into the HTML a scheduling tool expects.
 
@@ -144,6 +179,13 @@ def to_scheduler_html(text: str) -> str:
         out.append("<p>" + block + "</p>")
     return "<p></p>".join(out)
 
+
+def links(text: str) -> list:
+    """Every link in a post body, in order. Public because the plan is not the
+    only caller that has to ask the disclosure question."""
+    return LINK.findall(text)
+
+
 def plan(text: str, tier: Tier, when) -> str:
     """What is about to happen, in words, before anything happens."""
     body = check(text)
@@ -171,6 +213,22 @@ def plan(text: str, tier: Tier, when) -> str:
         lines.append(
             "warning   POSTIZ_INTEGRATION_NAME is not set, so this plan cannot "
             "show you which channel that id belongs to. Set it."
+        )
+    found = links(body)
+    if found:
+        # The documented trap, and the last place to catch it: a disclosure
+        # that was in the draft and not in the published version. Nothing here
+        # decides whether this post needs one, because nothing here can know
+        # whether there is a material connection behind a link. What is
+        # mechanical is that a post with no link at all never raises the
+        # question, so a post with one gets asked once, here, before sending.
+        lines.append(
+            f"disclose  this post carries {len(found)} "
+            f"link{'s' if len(found) > 1 else ''}. A paid, sponsored or "
+            "affiliate link is disclosed in the post body itself, not in a "
+            "comment and not below the fold. The wording that satisfies your "
+            "market is in locales/<lang>/market.md; this line does not decide "
+            "whether you owe one."
         )
     return "\n".join(lines)
 
@@ -204,7 +262,7 @@ def dispatch(text: str, tier: Tier, when, confirmed: bool) -> Result:
         try:
             proc = subprocess.run(
                 tier.command, shell=True, input=body, text=True,
-                capture_output=True, timeout=120,
+                capture_output=True, timeout=COMMAND_TIMEOUT,
             )
         except subprocess.TimeoutExpired as exc:
             raise PublishError(f"{tier.command} did not finish in time") from exc
@@ -238,9 +296,12 @@ def main(argv=None) -> int:
             print(plan(text, tier, args.when))
             return 0
         result = dispatch(text, tier, args.when, args.confirm)
-    except (ConfigError, PostError, PublishError) as exc:
+    except (ConfigError, PostError) as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return EXIT_REFUSED
+    except PublishError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_UNFINISHED
 
     print(result.payload)
     if result.note:

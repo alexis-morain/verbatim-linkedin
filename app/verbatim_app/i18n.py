@@ -18,15 +18,34 @@ class BundleError(Exception):
     pass
 
 
-def bundle_root() -> Path:
-    """The directory holding the router SKILL.md and locales/.
+#: Where a wheel puts the bundle: inside the package, because an installation
+#: has nothing two levels up to find. The name starts with an underscore so
+#: nobody mistakes it for a directory to edit.
+PACKAGED = "_bundle"
 
-    Source layout puts it two levels above this package. VERBATIM_BUNDLE
-    overrides for any other arrangement; packaging proper is step 6.
+
+def bundle_root(package=None) -> Path:
+    """The directory holding the router SKILL.md, locales/, skills/,
+    references/ and the two lib/ scripts.
+
+    Three places, tried in this order:
+
+    1. `VERBATIM_BUNDLE`, for any arrangement neither of the others covers.
+       A value naming no bundle falls through rather than stopping the app:
+       a stale export is not a reason to refuse to run in a tree that is
+       complete.
+    2. Two levels above this package, which is a checkout.
+    3. `_bundle` inside this package, which is what a wheel carries.
+
+    The checkout comes before the packaged copy on purpose. An editable
+    install has both, and the tree somebody is editing is the one they mean;
+    a snapshot that shadowed it would serve yesterday's language pack and say
+    nothing about it.
     """
+    here = Path(package) if package else Path(__file__).resolve().parent
     override = os.environ.get("VERBATIM_BUNDLE")
     candidates = [Path(override)] if override else []
-    candidates.append(Path(__file__).resolve().parents[2])
+    candidates += [here.resolve().parents[1], here.resolve() / PACKAGED]
     for candidate in candidates:
         if (candidate / "locales").is_dir() and (candidate / "SKILL.md").is_file():
             return candidate

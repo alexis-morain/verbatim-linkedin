@@ -67,6 +67,39 @@ class TestPlan(unittest.TestCase):
         self.assertIn(str(len(POST.strip())), text)
 
 
+class TestTheDisclosureLine(unittest.TestCase):
+    """The documented trap: a disclosure that survived the draft and not the
+    published version. A link in the body is the mechanical signal that the
+    question applies at all, so it is asked here, at the last screen before
+    anything is sent."""
+
+    def plan_for(self, body: str) -> str:
+        return publish.plan(body, publish.resolve({}), when=None)
+
+    def test_a_link_puts_the_disclosure_question_in_the_plan(self):
+        text = self.plan_for("A line.\n\nThe tool: https://example.com/x\n")
+        self.assertIn("disclos", text.lower())
+
+    def test_a_post_with_no_link_is_not_asked(self):
+        self.assertNotIn("disclos", self.plan_for(POST).lower())
+
+    def test_it_points_at_the_pack_rather_than_writing_the_wording(self):
+        # The wording is per market and per language. The engine names the
+        # file and stops, exactly as it does everywhere else.
+        text = self.plan_for("See https://example.com\n")
+        self.assertIn("market.md", text)
+
+    def test_a_bare_www_host_counts_as_a_link(self):
+        self.assertIn("disclos", self.plan_for("Go to www.example.com\n").lower())
+
+    def test_the_count_is_of_links_actually_in_the_body(self):
+        text = self.plan_for("https://a.example https://b.example\n")
+        self.assertIn("2 links", text)
+
+    def test_a_word_that_merely_contains_www_is_not_a_link(self):
+        self.assertNotIn("disclos", self.plan_for("The awwward went to us.\n").lower())
+
+
 class TestDispatch(unittest.TestCase):
     def test_copy_tier_returns_the_text_and_sends_nothing(self):
         out = publish.dispatch(POST, publish.resolve({}), when=None, confirmed=False)

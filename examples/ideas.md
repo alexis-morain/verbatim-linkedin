@@ -11,8 +11,6 @@ When an interview turns up a new angle, add it here before closing the session.
 
 ## Pillar 1. The argument, not the arithmetic
 
-- [P1] `VISIBILITY` Your model is not wrong, your commentary is. Material:
-  forecast error 31 to 6 percent, same model, different narrative.
 - [P1] `VISIBILITY` The board deck that reports last quarter turns a room of
   expensive people into an audience. Material: the eleven slides we deleted.
 - [P1] `TRUST` Founders think finance is a reporting function until the first
@@ -42,3 +40,4 @@ When an interview turns up a new angle, add it here before closing the session.
 
 <!-- date | pillar | angle | file -->
 2026-08-18 | P2 | Eleven hours for a first board pack | posts/2026-08-18-board-pack-hours.md
+2026-08-29 | P1 | Your model is not wrong, your commentary is | posts/2026-08-29-commentary-not-model.md

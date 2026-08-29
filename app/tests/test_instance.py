@@ -29,11 +29,24 @@ class InstanceCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-test-")
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "examples", self.root)
+        # examples/ is a real instance and people point the app at it, which
+        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # invisible in a diff and permanent on that machine: without this the
+        # fixture inherits somebody's conversation and three tests go red with
+        # nothing in the failure naming the cause. Found by a reviewer whose
+        # checkout had one.
+        shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         self.instance = Instance(self.root)
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
+
+    def named(self, filename: str):
+        """One post by name. The fixture grows a post whenever the example
+        instance gets a better thing to show, so an index into `posts()` is a
+        test that breaks for a reason that is not about the code."""
+        return [p for p in self.instance.posts() if p.filename == filename][0]
 
 
 class TestConformance(InstanceCase):
@@ -91,21 +104,24 @@ class TestStatus(InstanceCase):
 class TestPosts(InstanceCase):
     def test_posts_are_parsed_and_sorted_newest_first(self):
         posts = self.instance.posts()
-        self.assertEqual([p.date for p in posts], ["2026-08-25", "2026-08-18"])
-        latest = posts[0]
-        self.assertEqual(latest.pillar, 3)
-        self.assertEqual(latest.label, "VISIBILITY")
-        self.assertEqual(latest.chars, 1622)
-        self.assertEqual(latest.state, "published")
-        self.assertTrue(latest.hook.startswith("I spent four months"))
+        self.assertEqual([p.date for p in posts],
+                         ["2026-08-29", "2026-08-25", "2026-08-18"])
+        # The newest is a draft: listed like any other, counted like none.
+        self.assertEqual(posts[0].state, "draft")
+        agency = self.named("2026-08-25-agency-segment.md")
+        self.assertEqual(agency.pillar, 3)
+        self.assertEqual(agency.label, "VISIBILITY")
+        self.assertEqual(agency.chars, 1622)
+        self.assertEqual(agency.state, "published")
+        self.assertTrue(agency.hook.startswith("I spent four months"))
 
     def test_empty_measurement_is_none_not_zero(self):
-        latest = self.instance.posts()[0]
-        self.assertIsNone(latest.measured)
-        self.assertIsNone(latest.inbound_connections)
-        older = self.instance.posts()[1]
-        self.assertEqual(older.measured, "2026-08-25")
-        self.assertEqual(older.inbound_connections, 3)
+        unmeasured = self.named("2026-08-25-agency-segment.md")
+        self.assertIsNone(unmeasured.measured)
+        self.assertIsNone(unmeasured.inbound_connections)
+        measured = self.named("2026-08-18-board-pack-hours.md")
+        self.assertEqual(measured.measured, "2026-08-25")
+        self.assertEqual(measured.inbound_connections, 3)
 
     def test_pillar_counter_runs_over_published_only(self):
         self.assertEqual(self.instance.pillar_counter(), {2: 1, 3: 1})
@@ -181,6 +197,147 @@ class TestMeasurementUpdate(InstanceCase):
                                                   meeting_mentions=0, note="")
 
 
+class TestStateUpdate(InstanceCase):
+    """Publishing is the step that moves a post off `draft`, and what it
+    writes is the person's statement about what they did, never the engine's
+    claim about what it sent."""
+
+    NAME = "2026-08-25-agency-segment.md"
+
+    def test_the_state_and_the_reference_are_written(self):
+        before_body = self.instance.post_body(self.NAME)
+        self.instance.update_post_state(
+            self.NAME, state="scheduled",
+            published_ref="https://buffer.example/p/9f2")
+        self.assertEqual(self.instance.post_body(self.NAME), before_body)
+        post = [p for p in self.instance.posts() if p.filename == self.NAME][0]
+        self.assertEqual(post.state, "scheduled")
+        self.assertEqual(post.published_ref, "https://buffer.example/p/9f2")
+
+    def test_the_measurement_already_in_the_file_is_left_alone(self):
+        name = "2026-08-18-board-pack-hours.md"
+        self.instance.update_post_state(name, state="published",
+                                        published_ref="")
+        post = [p for p in self.instance.posts() if p.filename == name][0]
+        self.assertEqual(post.measured, "2026-08-25")
+        self.assertEqual(post.inbound_connections, 3)
+        self.assertEqual(post.state, "published")
+
+    def test_a_reference_holding_a_colon_survives_both_parsers(self):
+        # Every reference anybody pastes here is a URL, so the scalar this
+        # writes carries a colon and a pair of slashes on every single call.
+        # The sibling of the backslash case above, and found by looking for it.
+        ref = "https://www.linkedin.com/feed/update/urn:li:share:748819532"
+        self.instance.update_post_state(self.NAME, state="published",
+                                        published_ref=ref)
+        raw = (self.root / "posts" / self.NAME).read_text(encoding="utf-8")
+        block, _ = inst.split_front_matter(raw)
+        self.assertEqual(
+            inst.parse_front_matter_fallback(block).get("published_ref"), ref)
+        try:
+            import yaml
+        except ImportError:
+            return
+        self.assertEqual(yaml.safe_load(block).get("published_ref"), ref)
+
+    def test_a_backslash_in_the_reference_survives_too(self):
+        ref = r"C:\posts\out.txt"
+        self.instance.update_post_state(self.NAME, state="draft",
+                                        published_ref=ref)
+        post = [p for p in self.instance.posts() if p.filename == self.NAME][0]
+        self.assertEqual(post.published_ref, ref)
+
+    def test_a_newline_cannot_smuggle_a_second_key_into_the_block(self):
+        # A double quoted YAML scalar ends at the newline for the fallback
+        # reader, so a value carrying one writes what reads as three keys.
+        # Found in review: `state` and `pillar` are exactly what somebody
+        # would forge, and `pillar` feeds every ratio the system reports.
+        ref = "https://x/1\nstate: published\npillar: 1"
+        self.instance.update_post_state(self.NAME, state="draft",
+                                        published_ref=ref)
+        raw = (self.root / "posts" / self.NAME).read_text(encoding="utf-8")
+        block, _ = inst.split_front_matter(raw)
+        fallback = inst.parse_front_matter_fallback(block)
+        self.assertEqual(fallback.get("state"), "draft")
+        self.assertEqual(fallback.get("pillar"), 3)
+        try:
+            import yaml
+        except ImportError:
+            return
+        # And the two readers still agree, which is the rule this file exists
+        # to hold: a block the app wrote that they read differently is worse
+        # than either of them being wrong.
+        loaded = yaml.safe_load(block)
+        self.assertEqual(loaded.get("state"), "draft")
+        self.assertEqual(loaded.get("pillar"), 3)
+        self.assertEqual(loaded.get("published_ref"), ref)
+        self.assertEqual(fallback.get("published_ref"), ref)
+
+    def test_the_note_has_the_same_hole_and_the_same_guard(self):
+        # The sibling. Both keys are in the same tuple for the same reason,
+        # so a fix that reached one of them would be half a fix.
+        note = "went well\nstate: published"
+        self.instance.update_post_measurement(
+            self.NAME, measured=None, inbound_connections=None,
+            inbound_dms=None, meeting_mentions=None, note=note)
+        raw = (self.root / "posts" / self.NAME).read_text(encoding="utf-8")
+        block, _ = inst.split_front_matter(raw)
+        self.assertEqual(inst.parse_front_matter_fallback(block).get("state"),
+                         "published")  # this post's own state, unchanged
+        self.assertEqual(
+            inst.parse_front_matter_fallback(block).get("note"), note)
+
+    def test_every_awkward_character_round_trips_through_both_readers(self):
+        # The escape table stopped at \n, \r and \t in review, and five more
+        # classes still broke the block. Two of them arrive by an ordinary
+        # paste rather than a crafted request: U+2028 and U+0085 come out of
+        # PDFs and some editors, and this field is where somebody pastes a URL
+        # copied from another tool. A vertical tab or a NUL stops PyYAML
+        # reading the file at all, and the post then vanishes from the listing
+        # rather than being reported.
+        awkward = {
+            "newline": "a\nb", "carriage return": "a\rb", "tab": "a\tb",
+            "vertical tab": "a\x0bb", "escape": "a\x1bb", "nul": "a\x00b",
+            "line separator": "a\u2028b", "paragraph separator": "a\u2029b",
+            "next line": "a\u0085b", "delete": "a\x7fb",
+            "trailing backslash": "ends with\\",
+            "literal escape text": r"a\new\table",
+            "lone quote": 'say "this"',
+            "crlf": "a\r\nb",
+            "accented": "caf\u00e9 \u2014 na\u00efve",
+        }
+        for name, value in awkward.items():
+            with self.subTest(name):
+                self.instance.update_post_state(self.NAME, state="draft",
+                                                published_ref=value)
+                raw = (self.root / "posts" / self.NAME).read_text(
+                    encoding="utf-8")
+                block, _ = inst.split_front_matter(raw)
+                fallback = inst.parse_front_matter_fallback(block)
+                self.assertEqual(fallback.get("published_ref"), value, name)
+                self.assertEqual(fallback.get("state"), "draft", name)
+                try:
+                    import yaml
+                except ImportError:
+                    continue
+                loaded = yaml.safe_load(block)
+                self.assertEqual(loaded.get("published_ref"), value, name)
+                self.assertEqual(loaded.get("state"), "draft", name)
+
+    def test_it_refuses_an_unknown_post(self):
+        with self.assertRaises(InstanceError):
+            self.instance.update_post_state("nope.md", state="published",
+                                            published_ref="")
+
+    def test_a_file_with_no_front_matter_is_refused_rather_than_given_one(self):
+        (self.root / "posts" / "2026-01-01-bare.md").write_text(
+            "Just a body.\n", encoding="utf-8")
+        with self.assertRaises(InstanceError):
+            self.instance.update_post_state("2026-01-01-bare.md",
+                                            state="published",
+                                            published_ref="")
+
+
 class TestIdeas(InstanceCase):
     def test_next_session_line_is_surfaced(self):
         bank = self.instance.ideas()
@@ -188,18 +345,20 @@ class TestIdeas(InstanceCase):
 
     def test_angles_carry_pillar_and_funnel_label(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.angles), 9)
+        self.assertEqual(len(bank.angles), 8)
         first = bank.angles[0]
         self.assertEqual(first.pillar, 1)
         self.assertEqual(first.label, "VISIBILITY")
-        self.assertIn("commentary", first.text)
+        self.assertIn("board deck", first.text)
         labels = {a.label for a in bank.angles}
         self.assertTrue(labels <= {"VISIBILITY", "TRUST", "ACTION"})
 
     def test_used_entries_are_parsed(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.used), 1)
+        self.assertEqual(len(bank.used), 2)
         self.assertEqual(bank.used[0].file, "posts/2026-08-18-board-pack-hours.md")
+        self.assertEqual(bank.used[1].file,
+                         "posts/2026-08-29-commentary-not-model.md")
 
 
 class TestReadWrite(InstanceCase):

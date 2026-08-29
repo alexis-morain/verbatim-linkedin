@@ -77,6 +77,28 @@ It costs a few cents of your own key, and it is not in `check.sh` on purpose:
 CI has no key, and a check that skips itself into a green tick is the failure
 the smoke test exists against.
 
+## Packaging
+
+The app ships as a wheel, built from `app/`:
+
+```bash
+cd app && uv build --wheel
+```
+
+**Wheel only, and `uv build` with no flag fails on purpose.** The project file
+sits one level below the bundle it packages and reaches up for `locales/`,
+`skills/`, `references/` and the two `lib/` scripts, which the wheel carries
+inside the package as `verbatim_app/_bundle/`. That works from a checkout and
+cannot work from an unpacked sdist, where there is no parent to reach. The
+wheel is `py3-none-any` and is what uvx, pipx and pip install; the source
+distribution of this project is the git repository.
+
+**Anything the engine reads at run time has to be in that table.** An
+installation has no checkout to fall back on, so a new directory read in
+development and missing from the wheel is a hole nobody sees until somebody
+who is not the maintainer runs it. `app/tests/test_bundle.py` holds the
+manifest to the list, and `check.sh` builds the wheel and looks inside it.
+
 ## Adding a language pack, in short
 
 1. `cp -r locales/_template locales/<code>`

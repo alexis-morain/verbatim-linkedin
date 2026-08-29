@@ -1,6 +1,6 @@
 [project]
 name = "verbatim-linkedin"
-version = "2.0.0.dev0"
+version = "2.0.0"
 description = "Local web app over a Verbatim instance: LinkedIn posts built from an interview, never from thin air."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -17,12 +17,47 @@ dependencies = [
 [project.optional-dependencies]
 test = []
 
+# Two names for one command. `verbatim` is what somebody types once it is
+# installed; `verbatim-linkedin` matches the distribution name, which is what
+# makes `uvx verbatim-linkedin <instance>` work with no --from in front of it.
 [project.scripts]
 verbatim = "verbatim_app.cli:main"
+verbatim-linkedin = "verbatim_app.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# **Build the wheel, not the sdist**: `uv build --wheel`.
+#
+# This project file sits one level below the bundle it packages, and the
+# force-include table below reaches up for it. That works building from a
+# checkout and it cannot work building from an unpacked sdist, where there is
+# no parent to reach: `uv build` with no flag makes the sdist, then builds the
+# wheel out of it, and fails there. The wheel is `py3-none-any` and is what
+# uvx, pipx and pip all install, so the loss is `pip install --no-binary`,
+# and the source distribution of this project is the git repository, which is
+# how the skill bundle is installed anyway.
+#
+# The fix, the day an sdist is wanted, is to move this file to the bundle root
+# rather than to teach the table a second layout. It is not moved today
+# because the root of this repository is what people symlink into
+# ~/.claude/skills, and a build tree belongs beside the app.
+
 [tool.hatch.build.targets.wheel]
 packages = ["verbatim_app"]
+
+# The bundle travels inside the package. Installed from PyPI there is no
+# checkout two levels up, and every one of these is read at run time: the
+# skills and the references are the system block, the language packs are
+# every sentence a person sees, and the two lib/ scripts are run as
+# subprocesses. The tests beside those two scripts are not part of an
+# installation, so lib/ is named file by file rather than mapped whole.
+# app/tests/test_bundle.py holds this list to the one the engine reads.
+[tool.hatch.build.targets.wheel.force-include]
+"../SKILL.md" = "verbatim_app/_bundle/SKILL.md"
+"../locales" = "verbatim_app/_bundle/locales"
+"../skills" = "verbatim_app/_bundle/skills"
+"../references" = "verbatim_app/_bundle/references"
+"../lib/lint.py" = "verbatim_app/_bundle/lib/lint.py"
+"../lib/publish.py" = "verbatim_app/_bundle/lib/publish.py"

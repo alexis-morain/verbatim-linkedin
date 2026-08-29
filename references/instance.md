@@ -105,6 +105,22 @@ published, and every count anywhere in the system runs over `state: published`
 only. The body is the post exactly as published, followed by session notes
 that are not part of the post.
 
+**The seam between the two is the line `Session notes, not published:`**, and
+it is machine readable on purpose. What a consumer hands to a publishing tier
+is the body cut at that marker, never the body whole: below it sit the
+validation sheet, every anchor the engine claimed and the interview sentence
+behind each one, which is the rawest material an instance holds. A post is
+allowed to contain a line of dashes, so the marker is the seam and the
+horizontal rule above it is decoration.
+
+**`state` and `published_ref` are moved by the publishing step, and only ever
+on a person's statement.** A tier accepting a post is not the same fact as a
+post being live: the copy tier prints something nobody has pasted yet, and a
+scheduling payload still has to be sent by whatever holds the account. So no
+consumer writes `published` because a send returned zero. It writes what the
+person said happened, exactly as it writes the pillar and the format they
+chose rather than ones it inferred.
+
 Aggregates, trends and counters are recomputed from these files at read time,
 never written back. If a cache ever exists it is regenerated, and when it
 disagrees with `posts/`, `posts/` is right.

@@ -17,6 +17,13 @@ written. That constraint is the product; the writing is a consequence of it.
 MIT licensed. Self hosted or no host at all. No account, no subscription, no
 service in the middle.
 
+![The draft, and every claim of it checked against the interview](docs/screenshots/traceability.png)
+
+*Every claim of a draft against the sentence that backs it. Highlighted means
+no quote backs it, which is honest and is yours to check. The example instance
+in [`examples/`](examples/) is a fictional persona; nothing here is anybody's
+real material.*
+
 ## Why an interview
 
 Most tools of this kind assume the hard part is writing. It is not. The hard
@@ -34,6 +41,37 @@ reached six.
 Then, before a single line is drafted, it hands you a validation sheet where
 every bullet has to trace to something you said. You approve it or you correct
 it. Nothing is written until you do.
+
+## Two ways to run it
+
+**As a skill bundle**, inside Claude Code or any agent that reads skills. You
+talk, it interviews you, it writes the files. This is the original shape and
+it needs no Python at all.
+
+**As a local web app**, `verbatim`, which drives the same skills against the
+same directory and gives you screens for the parts that are decisions rather
+than conversation: the validation sheet you approve, the traceability panel
+above, the archive form, the publish plan. It binds to 127.0.0.1 and nothing
+about it is hosted.
+
+```bash
+uvx verbatim-linkedin ~/my-profile     # or: pipx install verbatim-linkedin
+```
+
+From a clone, which is also how you get the skills, it is one command and no
+install:
+
+```bash
+uv run --project app verbatim ~/my-profile
+```
+
+Either way it opens on the conformance report if that directory is not a
+profile yet, and tells you to run `linkedin-setup` first.
+
+The two are the same engine over the same files. Use whichever you are in
+front of; a directory written by one is read by the other.
+
+![The overview: status, next session, posts per pillar, latest posts](docs/screenshots/overview.png)
 
 ## Engine and profile
 
@@ -76,6 +114,20 @@ Then say you want to set up your LinkedIn profile.
 `linkedin-setup` runs about twenty minutes and ends on a written post, not on a
 folder.
 
+The app runs from the clone you just made:
+
+```bash
+uv run --project app verbatim ~/my-profile
+```
+
+It needs a model to run an interview, and it is told which one by three
+environment variables rather than by an account. `.env.example` documents them.
+Local and hosted are the same code path and neither is the recommended one:
+what decides is whether the model can hold a 6400 token system block, answer a
+forced tool call, and produce a five field validation sheet when asked.
+[`docs/smoke.md`](docs/smoke.md) carries the measurements and says plainly what
+the first release ships untested.
+
 Read [`examples/`](examples/) first if you want to see the shape of a filled
 profile before you fill your own. The persona in there is fictional and is
 deliberately not in the maintainer's field.
@@ -87,6 +139,7 @@ deliberately not in the maintainer's field.
 | [`linkedin-setup`](skills/linkedin-setup/) | Builds your profile, your pillars, your voice file and your idea bank from a short interview, then hands over to the first post. |
 | [`linkedin-post`](skills/linkedin-post/) | Interview, validation sheet, draft, style pass, revisions, archive, publish, measure at J+7. |
 | [`linkedin-profile`](skills/linkedin-profile/) | Audits and rewrites the nine sections of your public LinkedIn page, headline and About first, from material you can prove. |
+| [`verbatim`](app/) | The local app: the same skills, driven from screens, over the same directory. |
 
 One more is deliberately held back: a measurement skill that reads the store
 across posts. It waits for real measured posts to be built against, because a
@@ -145,6 +198,29 @@ Anything that leaves the machine needs `--confirm`, and without it the script
 prints the target channel and stops. That guard exists because the maintainer
 has already published to the wrong channel: a personal profile and a company
 page are two lines in a config file and two very different things in a feed.
+
+In the app the same guard is two clicks with a reading between them. You draw
+a plan, which is `lib/publish.py` printing what would happen, and the confirm
+button carries a digest of exactly that plan: if the channel, the time or the
+post moved since it was drawn, the click sends nothing and shows you what
+moved. A plan is confirmed once, so a reload or a double click cannot make two
+posts out of one.
+
+![The publish plan: tier, target channel by name, when, length, first line](docs/screenshots/publish-plan.png)
+
+A post carrying a link gets one more line, asking whether it needs a
+disclosure. Nothing here decides that for you, because nothing here can know
+whether there is a material connection behind a link. What is mechanical is
+that a post with no link never raises the question. The wording that satisfies
+your market is in `locales/<lang>/market.md`, and the reason this exists at all
+is that a disclosure once survived a draft here and not the published version.
+
+**Publishing does not set the state of a post.** A tier accepting something is
+not the same fact as a post being live: the copy tier printed a post nobody
+has pasted yet, and a scheduling payload still has to be sent by whatever holds
+the account. `state` and `published_ref` are yours to write, on the same
+screen, exactly like the pillar and the format the archive form asks for rather
+than guesses.
 
 ## What this will not do
 

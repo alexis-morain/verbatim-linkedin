@@ -42,6 +42,13 @@ class ArchiveCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-archive-")
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "examples", self.root)
+        # examples/ is a real instance and people point the app at it, which
+        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # invisible in a diff and permanent on that machine: without this the
+        # fixture inherits somebody's conversation and three tests go red with
+        # nothing in the failure naming the cause. Found by a reviewer whose
+        # checkout had one.
+        shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         self.instance = Instance(self.root)
 
@@ -444,6 +451,41 @@ class TestTheIdeaBank(ArchiveCase):
             interview.load(self.root, conversation.id).state, interview.CLOSED)
         # Reported rather than raised, and reported as a code the pack names.
         self.assertEqual(done.problems, ("idea-not-moved",))
+
+
+class TestThePostAloneComesBackOutOfTheFile(ArchiveCase):
+    """The publishing step reads a file this module wrote, and what is below
+    the seam is not the post. It is the sheet, every anchor pair, and every
+    interview sentence backing one, which is the rawest material in the whole
+    instance. Sending the file body would publish all of it."""
+
+    def body_of(self, conversation=None):
+        text = archive.compose(conversation or self.drafted(), filing(),
+                               signature=self.instance.signature())
+        _, body = split_front_matter(text)
+        return body
+
+    def test_the_post_comes_back_and_the_notes_do_not(self):
+        conversation = self.drafted()
+        only = archive.post_only(self.body_of(conversation))
+        self.assertEqual(
+            only, BODY + "\n\n" + self.instance.signature().strip())
+        self.assertNotIn("Session notes", only)
+        self.assertNotIn("Onze conversations, deux propositions, rien de "
+                         "signe.'", only)  # the anchor pair, quoted
+
+    def test_a_body_with_no_seam_comes_back_whole(self):
+        # A post file written by hand, or by a version older than the notes.
+        text = "A post.\n\nWith two paragraphs.\n"
+        self.assertEqual(archive.post_only(text), text.strip())
+
+    def test_a_rule_inside_the_post_does_not_cut_it_short(self):
+        # The seam is the marker, never the horizontal rule above it: a post
+        # is allowed to contain a line of dashes.
+        conversation = self.drafted(body="Before.\n\n---\n\nAfter.")
+        only = archive.post_only(self.body_of(conversation))
+        self.assertIn("After.", only)
+        self.assertNotIn("Session notes", only)
 
 
 if __name__ == "__main__":

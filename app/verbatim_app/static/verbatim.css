@@ -255,6 +255,14 @@ button:hover { background: var(--accent); border-color: var(--accent); }
 .measure label { display: grid; gap: 0.25rem; }
 .measure button { justify-self: start; }
 
+/* The publishing forms. A grid like .measure, and the hint inside one loses
+   the negative top margin the standalone hints carry: that margin exists to
+   pull a hint up under the heading it explains, and inside a grid it pulls it
+   up over the button instead. Same override .archive makes, same reason. */
+.publish { display: grid; gap: 0.5rem; }
+.publish button { justify-self: start; }
+.publish .hint, .measure .hint { margin: 0.1rem 0 0; font-size: 0.85rem; }
+
 .post-body {
   font-family: var(--mono);
   font-size: 0.85rem;

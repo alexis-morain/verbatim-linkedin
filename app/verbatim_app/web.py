@@ -35,6 +35,7 @@ from .i18n import bundle_root, load_strings
 from .instance import Instance
 from .routes import interview as interview_screen
 from .routes import pages
+from .routes import publish as publish_screen
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -58,6 +59,16 @@ def create_app(instance_path, lang: str | None = None, *,
     app.state.transport = transport
     app.state.bundle = bundle_root()
     app.state.turn_locks = {}
+    app.state.publish_locks = {}
+    # One live publish token per post: the plan most recently drawn for it,
+    # spent by the confirm that follows. Keyed by post rather than by token so
+    # that drawing a plan retires the one before it, which is what stops two
+    # outstanding plans confirming twice, and what keeps this bounded by the
+    # posts somebody has planned. In memory and per process on purpose: what
+    # it guards is a double click, a reloaded POST and a second tab, all of
+    # which happen inside one run of this app. It is not an idempotency key
+    # and does not pretend to be one across restarts.
+    app.state.publish_tokens = {}
     app.state.templates = Jinja2Templates(directory=PACKAGE / "templates")
     app.state.templates.env.globals.update(t=strings, lang=language,
                                            instance_root=str(instance.root))
@@ -97,5 +108,6 @@ def create_app(instance_path, lang: str | None = None, *,
 
     app.mount("/static", StaticFiles(directory=PACKAGE / "static"), name="static")
     app.include_router(pages.router)
+    app.include_router(publish_screen.router)
     app.include_router(interview_screen.router)
     return app

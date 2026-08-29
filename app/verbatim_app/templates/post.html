@@ -23,6 +23,73 @@
 <pre class="post-body">{{ body }}</pre>
 {% endif %}
 
+<h2>{{ t('post.publish') }}</h2>
+<p class="hint">{{ t('post.publish_hint') }}</p>
+{% if unreadable %}
+<p class="empty">{{ t('post.measure_blocked') }}</p>
+{% else %}
+{% if publish_problem == 'bad-when' %}
+<p class="gaps">{{ t('post.publish_bad_when') }}</p>
+{% elif publish_problem == 'running' %}
+<p class="gaps">{{ t('post.publish_running') }}</p>
+{% elif publish_problem == 'spent' %}
+<p class="gaps">{{ t('post.publish_spent') }}</p>
+{% elif publish_problem in ('refused', 'unfinished') %}
+<div class="gaps">
+  <p>{{ t('post.publish_' + ('unfinished' if publish_problem == 'unfinished' else 'refused')) }}</p>
+  <pre class="mono">{{ publish_words }}</pre>
+</div>
+{% endif %}
+{% if plan_changed %}
+<p class="gaps">{{ t('post.plan_changed') }}</p>
+{% endif %}
+{% if sent %}
+<p class="flash">{{ t('post.publish_sent') }}</p>
+<pre class="mono">{{ sent }}</pre>
+{% if publish_words %}<p class="hint mono">{{ publish_words }}</p>{% endif %}
+<p class="hint">{{ t('post.publish_state_next') }}</p>
+{% endif %}
+{% if plan %}
+<h3>{{ t('post.plan') }}</h3>
+<p class="hint">{{ t('post.plan_hint') }}</p>
+<pre class="mono">{{ plan }}</pre>
+<form method="post" action="/posts/{{ post.filename }}/publish" class="publish">
+  <input type="hidden" name="shown" value="{{ shown }}">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="when" value="{{ publish_when }}">
+  <button type="submit">{{ t('post.publish_do') }}</button>
+  <p class="hint">{{ t('post.publish_do_hint') }}</p>
+</form>
+{% endif %}
+<form method="post" action="/posts/{{ post.filename }}/publish/plan" class="publish">
+  <label>{{ t('post.publish_when') }}
+    <input type="datetime-local" name="when" value="{{ publish_when }}">
+  </label>
+  <button type="submit">{{ t('post.publish_ask') }}</button>
+  <p class="hint">{{ t('post.publish_when_hint') }}</p>
+</form>
+
+<h3>{{ t('post.state') }}</h3>
+<p class="hint">{{ t('post.state_hint') }}</p>
+{% if state_problem == 'bad-state' %}
+<p class="gaps">{{ t('post.state_bad') }}</p>
+{% endif %}
+<form method="post" action="/posts/{{ post.filename }}/state" class="measure">
+  <label>{{ t('posts.state') }}
+    <select name="state">
+      {% for name in states %}
+      <option value="{{ name }}"{% if post.state == name %} selected{% endif %}>{{ t('posts.state_' + name) }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>{{ t('post.state_ref') }}
+    <input type="text" name="published_ref" value="{{ post.published_ref or '' }}">
+  </label>
+  <p class="hint">{{ t('post.state_ref_hint') }}</p>
+  <button type="submit">{{ t('post.state_save') }}</button>
+</form>
+{% endif %}
+
 <h2>{{ t('post.measure') }}</h2>
 <p class="hint">{{ t('post.measure_hint') }}</p>
 {% if saved %}<p class="flash">{{ t('post.saved') }}</p>{% endif %}

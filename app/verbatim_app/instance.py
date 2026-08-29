@@ -64,6 +64,18 @@ MEASUREMENT_FIELDS = (
     "measured", "inbound_connections", "inbound_dms", "meeting_mentions", "note",
 )
 
+#: The three states of `references/measure.md`. Every count in the system runs
+#: over `published` alone, which is why a fourth one invented anywhere would be
+#: a post counted nowhere. Here rather than beside the archiving step, because
+#: two steps write this key now: archiving starts it at `draft` and publishing
+#: moves it.
+STATES = ("draft", "scheduled", "published")
+
+#: Front matter keys whose value is written as a double quoted scalar. Both
+#: hold text somebody pasted: a note holding a Windows path, a reference that
+#: is a URL and therefore carries a colon on every call.
+QUOTED = ("note", "published_ref")
+
 
 @dataclass
 class Gap:
@@ -159,7 +171,7 @@ def parse_front_matter(block: str) -> dict:
 def _scalar(raw: str):
     raw = raw.strip()
     if raw.startswith('"') and raw.endswith('"') and len(raw) >= 2:
-        return re.sub(r'\\(["\\])', r"\1", raw[1:-1])
+        return _unquote(raw[1:-1])
     if raw.startswith("'") and raw.endswith("'") and len(raw) >= 2:
         return raw[1:-1].replace("''", "'")
     # an unquoted scalar can carry a trailing comment, measure.md shows some
@@ -240,17 +252,87 @@ def atomic_write(path, text: str) -> None:
         raise
 
 
-def _measurement_line(key: str, value) -> str:
+def _front_matter_line(key: str, value) -> str:
     if value is None:
         return f"{key}:"
     if isinstance(value, int):
         return f"{key}: {value}"
-    if key == "note":
-        # a YAML double quoted scalar escapes the backslash itself first,
-        # otherwise a note holding a path writes an unreadable file
-        escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
-        return f'{key}: "{escaped}"'
+    if key in QUOTED:
+        return f'{key}: "{_quote(str(value))}"'
     return f"{key}: {value}"
+
+
+#: The named escapes of a YAML double quoted scalar, written and read back
+#: through the same table so the two sides cannot drift apart.
+NAMED = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+
+def _quote(value: str) -> str:
+    """One value as a YAML double quoted scalar, escaped completely.
+
+    Everything with no named escape and no business appearing raw goes out as
+    `\\xNN` or `\\uNNNN`. That covers three separate ways a pasted value used
+    to break the file: a line break ends the scalar for the built in reader
+    and writes what looks like several keys, `state` and `pillar` being
+    exactly the two somebody would forge; a control character stops PyYAML
+    reading the file at all, and the post then vanishes from every listing
+    instead of being reported; and U+2028 or U+0085, which the two readers
+    simply disagree about. The last pair is what an ordinary paste produces,
+    out of a PDF or an editor, and `published_ref` is where people paste.
+
+    Escaped character by character rather than by a chain of replacements. A
+    chain has to escape the backslash first and then never touch what it
+    wrote, so every escape added later is a chance to get that order wrong.
+    This walks the string once and there is no order to get wrong. Found by
+    review, twice: the first fix stopped at three characters.
+    """
+    out = []
+    for char in value:
+        if char in NAMED:
+            out.append(NAMED[char])
+        elif char < " " or char == "\x7f":
+            out.append(f"\\x{ord(char):02x}")
+        elif "\x80" <= char <= "\x9f" or char in ("\u2028", "\u2029"):
+            out.append(f"\\u{ord(char):04x}")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _unquote(body: str) -> str:
+    """The inverse, for the built in reader. PyYAML does this itself, and the
+    two have to agree about a block this engine wrote: a file the app can no
+    longer read the way it wrote it is worse than either reader being wrong.
+    """
+    back = {written[1:]: raw for raw, written in NAMED.items()}
+    out, index = [], 0
+    while index < len(body):
+        char = body[index]
+        if char != "\\" or index + 1 >= len(body):
+            out.append(char)
+            index += 1
+            continue
+        marker = body[index + 1]
+        if marker in back:
+            out.append(back[marker])
+            index += 2
+        elif marker in ("x", "u") and _hex(body, index, marker) is not None:
+            width = 2 if marker == "x" else 4
+            out.append(chr(int(body[index + 2:index + 2 + width], 16)))
+            index += 2 + width
+        else:
+            # Not an escape this writer produces. Kept as written rather than
+            # dropped: what is there is what somebody typed.
+            out.append(char)
+            index += 1
+    return "".join(out)
+
+
+def _hex(body: str, index: int, marker: str):
+    width = 2 if marker == "x" else 4
+    digits = body[index + 2:index + 2 + width]
+    if len(digits) == width and all(c in "0123456789abcdefABCDEF" for c in digits):
+        return digits
+    return None
 
 
 # ------------------------------------------------------------------- instance
@@ -476,20 +558,50 @@ class Instance:
         path = self._child(self.root / "posts", filename)
         if not path.is_file():
             raise InstanceError(f"no such post: {filename}")
-        raw = read_text(path, filename)
-        block, _ = split_front_matter(raw)
-        if block is None:
-            raise InstanceError(f"{filename} has no front matter to update")
-        updates = {
+        self._rewrite_front_matter(path, filename, {
             "measured": measured,
             "inbound_connections": inbound_connections,
             "inbound_dms": inbound_dms,
             "meeting_mentions": meeting_mentions,
             "note": note,
-        }
+        })
+
+    def update_post_state(self, filename: str, *, state: str,
+                          published_ref: str) -> None:
+        """Move a post off `draft`, and record what it can be found by.
+
+        The publishing step's half of the front matter, written the way the
+        measurement is: textually, so everything else in the file stays byte
+        for byte.
+
+        Neither value is checked against a vocabulary here. `state` is checked
+        on the form that produces it, which is the only caller: `posts/` is
+        outside `WRITABLE` and no tool reaches this, so a second check here
+        would be a guard with no case behind it. `published_ref` has no
+        vocabulary at all; it is whatever the tool that scheduled the post
+        calls it, and an empty one is the honest value until something did.
+        """
+        path = self._child(self.root / "posts", filename)
+        if not path.is_file():
+            raise InstanceError(f"no such post: {filename}")
+        self._rewrite_front_matter(path, filename,
+                                   {"state": state,
+                                    "published_ref": published_ref})
+
+    def _rewrite_front_matter(self, path, filename: str, updates: dict) -> None:
+        """Replace the named keys of a post's front matter and nothing else.
+
+        A key that is not in the block is appended rather than dropped: a post
+        file written before a key existed still gets it, which is the same
+        rule `missing_keys` reports on rather than silently completing.
+        """
+        raw = read_text(path, filename)
+        block, _ = split_front_matter(raw)
+        if block is None:
+            raise InstanceError(f"{filename} has no front matter to update")
         new_block = block
         for key, value in updates.items():
-            line = _measurement_line(key, value)
+            line = _front_matter_line(key, value)
             pattern = re.compile(rf"^{key}:[^\n]*$", re.MULTILINE)
             if pattern.search(new_block):
                 new_block = pattern.sub(line.replace("\\", "\\\\"), new_block, count=1)

@@ -27,6 +27,13 @@ class WebCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-web-")
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "examples", self.root)
+        # examples/ is a real instance and people point the app at it, which
+        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # invisible in a diff and permanent on that machine: without this the
+        # fixture inherits somebody's conversation and three tests go red with
+        # nothing in the failure naming the cause. Found by a reviewer whose
+        # checkout had one.
+        shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         self.client = TestClient(create_app(self.root, lang=self.lang),
                                  base_url="http://127.0.0.1:8747")
@@ -177,7 +184,7 @@ class TestScreens(WebCase):
 
     def test_ideas_screen_lists_the_bank(self):
         page = self.client.get("/ideas")
-        self.assertEqual(page.text.count('class="badge mono"'), 9)
+        self.assertEqual(page.text.count('class="badge mono"'), 8)
         self.assertIn("VISIBILITY", page.text)
         self.assertIn("Used", page.text)
 

@@ -2,7 +2,9 @@
 
 No model, no network, no state outside the instance directory. Reading is
 free; the only writes are profile.md (whole file, verbatim) and the
-measurement lines of a post's front matter.
+measurement lines of a post's front matter. Publishing is the one screen
+that can leave this machine, and it has its own module for that reason;
+`post_screen` below is shared with it, so both land on the same page.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from . import render as _render
-from ..instance import InstanceError, UnreadableError
+from ..instance import STATES, InstanceError, UnreadableError
 
 router = APIRouter()
 
@@ -82,8 +84,15 @@ def posts(request: Request):
     return _render(request, "posts.html", posts=request.app.state.instance.posts())
 
 
-@router.get("/posts/{name}")
-def post_detail(request: Request, name: str, saved: int = 0):
+def post_screen(request: Request, name: str, **extra):
+    """One post's screen, built the same way whichever route lands on it.
+
+    Shared with the publishing routes, which come back to this page carrying
+    a plan or what a tier answered. Every key a template branch reads is
+    defaulted here rather than in the template: a screen whose section
+    appears only because another route happened to pass a variable is a
+    screen nobody can reason about.
+    """
     instance = request.app.state.instance
     matches = [p for p in instance.posts() if p.filename == name]
     if not matches:
@@ -97,8 +106,18 @@ def post_detail(request: Request, name: str, saved: int = 0):
         body, unreadable = "", str(broken)
     except InstanceError:
         raise HTTPException(status_code=404)
-    return _render(request, "post.html", post=matches[0], body=body,
-                   unreadable=unreadable, saved=saved)
+    values = dict(post=matches[0], body=body, unreadable=unreadable, saved=0,
+                  plan="", shown="", token="", publish_when="",
+                  publish_problem="",
+                  plan_changed=False, sent="", publish_words="",
+                  state_problem="", states=STATES)
+    values.update(extra)
+    return _render(request, "post.html", **values)
+
+
+@router.get("/posts/{name}")
+def post_detail(request: Request, name: str, saved: int = 0):
+    return post_screen(request, name, saved=saved)
 
 
 @router.post("/posts/{name}/measure")

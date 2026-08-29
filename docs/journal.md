@@ -1,5 +1,152 @@
 # Journal
 
+## 2026-08-29 (fin). Étape 6 : la publication, le paquet, la release
+
+Quatre morceaux et quatre tours de revue à contexte frais, dont trois rouges.
+L'app fait maintenant le tour complet jusqu'au feed, elle s'installe depuis un
+wheel, et le README montre à quoi elle ressemble.
+
+### La publication : deux clics avec une lecture entre les deux
+
+Rien de neuf dans `lib/publish.py` côté paliers, et c'est le but : l'app le
+lance en sous-processus, comme elle lance déjà `lint.py`. Ce qui est neuf est
+la forme du geste. On tire un plan, on le lit, on confirme. Le plan est imprimé
+par le script lui-même, jamais reconstruit par l'app : un deuxième rendu de la
+cible serait une deuxième chose à tenir vraie, et c'est celle qu'on vérifie qui
+serait fausse.
+
+Le bouton de confirmation porte deux choses différentes. Un **condensé** du
+plan et du post, qui garde l'intégrité : si le canal, l'heure ou le post ont
+bougé depuis le tirage, le clic n'envoie rien et réaffiche le plan tel qu'il
+est. Et un **jeton**, qui garde le nombre. Les deux, parce qu'un condensé ne
+sait pas compter, et c'est là-dessus que la revue est passée trois fois.
+
+### Ce qu'un palier reçoit n'est pas le fichier
+
+`archive.post_only`. Le corps d'un fichier de post contient, sous
+`Session notes, not published:`, la fiche, chaque ancre et la phrase
+d'entretien derrière chacune. C'est la matière la plus brute d'une instance.
+Un palier qui recevrait le corps du fichier publierait tout ça dans un feed.
+La couture est le marqueur, jamais le filet de tirets au-dessus : un post a le
+droit de contenir une ligne de tirets.
+
+### La ligne de divulgation
+
+Le piège documenté du projet : une mention d'affiliation présente dans le
+brouillon et absente de la version publiée. Le plan compte maintenant les liens
+du corps et, s'il y en a, pose la question une fois, au dernier écran avant
+l'envoi. Il ne décide pas : rien ici ne peut savoir s'il y a une contrepartie
+derrière un lien. Ce qui est mécanique, c'est qu'un post sans lien ne pose
+jamais la question. La formulation est dans `locales/<lang>/market.md`.
+
+### Le refus qui mentait
+
+La trouvaille la plus intéressante de la revue, et elle a demandé deux tours.
+
+Version 1 : l'app coupait le sous-processus à 120 s, `publish.py` coupait la
+commande à 120 s aussi, la garde extérieure démarrait la première et gagnait
+donc toujours. Elle tue le fils direct, qui est un shell, dont les fils à lui
+survivent. L'écran affichait « rien n'a été envoyé » pour un post qui était
+sorti.
+
+Version 2 : la garde intérieure passe en premier, ce qui est correct, mais son
+échec sortait en code 2 comme une configuration invalide. Même écran, même
+mensonge, et la phrase écrite pour ce cas était du code mort.
+
+Version 3, celle qui tient : `publish.py` a deux codes de sortie. **2 quand
+rien n'a été dépêché** (palier inutilisable, post trop long), **3 quand le
+palier a été atteint et a échoué**. L'app en fait deux écrans, et seul le
+premier a le droit de dire que rien n'est parti. Le second dit que le post est
+peut-être sorti et qu'il faut aller regarder le canal avant de réessayer.
+
+La ligne reste imprécise du côté sûr : une commande qui n'existe pas revient en
+127 par le shell et tombe dans le deuxième cas. Lire 127 comme « jamais
+lancée » serait faux pour `vrai-publieur; typo`, donc l'imprécision est écrite
+dans le docstring plutôt que corrigée à l'envers.
+
+### La garde qui enfermait le post
+
+Premier jet du garde-fou anti-doublon : mémoriser les condensés déjà confirmés.
+La revue a montré le trou en une commande. Un condensé est une fonction pure du
+plan et du post, donc retirer le même plan redonne le même condensé : un seul
+échec transitoire rendait le post impubliable jusqu'au redémarrage du process,
+et les deux phrases de récupération à l'écran, dans les deux packs, disaient de
+retirer le plan. Elles étaient fausses.
+
+Deuxième jet : un jeton par plan tiré, dépensé avant l'envoi. La récupération
+redevient vraie. Sauf que la revue suivante a retrouvé le doublon par l'autre
+bout : deux plans tirés, deux jetons vivants, même condensé, deux confirmations
+qui passent. Pas d'attaquant, juste quelqu'un qui relit la cible ou qui a deux
+onglets.
+
+Troisième jet, celui qui tient : le magasin est indexé par post, pas par jeton.
+Tirer un plan retire celui d'avant. Un seul jeton vivant par post, par
+construction, et le magasin est borné par le nombre de posts plutôt que par le
+nombre de plans.
+
+### Deux fois la même leçon
+
+« Une garde ajoutée seule invite à recommencer » a resservi deux fois. La table
+d'échappement du front matter s'est arrêtée à la ligne, au retour chariot et à
+la tabulation : il restait la tabulation verticale, l'échappement, le NUL,
+U+2028 et U+0085, et les deux derniers arrivent par un copier-coller ordinaire
+depuis un PDF. Un caractère de contrôle brut empêche PyYAML de lire le fichier,
+et le post disparaît alors de toutes les listes au lieu d'être signalé. Réécrit
+en une passe caractère par caractère, avec le décodeur en face, et un test
+compare les deux lecteurs sur vingt-trois valeurs hostiles.
+
+### Le paquet
+
+`i18n.bundle_root()` cherchait le bundle deux niveaux au-dessus du paquet, ce
+qui est vrai dans un dépôt et faux dans un `site-packages`. Le wheel emporte
+donc `locales/`, `skills/`, `references/` et les deux scripts `lib/` sous
+`verbatim_app/_bundle/`, et `bundle_root` a trois candidats : la variable
+d'environnement, le dépôt, puis la copie embarquée. Le dépôt passe avant la
+copie exprès : une installation éditable a les deux, et l'arbre qu'on est en
+train de modifier est celui qu'on veut.
+
+Wheel seulement, et `uv build` sans drapeau échoue exprès : le fichier projet
+est sous `app/` et remonte d'un cran pour prendre le bundle, ce qui marche
+depuis un dépôt et ne peut pas marcher depuis un sdist déplié. La note est dans
+`app/pyproject.toml` avec le correctif du jour où un sdist sera voulu, qui est
+de déplacer le fichier projet, pas d'apprendre une deuxième disposition à la
+table.
+
+Vérifié pour de vrai : wheel construit, installé dans un venv nu ailleurs sur
+le disque, toutes les pages en 200, le plan de publication qui lance
+`_bundle/lib/publish.py`, et l'entrée `verbatim`. Deux noms de commande,
+`verbatim` et `verbatim-linkedin`, pour que `uvx verbatim-linkedin` marche sans
+`--from`.
+
+### Les captures
+
+Sous Nadia Feriel, jamais les données d'Alexis, et depuis un chemin neutre
+parce que le rail affiche le dossier de l'instance et qu'un chemin de machine
+n'a rien à faire dans un dépôt public. Trois écrans : la vue d'ensemble, le
+panneau de traçabilité, le plan de publication.
+
+L'entretien qu'on y voit est une fixture construite pour la capture puis
+supprimée. `check.sh` refuse un `interviews/` suivi, ce qui est la bonne
+garde ; ce qu'il ne voyait pas, c'est qu'`examples/` est une vraie instance,
+donc pointer l'app dessus y laisse un `interviews/` ignoré par git, invisible
+dans un diff et définitif sur la machine. Un relecteur en avait un et trois
+tests étaient rouges chez lui sans que rien ne nomme la cause. Les six fixtures
+le suppriment maintenant après le `copytree`.
+
+La passe de captures a aussi sorti un vrai bug de CSS : `.hint` porte une marge
+supérieure négative pour se coller sous son titre, et dans une grille de
+formulaire elle passait par-dessus le bouton. Deux textes illisibles sur
+l'écran de publication, invisibles pour la suite de tests.
+
+### Ce qui reste
+
+Le paquet n'est pas poussé sur PyPI et le tag `v2.0.0` n'est pas posé :
+l'envoi demande le jeton d'Alexis. Le fil `anthropic` part toujours non testé,
+décision du 29/08, et `docs/smoke.md` dit ce que ça coûte. La fenêtre de
+contexte trop petite reste le plus gros trou ouvert contre le « local
+d'abord », et la décision d'y répondre par une phrase à l'écran plutôt que par
+une heuristique n'a pas bougé.
+
 ## 2026-08-29 (suite). Le smoke test lancé, et ce qu'il a trouvé
 
 Commits `ca0aef3`, `0a440a1` et `040d522`, poussés. La session devait s'arrêter à la

@@ -15,6 +15,13 @@ model reads next.
   the argument list is built here and `--confirm` does not exist in it, so
   there is no input that makes this tool send anything.
 
+`publish_send` sits in this file because it runs the same script over the
+same seam, and it is deliberately **not** wrapped as a Tool: it is the only
+function here that passes `--confirm`, and the authority for that is a
+person's click on their own screen, which no argument a model writes can
+reach. The screen plans first and confirms against the plan it showed, so
+the target channel is read by a human before anything is scheduled.
+
 Nothing that comes back from a subprocess reaches the model before the
 values of secret named environment variables are struck out of it. Like
 every name based rule in this project, that guards an accident, not a
@@ -32,6 +39,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dataclasses import dataclass
+
 from .agent import Tool, ToolRefused
 from .instance import Instance, InstanceError, WRITABLE
 from . import interview
@@ -39,6 +48,39 @@ from .interview import InterviewError
 from .providers import SECRET_MARKERS
 
 SUBPROCESS_TIMEOUT = 120.0
+
+#: The deadline over `publish.py`, and it is deliberately longer than the one
+#: `publish.py` puts on the command tier. Whichever fires first decides what a
+#: person is told, and the inner one at least knows whether a command was
+#: dispatched. Pinned against the script's own constant by a test.
+PUBLISH_TIMEOUT = SUBPROCESS_TIMEOUT + 60.0
+
+
+class ToolUnfinished(ToolRefused):
+    """Something was dispatched and nobody here knows what it did.
+
+    Its own type, and a subclass so every caller that already handles a
+    refusal keeps working. What it adds is the one thing a refusal cannot
+    say. Two ways in, and they are the same fact:
+
+    - The subprocess passed its deadline and was killed. `subprocess.run`
+      kills the direct child, and on the command tier the direct child is a
+      shell whose own children outlive it, so a command that had already
+      published stays published.
+    - `publish.py` exited `EXIT_UNFINISHED`, which is its way of saying it
+      reached the tier and the tier failed.
+
+    A screen that answered either of these with "nothing was sent" would be
+    lying at the only moment it matters. Found in review: the first version
+    of this raised a plain refusal for the second case, so the sentence
+    written for it was unreachable.
+    """
+
+
+#: `publish.EXIT_UNFINISHED`. Repeated rather than imported: `lib/` is run as
+#: a subprocess from wherever the bundle is, never imported into this package,
+#: and a test pins the two together.
+EXIT_UNFINISHED = 3
 
 #: Root files a model may read: the writable set is also the readable one,
 #: posts/ and corpus/ are served by their own branches below.
@@ -138,9 +180,9 @@ def _run(script: Path, args, stdin: str, cwd, environ,
             capture_output=True, text=True, cwd=str(cwd),
             env=dict(environ), timeout=timeout)
     except subprocess.TimeoutExpired:
-        raise ToolRefused(
-            f"{script.name} did not answer within {timeout:g} seconds; "
-            "try again, or with a shorter text") from None
+        raise ToolUnfinished(
+            f"{script.name} did not answer within {timeout:g} seconds and was "
+            "killed") from None
 
 
 def lint_body(bundle_root, instance_root, body: str, lang: str, *,
@@ -158,8 +200,15 @@ def lint_body(bundle_root, instance_root, body: str, lang: str, *,
     if lang not in packs:
         raise ToolRefused(f"there is no {lang!r} language pack; "
                           f"the packs are: {', '.join(packs)}")
-    done = _run(bundle / "lib" / "lint.py", ["--lang", lang, "-"], body,
-                instance_root, environ, timeout)
+    try:
+        done = _run(bundle / "lib" / "lint.py", ["--lang", lang, "-"], body,
+                    instance_root, environ, timeout)
+    except ToolUnfinished as killed:
+        # The style pass sends nothing anywhere, so a killed one is simply a
+        # pass that did not run, and the advice that fits it is the advice
+        # that does not fit a killed publish.
+        raise ToolRefused(f"{killed}; try again, or with a shorter "
+                          "text") from None
     answer = (done.stdout + ("\n" + done.stderr if done.stderr else "")).strip()
     if done.returncode not in (0, 1):
         raise ToolRefused(redact(answer, environ))
@@ -173,15 +222,76 @@ def _lint(bundle: Path, inst: Instance, arguments: dict, environ,
                      timeout=timeout)
 
 
+@dataclass(frozen=True)
+class Sent:
+    """What the publishing step gave back. `payload` is what the tier
+    produced, the post itself on the copy tier, the scheduling payload on
+    postiz, whatever the command printed on command. `note` is the script's
+    own sentence about it, in English like the plan, and framed as such on
+    the screen."""
+    payload: str
+    note: str
+
+
+def _publish(bundle, instance_root, args, text: str, environ, timeout: float):
+    done = _run(Path(bundle) / "lib" / "publish.py", args, text,
+                instance_root, environ, timeout)
+    if done.returncode == 0:
+        return done
+    words = redact((done.stderr or done.stdout).strip(), environ)
+    if done.returncode == EXIT_UNFINISHED:
+        raise ToolUnfinished(words)
+    raise ToolRefused(words)
+
+
+def publish_plan_text(bundle_root, instance_root, text: str, *, when=None,
+                      environ=None, timeout: float = SUBPROCESS_TIMEOUT) -> str:
+    """What publishing this post would do, the real `lib/publish.py --plan`.
+
+    Public for the same reason `lint_body` is: the person's screen and the
+    model's tool have to run the same script, or the target somebody read is
+    not the target the engine answered about. `--when` is carried because the
+    plan is what a send is confirmed against, and a plan drawn without the
+    scheduled time would be confirmed for a different send.
+    """
+    environ = os.environ if environ is None else environ
+    args = ["-", "--plan"] + (["--when", when] if when else [])
+    try:
+        done = _publish(bundle_root, instance_root, args, text, environ,
+                        timeout)
+    except ToolUnfinished as killed:
+        # Plan mode never reaches `dispatch`, so a killed plan sent nothing
+        # and is a plain refusal. The sibling of the same conversion in
+        # `lint_body`, and made now rather than the day somebody mirrors the
+        # unfinished screen onto the plan route and tells a person to go check
+        # a channel nothing was offered to.
+        raise ToolRefused(str(killed)) from None
+    return redact(done.stdout.strip(), environ)
+
+
+def publish_send(bundle_root, instance_root, text: str, *, when=None,
+                 environ=None, timeout: float = PUBLISH_TIMEOUT) -> Sent:
+    """Publish for real, `--confirm` included. Reached from one place, the
+    screen, after the person has read the plan.
+
+    Nothing is built here. What crosses to a scheduler is built by
+    `publish.to_scheduler_html` inside the script, which is the whole reason
+    this goes through a subprocess rather than through a payload assembled in
+    the app: a feed renders consecutive paragraphs with no gap, and a
+    decomposed accent that survived every layer intact arrives as a letter
+    with something floating beside it. Both have happened here, on one post.
+    """
+    environ = os.environ if environ is None else environ
+    args = ["-", "--confirm"] + (["--when", when] if when else [])
+    done = _publish(bundle_root, instance_root, args, text, environ, timeout)
+    return Sent(payload=redact(done.stdout.strip(), environ),
+                note=redact(done.stderr.strip(), environ))
+
+
 def _publish_plan(bundle: Path, inst: Instance, arguments: dict, environ,
                   timeout: float) -> str:
-    text = _required(arguments, "text")
-    done = _run(bundle / "lib" / "publish.py", ["-", "--plan"], text,
-                inst.root, environ, timeout)
-    if done.returncode != 0:
-        raise ToolRefused(redact(
-            (done.stderr or done.stdout).strip(), environ))
-    return redact(done.stdout.strip(), environ)
+    return publish_plan_text(bundle, inst.root, _required(arguments, "text"),
+                             environ=environ, timeout=timeout)
 
 
 # ---------------------------------------------- the two that hold state

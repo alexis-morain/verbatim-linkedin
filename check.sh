@@ -35,6 +35,38 @@ else
   printf '   skip uv not installed, the app suite did not run\n'
 fi
 
+step "the wheel carries the whole bundle"
+# An installation has no checkout to fall back on, so anything the engine
+# reads at run time and the wheel does not carry is a hole nobody sees until
+# somebody who is not the maintainer runs it. The manifest is checked by
+# app/tests/test_bundle.py; this builds the thing and looks inside it.
+# Wheel only, on purpose: see the note in app/pyproject.toml.
+if command -v uv >/dev/null 2>&1; then
+  if (cd app && uv build --wheel --quiet) >/dev/null 2>&1; then
+    wheel="$(ls -t app/dist/*.whl 2>/dev/null | head -1)"
+    # Listed once, then matched without a pipe: under pipefail a `grep -q`
+    # that finds its match early closes the pipe, unzip takes the SIGPIPE,
+    # and the pipeline reports a failure that is really a success. Every
+    # entry but the last one in the archive would read as absent.
+    listing="$(unzip -l "$wheel" 2>/dev/null)"
+    absent=""
+    for path in SKILL.md locales/en/app.yml skills/linkedin-post/SKILL.md \
+                references/anchoring.md lib/lint.py lib/publish.py; do
+      case "$listing" in
+        *"verbatim_app/_bundle/$path"*) ;;
+        *) absent="$absent $path" ;;
+      esac
+    done
+    if [ -z "$absent" ]; then ok "$(basename "$wheel")"; else bad "not in the wheel:$absent"; fi
+  else
+    bad "the wheel does not build"
+    (cd app && uv build --wheel) 2>&1 | tail -10 | sed 's/^/     /'
+  fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip uv not installed, the wheel was not built\n'
+fi
+
 step "no model instruction lives under app/"
 # Prompts stay in skills/ and locales/. The app carries mechanics only.
 prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai|respond only with|never reveal' \
