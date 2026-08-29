@@ -20,11 +20,16 @@ itself into a green tick is the failure this whole file exists against.
 Three probes, and each one answers a question the recorded streams cannot:
 
 1. **Text streams back.** The endpoint speaks the format this engine parses,
-   in the shape it parses it, today.
+   in the shape it parses it, today. No tool is declared on this one: whether
+   the endpoint accepts a tool declaration at all is the next probe's
+   question, and a model with no tool support answers 400 to the whole
+   request rather than to the tool.
 2. **A required tool fires.** `tool_choice` is the mechanism that replaces
-   asking a model nicely, and local runtimes are known to ignore it. A miss
-   here is not a failure of the endpoint, it is the degraded path the engine
-   documents, and it is reported as DEGRADED rather than as a pass or a fail.
+   asking a model nicely. Two ways to miss it, and they are not the same:
+   refusing the request outright is a model this engine cannot drive, since
+   the sheet and the draft both happen through tools, and it is a `FAIL`.
+   Answering in prose instead is the degraded path the engine documents and
+   is reported as `DEGRADED`.
 3. **Tokens come back.** The meter over somebody's bill is only as honest as
    what the provider reports. Silence here means the screen shows zero, and
    zero over a real bill is the answer `providers.py` refuses to give.
@@ -71,11 +76,19 @@ def probe_tool(seen: list) -> Tool:
         run=lambda arguments: seen.append(arguments.get("word", "")) or "noted")
 
 
-def run(settings, transport, *, require: str = ""):
-    """One turn, collected. Returns (text, tool calls, usage, stop)."""
+def run(settings, transport, *, require: str = "", tools=None):
+    """One turn, collected. Returns (text, tool calls, usage, stop).
+
+    `tools` defaults to the probe tool; the first probe passes an empty list,
+    and that is what separates the two. Declaring a tool is itself something
+    an endpoint can refuse: a model with no tool support answers 400 to the
+    whole request, so a first probe that declared one would report "this
+    endpoint does not speak the format" about an endpoint that speaks it
+    perfectly well.
+    """
     seen: list = []
-    agent = Agent(settings, [probe_tool(seen)], transport=transport,
-                  max_turns=2)
+    declared = [probe_tool(seen)] if tools is None else list(tools)
+    agent = Agent(settings, declared, transport=transport, max_turns=2)
     text, calls, stop = "", [], ""
     messages = [{"role": "user", "content": [{"type": "text", "text": ASK}]}]
     for step in agent.run("", messages, require=require):
@@ -127,7 +140,7 @@ def main_with(environ, make_transport) -> int:
     results = []
 
     try:
-        text, _, usage, stop = run(settings, transport)
+        text, _, usage, stop = run(settings, transport, tools=[])
     except (AgentError, ProviderError) as failure:
         # Redacted the way the app redacts a provider failure: a gateway that
         # echoes an Authorization header into a debug body would otherwise put

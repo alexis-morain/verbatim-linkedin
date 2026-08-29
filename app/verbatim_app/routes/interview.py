@@ -381,9 +381,20 @@ def propose_sheet(request: Request, interview_id: str):
     This is the mechanism that replaces asking a model nicely. A weak model
     reads `The validation sheet` and answers it in prose, which fires nothing:
     no proposal, no panel, no approval, and a person left believing the guard
-    ran. Requiring the tool for this one turn leaves it no prose to write, and
-    it stays the person's decision to ask, because they are the one who knows
-    the interview has enough material in it.
+    ran. It stays the person's decision to ask, because they are the one who
+    knows the interview has enough material in it.
+
+    **The requirement is not a guarantee, and this comment used to say it
+    was.** Measured on Ollama on 2026-08-29, `docs/smoke.md`: the same model
+    and the same request called the tool two times in six. `tool_choice` is
+    enforced by the provider on the native wire and is advisory on that one.
+    So on a local runtime this fires most of the time and does nothing the
+    rest, and unlike the draft there is no prose fallback here. What a person
+    sees then is their sheet written out in the thread with no panel and no
+    approve button, and their only move is to ask again. Named rather than
+    papered over, and open: reading a sheet out of prose would mean parsing
+    five fields out of free text, which is a different guard with a different
+    failure mode.
     """
     return _start(request, interview_id, require=SHEET_TOOL)
 

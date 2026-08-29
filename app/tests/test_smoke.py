@@ -40,6 +40,15 @@ class TestTheProbes(unittest.TestCase):
         self.assertEqual(stop, "end_turn")
         self.assertEqual((usage.input_tokens, usage.output_tokens), (100, 10))
 
+    def test_the_first_probe_declares_no_tool_at_all(self):
+        # Declaring one is what the second probe measures. A model with no
+        # tool support answers 400 to the whole request, and a first probe
+        # carrying a declaration would report that as "this endpoint does not
+        # speak the format". Observed on deepseek-r1 through Ollama.
+        transport = Replay(says("ready."))
+        smoke.run(ANTHROPIC, transport, tools=[])
+        self.assertNotIn("tools", transport.calls[0]["payload"])
+
     def test_a_required_tool_is_asked_for_on_the_wire(self):
         transport = Replay(asks(("c1", smoke.PROBE_TOOL, {"word": "ready"})),
                            says("done"))

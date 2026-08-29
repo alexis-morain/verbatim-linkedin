@@ -235,8 +235,11 @@ a timestamp. Three rules:
   to speak. What it forbids is another interview turn, not another word.
 
 A draft normally arrives through that tool, one field per column above. A
-runtime that ignores a forced tool call, which local ones do, answers in prose
-instead, and the engine then reads the `ANCHORS` block out of the answer. That
+runtime that ignores a forced tool call answers in prose instead, and the
+engine then reads the `ANCHORS` block out of the answer. That is not a
+hypothetical: `tool_choice` is enforced by the provider on the native wire and
+is advisory on an OpenAI compatible one, so a local runtime takes this path
+several turns out of six, measured rather than assumed. That
 path is degraded on purpose and shows it: `body` then holds everything the
 model wrote before the block, hooks and notes included, so the panel marks
 sentences the post itself would never contain. Whatever could not be read
