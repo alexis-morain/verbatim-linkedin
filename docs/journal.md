@@ -2,7 +2,7 @@
 
 ## 2026-08-29 (suite). Le smoke test lancé, et ce qu'il a trouvé
 
-Commits `ca0aef3` et `0a440a1`, poussés. La session devait s'arrêter à la
+Commits `ca0aef3`, `0a440a1` et `040d522`, poussés. La session devait s'arrêter à la
 tranche 5.6 ; elle a continué parce que lancer le smoke test pour de vrai a
 sorti trois choses, dont deux qu'aucun test ne pouvait voir.
 
