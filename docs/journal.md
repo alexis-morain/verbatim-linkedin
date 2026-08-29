@@ -2,6 +2,7 @@
 
 ## 2026-08-29 (fin). Étape 6 : la publication, le paquet, la release
 
+Commits `1dd0691` et `ead6174`, poussés, **tag `v2.0.0` posé et poussé**.
 Quatre morceaux et quatre tours de revue à contexte frais, dont trois rouges.
 L'app fait maintenant le tour complet jusqu'au feed, elle s'installe depuis un
 wheel, et le README montre à quoi elle ressemble.
@@ -138,14 +139,42 @@ supérieure négative pour se coller sous son titre, et dans une grille de
 formulaire elle passait par-dessus le bouton. Deux textes illisibles sur
 l'écran de publication, invisibles pour la suite de tests.
 
+### Le plan de finition, écrit dans la foulée
+
+`plans/2026-08-29-app-finition.md`, gitignoré comme `CLAUDE.md` : de la prose
+de pilotage en français n'a rien à faire dans un moteur écrit en anglais, et ce
+qu'un plan a décidé finit ici, dans le journal, qui est livré (`ead6174`).
+
+Quatre tranches. **7.1** le rendu markdown et les boutons de copie, en premier
+parce que les deux suivantes affichent des documents. **7.2** l'édition des
+fichiers racines section par section, la demande Alchie. **7.3** l'écran
+Mesure, avec cinq posts de fixture. **7.4** les dettes du plan V2 : coût estimé
+avant l'entretien, colonne 72ch, `Dockerfile`, PyPI.
+
+Trois choses tranchées à l'écriture du plan, contre le réflexe :
+
+- **Le corps d'un post ne se rendra pas en markdown.** LinkedIn n'en a pas.
+  Rendre le brouillon montrerait un titre là où le fil affichera `## Titre`, au
+  moment précis où quelqu'un décide de publier. Le reste se rend, notes de
+  session comprises. Question 1 du plan, laissée à Alexis.
+- **Les cinq posts inventés ouvrent l'écran, pas le skill.** `linkedin-measure`
+  reste gaté sur des relevés réels : un skill de conseil écrit contre des
+  chiffres inventés mesure l'imagination. L'écran, lui, calcule ce que les
+  fichiers disent, ce qui est mécanique.
+- **Trois condensés, c'est un de trop.** La fiche, le plan de publication et
+  maintenant l'édition par section font tous « le formulaire porte un condensé
+  de ce qui était à l'écran ». 7.2 fait le helper partagé avant que le
+  quatrième ne diverge.
+
 ### Ce qui reste
 
-Le paquet n'est pas poussé sur PyPI et le tag `v2.0.0` n'est pas posé :
-l'envoi demande le jeton d'Alexis. Le fil `anthropic` part toujours non testé,
-décision du 29/08, et `docs/smoke.md` dit ce que ça coûte. La fenêtre de
-contexte trop petite reste le plus gros trou ouvert contre le « local
-d'abord », et la décision d'y répondre par une phrase à l'écran plutôt que par
-une heuristique n'a pas bougé.
+Le paquet n'est pas poussé sur PyPI, l'envoi demande le jeton d'Alexis, et la
+page de release GitHub attend cet envoi : annoncer une v2.0.0 dont la commande
+d'installation ne résout pas serait un README qui ment. Le fil `anthropic` part
+toujours non testé, décision du 29/08, et `docs/smoke.md` dit ce que ça coûte.
+La fenêtre de contexte trop petite reste le plus gros trou ouvert contre le
+« local d'abord », et la décision d'y répondre par une phrase à l'écran plutôt
+que par une heuristique n'a pas bougé.
 
 ## 2026-08-29 (suite). Le smoke test lancé, et ce qu'il a trouvé
 
