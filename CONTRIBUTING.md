@@ -61,6 +61,22 @@ It runs the tests, self tests every language pack, and refuses a tree where
 somebody's profile, a `.env`, an em dash or an emoji made it into the shipped
 files. All of those have happened to somebody.
 
+**Green is not evidence that any endpoint answers this engine.** The app's
+tests replay recorded streams, written from the published formats, so they
+prove the parser and stop there. Touching `app/verbatim_app/providers.py` or
+`agent.py` means running the manual smoke test against a real endpoint and
+appending a row to [`docs/smoke.md`](docs/smoke.md), which explains what its
+three probes mean and why a required tool that does not fire is a documented
+degraded path rather than a failure.
+
+```bash
+ANTHROPIC_API_KEY=... uv run --project app python scripts/smoke.py
+```
+
+It costs a few cents of your own key, and it is not in `check.sh` on purpose:
+CI has no key, and a check that skips itself into a green tick is the failure
+the smoke test exists against.
+
 ## Adding a language pack, in short
 
 1. `cp -r locales/_template locales/<code>`

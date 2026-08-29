@@ -103,6 +103,26 @@
   <h2>{{ t('interview.draft') }}</h2>
   <p class="hint">{{ t('interview.draft_hint') }}</p>
   {% if conversation.state == 'open' %}
+  {% if trace %}
+  {# The revision loop of the skill, made a box. What is typed here is kept and
+     joins the Said side: the hint says so, because somebody has to know that
+     a correction typed here is quotable and a request typed here is on the
+     record. The button reads it; nothing is appended to the interview. #}
+  {% if conversation.revisions %}
+  <h3>{{ t('interview.revision_history') }}</h3>
+  <ul class="revisions">
+    {% for asked in conversation.revisions %}
+    <li>
+      <p class="hint mono">{{ t('interview.revision_asked', stamp=asked.asked) }}</p>
+      <p class="their-words">{{ asked.text }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <label class="mono" for="revision">{{ t('interview.revision') }}</label>
+  <p class="hint">{{ t('interview.revision_hint') }}</p>
+  <textarea id="revision" rows="3"></textarea>
+  {% endif %}
   <button type="button" id="write-draft" data-url="/interview/{{ conversation.id }}/draft">{{ t('interview.draft_rewrite')
     if trace else t('interview.draft_write') }}</button>
   {% endif %}
@@ -164,6 +184,87 @@
   </ul>
   </div>
   </div>
+
+  {# Not the post, and never rendered inside it. Every kind the skill asks the
+     writing step for is listed, present or not: a list that silently holds one
+     of two reads as a complete answer, and nobody asks again for a thing they
+     were never told was missing. #}
+  <section class="notes">
+    <h3>{{ t('interview.notes') }}</h3>
+    <p class="hint">{{ t('interview.notes_hint') }}</p>
+    <dl class="session-notes">
+      <dt class="mono">{{ t('interview.photos') }}</dt>
+      <dd>
+        <ul>
+          {% for note in trace.photos %}<li><span class="badge mono">{{ t('interview.note_' ~ note.kind) }}</span> {{ note.text }}</li>{% endfor %}
+          {% for kind in trace.missing.photos %}<li class="empty"><span class="badge mono">{{ t('interview.note_' ~ kind) }}</span> {{ t('interview.note_missing') }}</li>{% endfor %}
+        </ul>
+      </dd>
+      <dt class="mono">{{ t('interview.tips') }}</dt>
+      <dd>
+        <ul>
+          {% for note in trace.tips %}<li><span class="badge mono">{{ t('interview.note_' ~ note.kind) }}</span> {{ note.text }}</li>{% endfor %}
+          {% for kind in trace.missing.tips %}<li class="empty"><span class="badge mono">{{ t('interview.note_' ~ kind) }}</span> {{ t('interview.note_missing') }}</li>{% endfor %}
+        </ul>
+      </dd>
+    </dl>
+  </section>
+
+  {# Outside the open guard, deliberately. One of the refusals this carries is
+     "this interview already became a post", which by definition can only be
+     shown on a closed one: inside the guard it was a sentence nobody could
+     ever read. #}
+  {% if archive_problem %}
+  <p class="callout" id="archive-problem">{{ t('interview.archive_' ~ archive_problem|replace('-', '_')) }}</p>
+  {% endif %}
+
+  {% if conversation.state == 'open' %}
+  {# The step the skill says decides whether any of this was worth doing. The
+     classification is the person's: none of it is derivable from a body of
+     text, and a value guessed here is a guess counted in every ratio. #}
+  <section class="archive" id="archive">
+    <h3>{{ t('interview.archive') }}</h3>
+    <p class="hint">{{ t('interview.archive_hint') }}</p>
+    <form method="post" action="/interview/{{ conversation.id }}/archive">
+      <label class="mono" for="archive-date">{{ t('interview.archive_date') }}</label>
+      <input type="date" id="archive-date" name="date" value="{{ today }}" required>
+
+      <label class="mono" for="archive-slug">{{ t('interview.archive_slug') }}</label>
+      <input type="text" id="archive-slug" name="slug" required
+             pattern="[a-z0-9]+(-[a-z0-9]+)*">
+      <p class="hint">{{ t('interview.archive_slug_hint') }}</p>
+
+      <label class="mono" for="archive-pillar">{{ t('interview.archive_pillar') }}</label>
+      <select id="archive-pillar" name="pillar">
+        {% for pillar in pillars %}<option value="{{ pillar }}">P{{ pillar }}</option>{% endfor %}
+      </select>
+
+      <label class="mono" for="archive-format">{{ t('interview.archive_format') }}</label>
+      <select id="archive-format" name="format">
+        {% for shape in formats %}<option value="{{ shape }}">{{ t('interview.format_' ~ shape|replace('-', '_')) }}</option>{% endfor %}
+      </select>
+
+      <label class="mono" for="archive-label">{{ t('interview.archive_label') }}</label>
+      <select id="archive-label" name="label">
+        {% for objective in labels %}<option value="{{ objective }}">{{ t('interview.label_' ~ objective|lower) }}</option>{% endfor %}
+      </select>
+
+      <label class="mono" for="archive-state">{{ t('interview.archive_state') }}</label>
+      <select id="archive-state" name="state">
+        {% for state in states %}<option value="{{ state }}">{{ t('posts.state_' ~ state) }}</option>{% endfor %}
+      </select>
+      <p class="hint">{{ t('interview.archive_state_hint') }}</p>
+
+      <label class="mono" for="archive-idea">{{ t('interview.archive_idea') }}</label>
+      <select id="archive-idea" name="idea">
+        <option value="">{{ t('interview.archive_idea_none') }}</option>
+        {% if bank %}{% for angle in bank.angles %}<option value="{{ angle.text }}">P{{ angle.pillar }} {{ angle.text }}</option>{% endfor %}{% endif %}
+      </select>
+
+      <button type="submit">{{ t('interview.archive_do') }}</button>
+    </form>
+  </section>
+  {% endif %}
   {% endif %}
 </section>
 {% endif %}

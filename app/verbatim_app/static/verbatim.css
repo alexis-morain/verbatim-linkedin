@@ -57,6 +57,11 @@
   }
 }
 
+/* Native controls follow the page. Without this the date picker and the
+   select dropdown come up light on a dark screen, which is the one place a
+   theme leaks through a widget nobody styled. */
+:root { color-scheme: light dark; }
+
 * { box-sizing: border-box; }
 
 [hidden] { display: none !important; }
@@ -428,6 +433,51 @@ mark.claim-fabricated {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.5;
+}
+
+/* What was asked for, above the box that asks for the next thing. Serif on
+   the request itself: it is somebody's own words, and it anchors. */
+.revisions { list-style: none; padding: 0; margin: 0 0 1.25rem; max-width: 68ch; }
+.revisions li { border-left: 3px solid var(--ink); padding: 0 0 0 1rem;
+                margin-bottom: 0.9rem; }
+.revisions .hint { margin: 0; }
+.revisions .their-words { font-family: var(--serif); margin: 0.15rem 0 0;
+                          white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.draft > label { display: block; margin-top: 1.25rem; color: var(--muted); }
+.draft > textarea { max-width: 68ch; }
+
+/* Beside the post, never in it. Grotesque throughout: none of this is
+   somebody's words, it is the engine's notes on a session. */
+.notes { margin: 2rem 0 0; max-width: 68ch; }
+.notes h3 { margin: 0 0 0.35rem; }
+.session-notes { margin: 1rem 0 0; }
+.session-notes dt { color: var(--muted); font-size: 0.78rem; margin-top: 0.9rem; }
+.session-notes dd { margin: 0.2rem 0 0; }
+.session-notes ul { list-style: none; margin: 0; padding: 0; }
+.session-notes li { padding: 0.3rem 0; overflow-wrap: anywhere; }
+.session-notes .badge { margin-right: 0.4rem; }
+.session-notes .empty { color: var(--muted); }
+
+.archive { margin: 2rem 0 0; max-width: 40rem; }
+.archive h3 { margin: 0 0 0.35rem; }
+.archive form { display: grid; gap: 0.3rem; margin-top: 1rem; }
+.archive label { color: var(--muted); margin-top: 0.8rem; }
+.archive .hint { margin: 0.1rem 0 0; font-size: 0.85rem; }
+.archive button { justify-self: start; margin-top: 1.25rem; }
+
+select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0.5rem 0.6rem;
+  width: 100%;
+}
+select:focus-visible, textarea:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 @media (max-width: 980px) {

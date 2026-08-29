@@ -36,6 +36,16 @@ class UnreadableError(InstanceError):
     """
 
 
+class NameTaken(InstanceError):
+    """The file is already there and this write would replace it.
+
+    Its own type for the reason `UnreadableError` has one: a caller that
+    cannot tell it apart from "the directory will not take a file" shows the
+    wrong screen, and here the two fixes are pick another name and repair
+    your disk.
+    """
+
+
 # Files a consumer may write. Everything else in the instance is either
 # produced by a dedicated skill (posts/, linkedin-page.md via its owner)
 # or is somebody's raw corpus, which is never rewritten.
@@ -297,6 +307,27 @@ class Instance:
             output_language_default=values.get("output_language_default", "en"),
         )
 
+    def signature(self) -> str:
+        """The signature block, as it is appended to every post.
+
+        Concatenated, never generated: a generated signature drifts a little
+        on every post until it belongs to somebody else. The fence around it
+        in `profile.md` is markup for a reader, so it comes off here.
+
+        An empty section is an answer, and it means no signature. An absent
+        one is not: `references/instance.md` says its absence means the
+        migration was incomplete, so reading it as "there is none" would file
+        a post without one and call that a decision. This raises instead.
+        """
+        section = _section(self.read("profile.md"), "Signature block")
+        if section is None:
+            raise InstanceError(
+                "profile.md has no '## Signature block' section. That is a "
+                "section to restore, not a signature to do without")
+        fenced = re.search(r"^```[^\n]*\n(.*?)^```", section,
+                           re.MULTILINE | re.DOTALL)
+        return (fenced.group(1) if fenced else section).strip()
+
     # -- posts
 
     def posts(self) -> list[PostMeta]:
@@ -353,6 +384,82 @@ class Instance:
             raise InstanceError(f"no such post: {filename}")
         _, body = split_front_matter(read_text(path, filename))
         return body
+
+    def write_post(self, filename: str, text: str) -> None:
+        """File one post under `posts/`, and never over one.
+
+        `posts/` is deliberately outside `WRITABLE`, which is the set the
+        tools hand a model. This method is why it does not need to be there:
+        archiving is the person's step, reached from their screen, and a model
+        that could write here could write its own measurements.
+
+        A name already taken stops the step. The two files would be two posts
+        from one day on one subject, and the one that loses is somebody's.
+        """
+        directory = self.root / "posts"
+        path = self._child(directory, filename)
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as broken:
+            raise InstanceError(
+                f"cannot create posts/: {broken.strerror}") from None
+        if path.exists():
+            raise NameTaken(
+                f"posts/{filename} already exists; pick another slug or "
+                "another date rather than writing over it")
+        try:
+            atomic_write(path, text)
+        except OSError as broken:
+            # Symmetric with `read_text`, which turns an OSError into an
+            # instance failure so no screen has to know what a strerror is.
+            # A directory that will not take a file is a repair, and the
+            # caller answering it has to be able to tell it from a name that
+            # is simply taken.
+            raise InstanceError(
+                f"cannot write posts/{filename}: {broken.strerror}") from None
+
+    def use_idea(self, angle: str, *, date: str, file: str) -> None:
+        """Move one angle out of the bank and into `## Used`.
+
+        The bank is append only on the used side and a session never closes
+        leaving it poorer than it found it. The half that is mechanical is
+        this one; adding the angles an interview turned up is a judgement and
+        stays with the person.
+        """
+        text = self.read("ideas.md")
+        lines = text.splitlines()
+        found = [(angle_, start, end)
+                 for angle_, start, end in _scan_angles(lines)
+                 if angle_.text == angle]
+        if not found:
+            raise InstanceError(f"no such angle in the bank: {angle!r}")
+        entry, start, end = found[0]
+        if "|" in entry.text:
+            # The used line is four fields split on a pipe. An angle carrying
+            # one would write a line nothing can read back, and mangling
+            # somebody's own words to fit the format is worse than saying so.
+            raise InstanceError(
+                "this angle carries a '|', which is the separator of the "
+                "used line; edit the angle in ideas.md, then archive again")
+        kept = lines[:start] + lines[end:]
+        used = f"{date} | P{entry.pillar} | {entry.text} | {file}"
+        marker = None
+        for index, line in enumerate(kept):
+            if line.strip().lower() == "## used":
+                marker = index
+        if marker is None:
+            kept += ["", "## Used", "", "<!-- date | pillar | angle | file -->"]
+            kept.append(used)
+        else:
+            end_of = len(kept)
+            for index in range(marker + 1, len(kept)):
+                if kept[index].startswith("## "):
+                    end_of = index
+                    break
+            while end_of > marker + 1 and not kept[end_of - 1].strip():
+                end_of -= 1
+            kept.insert(end_of, used)
+        self.write("ideas.md", "\n".join(kept).rstrip("\n") + "\n")
 
     def pillar_counter(self) -> dict:
         counter: dict = {}
@@ -415,20 +522,12 @@ class Instance:
             para.append(lines[i].strip())
             i += 1
         next_session = " ".join(para)
+        angles = [angle for angle, _, _ in _scan_angles(lines, start=i)]
+        section = ""
         for j in range(i, len(lines)):
             line = lines[j]
             if line.startswith("## "):
                 section = line[3:].strip()
-                continue
-            m = re.match(r"^-\s+\[P(\d+)\]\s+(?:`(\w+)`|(\w+))\s+(.*)$", line)
-            if m and section.lower() != "used":
-                label = m.group(2) or m.group(3)
-                angles.append(Angle(pillar=int(m.group(1)), label=label,
-                                    text=m.group(4).strip(), section=section))
-                continue
-            if angles and (line.startswith("  ") and line.strip()
-                           and not line.strip().startswith("-")):
-                angles[-1].text += " " + line.strip()
                 continue
             if section.lower() == "used" and "|" in line and not line.strip().startswith("<!--"):
                 parts = [p.strip() for p in line.split("|")]
@@ -480,6 +579,42 @@ class Instance:
                 gaps.append(Gap("post-keys-missing",
                                 f"{post.filename}: {' '.join(post.missing_keys)}"))
         return gaps
+
+
+ANGLE_LINE = re.compile(r"^-\s+\[P(\d+)\]\s+(?:`(\w+)`|(\w+))\s+(.*)$")
+
+
+def _scan_angles(lines, start: int = 0):
+    """Every angle of the bank, with the lines it occupies.
+
+    One walker, because two of them would eventually disagree: reading the
+    bank and moving a line out of it have to agree on where an angle starts
+    and where its wrapped continuation ends, or a move takes half a line with
+    it and leaves the other half behind. `ideas` drops the spans, `use_idea`
+    uses them.
+
+    Yields `(Angle, first line, one past the last)`.
+    """
+    section, found = "", []
+    for index in range(start, len(lines)):
+        line = lines[index]
+        if line.startswith("## "):
+            section = line[3:].strip()
+            continue
+        match = ANGLE_LINE.match(line)
+        if match and section.lower() != "used":
+            found.append([Angle(pillar=int(match.group(1)),
+                                label=match.group(2) or match.group(3),
+                                text=match.group(4).strip(), section=section),
+                          index, index + 1])
+            continue
+        if found and (line.startswith("  ") and line.strip()
+                      and not line.strip().startswith("-")):
+            angle, first, _ = found[-1]
+            found[-1] = [Angle(pillar=angle.pillar, label=angle.label,
+                               text=angle.text + " " + line.strip(),
+                               section=angle.section), first, index + 1]
+    return [(angle, first, last) for angle, first, last in found]
 
 
 def _section(text: str, heading: str) -> str | None:

@@ -26,8 +26,10 @@
   var button = form ? form.querySelector("button") : null;
   var ask = document.getElementById("ask-sheet");
   var write = document.getElementById("write-draft");
+  var revision = document.getElementById("revision");
   var current = null;
   var pending = null;   /* what was typed, until the turn is known to be real */
+  var origin = null;    /* the box it was typed in, so the right one clears */
   var committed = false;  /* whether this turn's words reached disk */
   var landed = false;   /* whether this turn put a draft on the conversation */
 
@@ -170,8 +172,12 @@
   }
 
   function commit() {
+    /* The words are on disk, so they come out of the box and into the thread.
+       Which box is carried from the click rather than assumed: once the sheet
+       is approved the answer box is not on the page at all, and the one that
+       is holds a revision request. */
     spoken("turn-said", T.said).textContent = pending;
-    box.value = "";
+    if (origin) { origin.value = ""; }
     pending = null;
   }
 
@@ -226,7 +232,7 @@
   }
 
   function busy(yes) {
-    [box, button, again, ask, write].forEach(function (node) {
+    [box, button, again, ask, write, revision].forEach(function (node) {
       if (node) { node.disabled = yes; }
     });
   }
@@ -234,15 +240,16 @@
   function run(text) {
     /* An empty body is a resume: the words are already on disk and the model
        still owes a reply, so there is nothing to show and nothing to clear. */
-    return stream(form.action, text);
+    return stream(form.action, text, false, box);
   }
 
-  function stream(url, text, reload) {
+  function stream(url, text, reload, source) {
     /* One turn, whichever button started it. The three of them differ by
        where they post and by what the server does with it; a screen that
        carried three copies of this would grow three ways of failing. */
     busy(true);
     pending = text ? text : null;
+    origin = source || null;
     committed = false;
     landed = false;
     current = null;   /* a cut answer must not swallow the next one */
@@ -303,12 +310,17 @@
        behind this requires the tool rather than asking for it, which is what
        makes the sheet happen on a model that would otherwise write about it. */
     ask.addEventListener("click", function () {
-      stream(ask.getAttribute("data-url"), "");
+      stream(ask.getAttribute("data-url"), "", false, null);
     });
   }
   if (write) {
+    /* An empty box is a plain rewrite, which the skill allows: a revision
+       restarts from the interview material either way. What is typed is a
+       request, and it is kept, which is why it travels with the turn rather
+       than being cleared here and forgotten. */
     write.addEventListener("click", function () {
-      stream(write.getAttribute("data-url"), "", true);
+      stream(write.getAttribute("data-url"),
+             revision ? revision.value : "", true, revision);
     });
   }
 

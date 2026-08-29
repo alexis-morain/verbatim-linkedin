@@ -14,7 +14,8 @@ step "tests"
 for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py \
          app/tests/test_providers.py app/tests/test_agent.py \
          app/tests/test_skills.py app/tests/test_tools.py \
-         app/tests/test_anchors.py app/tests/test_interview.py; do
+         app/tests/test_anchors.py app/tests/test_interview.py \
+         app/tests/test_archive.py app/tests/test_smoke.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
 
@@ -89,7 +90,7 @@ if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "th
 
 step "every engine file is actually tracked"
 missing=""
-for f in $(find references skills locales lib app/verbatim_app app/tests -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml; do
+for f in $(find references skills locales lib app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml; do
   git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
 done
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi

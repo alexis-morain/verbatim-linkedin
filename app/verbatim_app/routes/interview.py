@@ -33,15 +33,16 @@ from __future__ import annotations
 
 import json
 import threading
+from datetime import date as _date
 from dataclasses import dataclass, replace
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from . import render as _render
-from .. import anchors, interview
+from .. import anchors, archive, interview
 from ..agent import Agent, AgentError, http_transport
-from ..instance import InstanceError
+from ..instance import InstanceError, UnreadableError
 from ..providers import (
     PRICES, ProviderError, Settings, Usage, price, problems, resolve,
 )
@@ -189,7 +190,7 @@ def begin(request: Request):
 #: Notices a redirect may carry back to the screen. A whitelist, because the
 #: query string is anybody's to write and an unknown value must render as
 #: nothing rather than reach the string table.
-NOTICES = ("sheet-changed", "turn-running")
+NOTICES = ("sheet-changed", "turn-running", "idea-not-moved")
 
 
 def panel(conversation) -> dict:
@@ -226,6 +227,17 @@ def panel(conversation) -> dict:
         "body": draft.body,
         "written": draft.written,
         "problems": list(draft.problems),
+        # Not the post, and never rendered inside it. The skill asks the
+        # writing step for both; what did not arrive is shown as missing,
+        # which is the only way somebody knows to ask again.
+        "photos": [{"kind": note.kind, "text": note.text}
+                   for note in draft.photos],
+        "tips": [{"kind": note.kind, "text": note.text}
+                 for note in draft.tips],
+        "missing": {
+            "photos": _absent(draft.photos, interview.PHOTO_KINDS),
+            "tips": _absent(draft.tips, interview.TIP_KINDS),
+        },
         "lines": [[{"text": piece.text, "covered": piece.covered,
                     "status": _claim(piece, invented)}
                    for piece in row] for row in painted],
@@ -234,6 +246,17 @@ def panel(conversation) -> dict:
                       "status": verdict.status} for verdict in verdicts],
         "counts": counts,
     }
+
+
+def _absent(notes, kinds) -> list:
+    """The kinds the writing step was asked for and did not return.
+
+    Computed here rather than in the template, and as kinds rather than as
+    prefixed strings: a screen that has to slice a prefix off to find the
+    label is one rename away from printing half a word.
+    """
+    arrived = {note.kind for note in notes}
+    return [kind for kind in kinds if kind not in arrived]
 
 
 def _claim(piece, invented) -> str:
@@ -272,7 +295,10 @@ def _screen(request: Request, conversation, **extra):
                   notice=asked if asked in NOTICES else "",
                   engine=_engine(request), bank=bank,
                   trace=panel(conversation), findings="",
-                  lint_failed=False,
+                  lint_failed=False, archive_problem="",
+                  formats=archive.FORMATS, labels=archive.LABELS,
+                  states=archive.STATES, pillars=archive.PILLARS,
+                  today=_date.today().isoformat(),
                   strings=_frame_strings(request.app.state.t))
     fields.update(extra)
     return _render(request, "interview.html", **fields)
@@ -363,10 +389,79 @@ def propose_sheet(request: Request, interview_id: str):
 
 
 @router.post("/interview/{interview_id}/draft")
-def draft(request: Request, interview_id: str):
+def draft(request: Request, interview_id: str, text: str = Form("")):
     """Write the post. Refused until the sheet is signed, which is the
-    sentence `linkedin-post` opens the sheet with, made mechanical."""
-    return _start(request, interview_id, require=DRAFT_TOOL, drafting=True)
+    sentence `linkedin-post` opens the sheet with, made mechanical.
+
+    `text` is the revision request, empty on the first draft and on a plain
+    rewrite. It is kept, on the `Said` side: the skill's revision loop is
+    free, and what somebody types to steer it is theirs.
+    """
+    return _start(request, interview_id, require=DRAFT_TOOL, drafting=True,
+                  text=text)
+
+
+@router.post("/interview/{interview_id}/archive")
+def archive_interview(request: Request, interview_id: str,
+                      date: str = Form(""), slug: str = Form(""),
+                      pillar: str = Form(""), format: str = Form(""),
+                      label: str = Form(""), state: str = Form("draft"),
+                      idea: str = Form("")):
+    """The interview becomes a post, which is the step the skill says decides
+    whether any of this was worth doing.
+
+    Under the turn lock, for the reason approving a sheet is: a close written
+    beside a running turn is a close the turn's next save writes over, and
+    what would be lost is the only record that these words became that file.
+
+    Nothing here is streamed and nothing here costs anything: it is disk, and
+    the person's own decisions on their own material.
+    """
+    # For the 404 alone: an interview that is not on disk is not a form to
+    # answer. What the refusal screen renders is read again afterwards, since
+    # the step itself may have changed what this says.
+    _conversation(request, interview_id)
+    instance = request.app.state.instance
+    lock = lock_for(request.app, interview_id)
+    if not lock.acquire(blocking=False):
+        return RedirectResponse(f"/interview/{interview_id}?notice=turn-running",
+                                status_code=303)
+    done, refused = None, ""
+    try:
+        filing = archive.Filing(
+            date=date.strip(), slug=slug.strip(),
+            # A pillar that is not a number is a pillar that is not one of the
+            # three, and `check` already has the sentence for that.
+            pillar=int(pillar) if pillar.strip().lstrip("-").isdigit() else 0,
+            format=format.strip(), label=label.strip(), state=state.strip(),
+            idea=idea)
+        done = archive.archive(instance, interview_id, filing)
+    except archive.ArchiveError as refusal_code:
+        refused = str(refusal_code)
+    except UnreadableError:
+        # A file of the instance is there and its bytes will not come back as
+        # text. Its own screen: that is a file to repair, not a form to fix.
+        refused = "instance-unreadable"
+    except InstanceError:
+        # The profile has no signature block to append, or has gone. Both are
+        # repairs on one file, and neither is a slug to change. A directory
+        # that will not take the post is not here: it has its own code.
+        refused = "signature-missing"
+    finally:
+        # Released before the page is built. Rendering reads the bank and the
+        # whole conversation, and none of that needs to hold a turn out.
+        lock.release()
+    if refused:
+        return _screen(request, _conversation(request, interview_id),
+                       archive_problem=refused)
+    if done.problems:
+        # The post is filed and the interview is closed. What is left is the
+        # bank line, which is somebody's ten seconds, and saying nothing about
+        # it is how a bank quietly gets poorer.
+        return RedirectResponse(
+            f"/interview/{interview_id}?notice={done.problems[0]}",
+            status_code=303)
+    return RedirectResponse(f"/posts/{done.filename}", status_code=303)
 
 
 @router.post("/interview/{interview_id}/draft/lint")
@@ -432,7 +527,7 @@ def turn(request: Request, interview_id: str, text: str = Form("")):
 
 
 def _start(request: Request, interview_id: str, *, require: str = "",
-           drafting: bool = False):
+           drafting: bool = False, text: str = ""):
     """Refuse what a status code can refuse, then stream.
 
     Same reasoning as `turn` above and for the same reason: nothing is
@@ -454,11 +549,16 @@ def _start(request: Request, interview_id: str, *, require: str = "",
         # has to invent, and inventing it is the failure the sheet exists to
         # catch.
         raise HTTPException(status_code=422, detail="nothing-to-send")
+    if drafting and text.strip() and conversation.draft is None:
+        # A revision revises something. The approved sheet is what the first
+        # draft answers to, and a request typed against no draft is a stale
+        # form, not an instruction. Re-checked under the lock, like the rest.
+        raise HTTPException(status_code=409, detail="nothing-to-revise")
     lock = lock_for(request.app, interview_id)
     if lock.locked():
         raise HTTPException(status_code=409, detail="turn-running")
     return StreamingResponse(
-        _run(request, engine, interview_id, "", lock, require=require,
+        _run(request, engine, interview_id, text, lock, require=require,
              drafting=drafting),
         media_type="text/event-stream",
         headers={"cache-control": "no-store", "x-accel-buffering": "no"})
@@ -556,12 +656,25 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
             yield _frame("error", code="sheet-not-approved")
             return
         if text.strip():
-            interview.say(conversation, text)
+            if drafting:
+                if conversation.draft is None:
+                    # Re-checked under the lock, like `closed` above: the copy
+                    # the handler refused on is only as fresh as losing the
+                    # race for this lock left it.
+                    yield _frame("error", code="nothing-to-revise")
+                    return
+                interview.revise(conversation, text)
+            else:
+                interview.say(conversation, text)
         conversation.provider = engine.settings.provider
         conversation.model = engine.settings.model
         base = conversation.usage
         base_spent = conversation.spent
-        sections = interview.DRAFT_SECTIONS if drafting else None
+        # Read after the revision is on the conversation, and off the
+        # conversation: a rewrite gets the skill's rules about rewriting, a
+        # first draft does not.
+        sections = interview.drafting_sections(conversation) if drafting \
+            else None
         # What somebody typed is on disk before a single token is spent on it,
         # and the frame that says so is the seam the screen needs: before it,
         # a refusal means nothing was written and the words stay in the box;
@@ -721,6 +834,7 @@ FRAME_KEYS = (
     "interview.error_gone", "interview.error_engine_failed",
     "interview.error_bundle_broken", "interview.error_sheet_approved",
     "interview.error_sheet_not_approved",
+    "interview.error_nothing_to_revise",
     "interview.error_unknown", "interview.tokens", "interview.spent",
 )
 

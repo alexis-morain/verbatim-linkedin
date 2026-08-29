@@ -34,6 +34,7 @@ from pathlib import Path
 
 from .agent import Tool, ToolRefused
 from .instance import Instance, InstanceError, WRITABLE
+from . import interview
 from .interview import InterviewError
 from .providers import SECRET_MARKERS
 
@@ -253,7 +254,11 @@ def draft_tool(write) -> Tool:
             "the body copied exactly, with 'said', the interview sentence "
             "backing it, quoted word for word in the language of the "
             "interview. A claim nothing backs stays bare: bare is honest, "
-            "an invented quote is not."),
+            "an invented quote is not. 'photos' and 'tips' are what the "
+            "session leaves behind rather than part of the post: they are "
+            "filed under its session notes and never concatenated into it. "
+            "One entry per kind at most, and what is left out is shown as "
+            "left out rather than refusing the post."),
         input_schema={
             "type": "object",
             "properties": {
@@ -267,10 +272,28 @@ def draft_tool(write) -> Tool:
                         "required": ["post", "said"],
                     },
                 },
+                "photos": _notes_schema(interview.PHOTO_KINDS),
+                "tips": _notes_schema(interview.TIP_KINDS),
             },
             "required": ["body"],
         },
         run=run)
+
+
+def _notes_schema(kinds) -> dict:
+    """The shape `photos` and `tips` share. Kinds are the vocabulary the
+    interview store enforces, read from there rather than repeated here: two
+    lists that have to agree eventually will not."""
+    return {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {"kind": {"type": "string",
+                                    "enum": list(kinds)},
+                           "text": {"type": "string"}},
+            "required": ["kind", "text"],
+        },
+    }
 
 
 # ------------------------------------------------------------------- factory

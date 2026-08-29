@@ -142,6 +142,7 @@ rejects. Its keys:
 | `spent` | dollars, accumulated turn by turn at the rate of the model that ran that turn. `null` once any turn had no price, and empty in the transcript front matter: a total that silently drops a turn is worse than no total, and applying today's rate to yesterday's turns is worse still |
 | `sheet` | the validation sheet, once the engine has proposed one. Absent until then, so an older reader sees a file it already knows |
 | `draft` | the post the engine wrote and the anchors it offered for it, once there is one. Absent until then, like `sheet` |
+| `revisions` | what the person asked for once a draft existed, one entry per request. Absent until the first one, like the two above |
 | `messages` | the provider shaped message list, as it goes on the wire |
 
 It is rewritten after every step that changes the conversation, so what is on
@@ -179,14 +180,24 @@ the two timestamps (`proposed`, `approved`). Three rules:
 **`draft` is the post, and the anchors it claims for itself.** It appears once
 the engine has written one, which cannot happen before the sheet is approved:
 that guard is the sheet's whole purpose and this key is where it is paid.
-Four fields:
+Six fields:
 
 | Field | What it says |
 |---|---|
 | `body` | the post as it would be published, signature block excluded: that one is concatenated from `profile.md`, never generated |
 | `anchors` | the pairs of `references/anchoring.md`, `post` for the claim and `said` for the interview sentence backing it, in the order the engine offered them |
+| `photos` | the two photo ideas the skill asks the writing step for, the staged portrait and the visual. Empty when they did not arrive |
+| `tips` | the three tips the same step is asked for, each a `kind` (`strong`, `weak`, `lesson`) and a `text`. Empty when they did not arrive |
 | `problems` | what was unreadable in the way this draft arrived, empty when it arrived structured |
 | `written` | timestamp, local time, seconds |
+
+`photos` and `tips` are not the post and are never concatenated into it: they
+are what the session leaves behind, and archiving writes them under the post's
+session notes. They are optional on the wire on purpose. The skill asks for
+eight things and a small runtime returns some of them; refusing the whole
+draft over a missing photo idea would trade the post for a note about a photo.
+What is missing is shown as missing instead, which is the same bargain the
+prose fallback below makes.
 
 Three rules, and the first is the one the screen is built on:
 
@@ -201,6 +212,27 @@ Three rules, and the first is the one the screen is built on:
   closes the interview.
 - **A model can only offer a draft, exactly as it can only propose a sheet.**
   The engine's tool writes this key and nothing else does.
+
+**`revisions` is what the person asked for after a draft existed, and it is
+part of what they said.** The skill's revision loop is free and always
+restarts from the interview material; this key is the record of what was
+asked for. Each entry holds `text`, the request exactly as typed, and `asked`,
+a timestamp. Three rules:
+
+- **Only a person writes here.** No tool reaches it, exactly as no tool
+  reaches `approved`. The engine putting a request in somebody's mouth and
+  then quoting it back is the failure the whole anchoring apparatus exists
+  for, and this key is on the side of the line that would make it possible.
+- **It is append only.** A revision that has been answered is still something
+  somebody asked for, and a record keeping only the last one cannot say why
+  the third draft differs from the second.
+- **It joins the `Said` side.** `transcript.md` renders each entry as a
+  `## Said` section, in order, after the interview turns, and the anchoring
+  source includes it. A correction typed here ("it was forty, not thirty") is
+  material a redraft is allowed to quote, because the same person typed it on
+  the same screen as every interview answer. The consequence is named rather
+  than hidden: an approved sheet ends the questions, not the person's ability
+  to speak. What it forbids is another interview turn, not another word.
 
 A draft normally arrives through that tool, one field per column above. A
 runtime that ignores a forced tool call, which local ones do, answers in prose
@@ -238,6 +270,26 @@ An interview ends one of three ways:
   post file. The engine does not delete the directory: those are the
   person's own words, and the session notes in the post file are a summary
   of them, not a replacement.
+
+  Archiving is one step and writes three things, in this order: the post file
+  under `posts/`, the interview closed on the name of that file, then the
+  consumed idea moved into the `## Used` section of `ideas.md`. The order is
+  the recovery story, and it runs shortest trap first. Closing an interview
+  onto a file that is not there is the worst of the three, so the file goes
+  down before the close. Leaving it open after the file exists is the second
+  worst: a second attempt then collides with a name already taken and the
+  person is stuck between two half states. The idea bank comes last for the
+  opposite reason: failing to move a line there is bookkeeping somebody
+  repairs by hand in ten seconds, so it is reported and it does not abort
+  what has already landed. A post file name that is already taken stops the
+  step before anything is written at all.
+
+  The classification the front matter needs, the pillar, the format, the label
+  and the slug, is the person's on their screen: none of it is derivable from
+  the draft, and a value guessed here would be a guess counted in every ratio
+  the system reports afterwards. `state` starts at `draft`, because publishing
+  is a different step with a different tool, and the measurement fields start
+  empty, because J+7 has not happened.
 - **It is discarded.** The person says so, and the directory goes, whole.
 - **It is left.** Nothing happens, which is the point. The directory stays
   `state: open`, and the next consumer offers to resume or to discard it. No

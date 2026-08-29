@@ -37,6 +37,7 @@ const STRINGS = {
   error_gone: "not-on-disk", error_engine_failed: "engine-broke",
   error_bundle_broken: "bundle-broke", error_sheet_approved: "sheet-done",
   error_sheet_not_approved: "sheet-missing",
+  error_nothing_to_revise: "nothing-to-revise",
   error_unknown: "no-name-for",
   tokens: "{input} in, {output} out", spent: "{amount} USD"
 };
@@ -424,15 +425,85 @@ test("a drafting turn that lands nothing leaves the page where it is",
 
 test("a turn in flight disables every button that would start another",
      async () => {
-  /* Both buttons on the fixture, deliberately: a screen that only ever had
-     one of them would let the other drop out of `busy` unnoticed. */
-  const screen = opened({ask: true, draft: true});
+  /* Every affordance on the fixture, deliberately: a screen that only ever
+     had one of them would let the others drop out of `busy` unnoticed. That
+     has already happened once here, to the write button. */
+  const screen = opened({ask: true, draft: true, revision: true});
   screen.reply = streamed([frame({kind: "text", text: "one moment"})]);
   screen.at("ask-sheet").dispatch("click");
 
   assert.strictEqual(screen.at("ask-sheet").disabled, true);
   assert.strictEqual(screen.at("write-draft").disabled, true);
+  assert.strictEqual(screen.at("revision").disabled, true);
   await settled();
   assert.strictEqual(screen.at("ask-sheet").disabled, false);
   assert.strictEqual(screen.at("write-draft").disabled, false);
+  assert.strictEqual(screen.at("revision").disabled, false);
+});
+
+
+/* ------------------------------------------------------ the revision box */
+
+test("the rewrite carries what is in the revision box", async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.at("revision").value = "Ouvre sur le chiffre.";
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.calls[0].url, "/interview/2026-08-28-01/draft");
+  assert.strictEqual(screen.calls[0].init.body,
+                     "text=Ouvre+sur+le+chiffre.");
+});
+
+test("an empty box is a plain rewrite, not a refusal", async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.calls.length, 1);
+  assert.strictEqual(screen.calls[0].init.body, "text=");
+});
+
+test("the request leaves the box only once the server says it is on disk",
+     async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.at("revision").value = "Plus court.";
+  screen.reply = refused(409, {detail: "nothing-to-revise"});
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  /* Refused before `accepted`: nothing was written, so the words stay where
+     somebody can send them again. */
+  assert.strictEqual(screen.at("revision").value, "Plus court.");
+  assert.deepStrictEqual(screen.thread(), ["nothing-to-revise"]);
+
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.at("revision").value, "");
+  assert.deepStrictEqual(screen.thread(),
+                         ["nothing-to-revise", "you-said Plus court."]);
+});
+
+test("clearing the box never reaches the answer box, which is not there",
+     async () => {
+  /* An approved sheet takes the answer form off the page. A commit that
+     assumed it was still there would throw inside the stream and take the
+     rest of the turn with it. */
+  const screen = opened({draft: true, revision: true});
+  assert.strictEqual(screen.at("text"), null);
+  screen.at("revision").value = "Autre angle.";
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "rewriting"}),
+    frame({kind: "stop", stop: "end_turn", owing: false})
+  ]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.deepStrictEqual(screen.thread(),
+                         ["you-said Autre angle.", "verbatim-asked rewriting"]);
 });

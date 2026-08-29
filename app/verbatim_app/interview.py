@@ -60,6 +60,13 @@ APPROVED = "approved"
 #: the first two, and anchoring reads `said` alone.
 SAID, ASKED, CALL, RESULT = "said", "asked", "call", "result"
 
+#: What the writing step is asked for beside the post itself. The skill names
+#: two photo ideas, a staged portrait and a visual of the number or object, and
+#: three tips: the strong message, the weak spot and the lesson. Kinds rather
+#: than positions, so a partial answer says which half arrived.
+PHOTO_KINDS = ("portrait", "visual")
+TIP_KINDS = ("strong", "weak", "lesson")
+
 #: The step of the bundle this screen drives. Structure, not text: the app
 #: names which part of the skill applies here, the skill holds every word.
 #: A section renamed in `skills/` fails the test that pins these names rather
@@ -74,6 +81,14 @@ STEP_SECTIONS = ("Before anything", "The interview",
 #: time instead of appending to the conversation the questions happened in.
 DRAFT_SECTIONS = ("Before anything", "Writing", "The deterministic pass",
                   "Hard rules")
+
+#: What a rewrite reads on top of them. The skill's `Revisions` section holds
+#: the rule it says is the one usually forgotten, that the sheet still applies
+#: and a revision can smuggle an invented detail in behind it. It is not sent
+#: on a first draft: the same section tells the model to offer five ways in
+#: when a revision is asked for without saying what, which on a first draft is
+#: an instruction to produce a menu instead of a post.
+REVISION_SECTION = "Revisions"
 
 #: The contract's name format, and the whole path guard: an id that is not a
 #: timestamp cannot address anything, inside this directory or out of it.
@@ -132,6 +147,29 @@ class Sheet:
 
 
 @dataclass(frozen=True)
+class Note:
+    """One photo idea or one tip: what it is, and what it says.
+
+    Keyed by kind rather than by position because these arrive incomplete. A
+    list of two strings cannot say which of the two ideas is missing, and a
+    screen that has to guess shows the wrong label half the time.
+    """
+    kind: str
+    text: str
+
+
+@dataclass(frozen=True)
+class Revision:
+    """One request the person made once a draft existed.
+
+    Their words, which is the whole of it: `references/instance.md` says why
+    this joins the `Said` side and what that costs.
+    """
+    text: str
+    asked: str = ""
+
+
+@dataclass(frozen=True)
 class Draft:
     """The post the engine wrote, and the anchors it claims for it.
 
@@ -142,6 +180,11 @@ class Draft:
     """
     body: str
     anchors: tuple = ()
+    #: The two photo ideas and the three tips, when they arrived. Not the
+    #: post and never concatenated into it: archiving files them under the
+    #: post's session notes, which is where the contract puts them.
+    photos: tuple = ()
+    tips: tuple = ()
     #: What could not be read in the way this draft arrived. Empty when it
     #: came through the tool; a runtime that answered in prose fills it.
     problems: tuple = ()
@@ -169,6 +212,9 @@ class Conversation:
     spent: float | None = 0.0
     sheet: Sheet | None = None
     draft: Draft | None = None
+    #: Append only, and written by a person's click alone. Part of what they
+    #: said, which is why `said` reads it and the transcript renders it.
+    revisions: list = field(default_factory=list)
     messages: list = field(default_factory=list)
 
     # -- what the person said, and nothing else
@@ -177,8 +223,16 @@ class Conversation:
         return [moment.text for moment in timeline(self) if moment.kind == SAID]
 
     def said(self) -> str:
-        """The anchoring source: every word the person typed, and no other."""
-        return "\n\n".join(self.person_turns())
+        """The anchoring source: every word the person typed, and no other.
+
+        Their revision requests included. Same person, same screen, same
+        keyboard as every interview answer, so a correction typed there is
+        material a redraft may quote. What this rules out is the engine
+        writing here, and no path does.
+        """
+        return "\n\n".join(
+            self.person_turns()
+            + [revision.text for revision in self.revisions])
 
     def engine_turns(self) -> list:
         return [moment.text for moment in timeline(self) if moment.kind == ASKED]
@@ -428,6 +482,40 @@ def _anchor_pairs(arguments: dict) -> tuple:
     return tuple(found)
 
 
+def _notes(arguments: dict, name: str, kinds: tuple) -> tuple:
+    """The photo ideas or the tips of a proposal, refused whole or not at all.
+
+    Absent is fine and is the documented bargain: the skill asks the writing
+    step for eight things and a small runtime returns some of them, so a
+    missing photo idea does not cost the post. Malformed is refused, like a
+    half read anchor, because the refusal travels back as the tool result and
+    a model that sent nonsense gets to send it again.
+    """
+    entries = arguments.get(name, [])
+    if not isinstance(entries, list):
+        raise InterviewError(
+            f"{name!r} is a list of {{kind, text}} entries, or absent")
+    found, seen = [], set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise InterviewError(f"each entry of {name!r} is a {{kind, text}}")
+        kind, text = entry.get("kind"), entry.get("text")
+        if kind not in kinds:
+            raise InterviewError(
+                f"the 'kind' of a {name!r} entry is one of "
+                + ", ".join(kinds))
+        if not isinstance(text, str) or not text.strip():
+            raise InterviewError(
+                f"each entry of {name!r} needs 'text', a non-empty string")
+        if kind in seen:
+            # One of each. A kind offered twice is padding, and the screen
+            # labels by kind, so the second one would overwrite the first.
+            raise InterviewError(f"{kind!r} is offered twice in {name!r}")
+        seen.add(kind)
+        found.append(Note(kind=kind, text=text.strip()))
+    return tuple(found)
+
+
 def write(conversation: Conversation, arguments: dict, *, problems=(),
           now: datetime | None = None) -> Draft:
     """The engine's draft, offered the way the sheet is proposed.
@@ -454,10 +542,54 @@ def write(conversation: Conversation, arguments: dict, *, problems=(),
         raise InterviewError(
             "the draft needs 'body', the post as it would be published")
     draft = Draft(body=body.strip(), anchors=_anchor_pairs(arguments),
+                  photos=_notes(arguments, "photos", PHOTO_KINDS),
+                  tips=_notes(arguments, "tips", TIP_KINDS),
                   problems=tuple(problems),
                   written=(now or datetime.now()).strftime(STAMP))
     conversation.draft = draft
     return draft
+
+
+def revise(conversation: Conversation, text: str,
+           now: datetime | None = None) -> Revision:
+    """What the person asks for once a draft exists.
+
+    Kept, and kept on the `Said` side. A record that dropped it could not say
+    why the third draft differs from the second, and a person who types a
+    correction here would watch the engine quote it back marked fabricated,
+    which is the loudest alarm this screen has, fired at the most legitimate
+    thing anybody does on it.
+
+    It is not an interview turn. Nothing is appended to `messages`: that list
+    is a wire request, and a drafting turn is not on it.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            "this interview is closed; nothing about it changes any more")
+    if conversation.draft is None:
+        # The sheet steers the first draft. A revision revises something.
+        raise InterviewError(
+            f"{conversation.id} has no draft yet, so there is nothing to "
+            "revise; the approved sheet is what the first one is written to")
+    text = (text or "").strip()
+    if not text:
+        raise InterviewError("an empty request is not a request")
+    revision = Revision(text=text, asked=(now or datetime.now()).strftime(STAMP))
+    conversation.revisions.append(revision)
+    return revision
+
+
+def drafting_sections(conversation: Conversation) -> tuple:
+    """Which sections of the skill a drafting turn is assembled from.
+
+    A rewrite is not a first draft, and the skill has a section about exactly
+    that difference. Which one applies is read off the conversation rather
+    than passed in: the caller that knows there is a draft already is the one
+    holding this object.
+    """
+    if conversation.draft is None:
+        return DRAFT_SECTIONS
+    return DRAFT_SECTIONS + (REVISION_SECTION,)
 
 
 def material(conversation: Conversation) -> str:
@@ -489,6 +621,14 @@ def material(conversation: Conversation) -> str:
          "moment": sheet.moment, "conviction": sheet.conviction,
          "first_lines": list(sheet.first_lines), "state": sheet.state},
         ensure_ascii=False, indent=2))
+    if conversation.revisions:
+        # Last, and said twice on purpose. The sides above are the record and
+        # the anchoring source, where every request belongs in order; this one
+        # is the request being answered now, and a reader that had to work out
+        # which of five `Said` sections was the instruction would sometimes
+        # answer the wrong one.
+        parts.append("## Revision\n\n"
+                     + _not_a_heading(conversation.revisions[-1].text))
     return "\n\n".join(parts)
 
 
@@ -683,9 +823,17 @@ def _as_json(conversation: Conversation) -> str:
             "body": draft.body,
             "anchors": [{"post": anchor.fragment, "said": anchor.quote}
                         for anchor in draft.anchors],
+            "photos": [{"kind": note.kind, "text": note.text}
+                       for note in draft.photos],
+            "tips": [{"kind": note.kind, "text": note.text}
+                     for note in draft.tips],
             "problems": list(draft.problems),
             "written": draft.written,
         }
+    if conversation.revisions:
+        # Absent until the first one, exactly like `sheet` and `draft`.
+        data["revisions"] = [{"text": revision.text, "asked": revision.asked}
+                             for revision in conversation.revisions]
     data["messages"] = conversation.messages
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -757,6 +905,7 @@ def _build(data: dict, interview_id: str) -> Conversation:
         spent=spent,
         sheet=_check_sheet(data.get("sheet")),
         draft=_check_draft(data.get("draft")),
+        revisions=_check_revisions(data.get("revisions")),
         messages=data["messages"])
 
 
@@ -814,11 +963,38 @@ def _check_draft(data) -> Draft | None:
         raise ValueError("draft")
     try:
         anchors = _anchor_pairs(data)
+        photos = _notes(data, "photos", PHOTO_KINDS)
+        tips = _notes(data, "tips", TIP_KINDS)
     except InterviewError:
         raise ValueError("draft") from None
-    return Draft(body=data["body"], anchors=anchors,
+    return Draft(body=data["body"], anchors=anchors, photos=photos, tips=tips,
                  problems=tuple(problems),
                  written=str(data.get("written", "")))
+
+
+def _check_revisions(data) -> list:
+    """The requests, refused whole rather than half read.
+
+    Same strictness as the sheet and the draft, and for a sharper reason than
+    either: this list is an anchoring source. An entry silently dropped for
+    being the wrong shape takes a sentence out of what somebody said, and the
+    panel would then call a real quote of it fabricated.
+    """
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        raise ValueError("revisions")
+    found = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            raise ValueError("revisions")
+        text, asked = entry.get("text"), entry.get("asked", "")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("revisions")
+        if not isinstance(asked, str):
+            raise ValueError("revisions")
+        found.append(Revision(text=text, asked=asked))
+    return found
 
 
 def _check_message(message) -> None:
@@ -908,9 +1084,16 @@ def _not_a_heading(text: str) -> str:
 
 def _sides(conversation: Conversation):
     """The conversation as alternating sides, in message order. Tool traffic
-    is skipped: a file the engine read is not a thing anybody said."""
+    is skipped: a file the engine read is not a thing anybody said.
+
+    The revision requests follow, on the `Said` side they belong to. They come
+    last because that is when they happened: an approved sheet ends the
+    questions, so nothing is asked after the first one.
+    """
     for moment in timeline(conversation):
         if moment.kind == SAID:
             yield "Said", moment.text
         elif moment.kind == ASKED:
             yield "Asked", moment.text
+    for revision in conversation.revisions:
+        yield "Said", revision.text

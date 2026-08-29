@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO / "app"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
+from markupsafe import escape  # noqa: E402
 
 from test_agent import Replay, asks, says  # noqa: E402
 
@@ -31,7 +32,8 @@ CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
 #: Codes an SSE frame carries. They get an `error_` sentence, not a
 #: `refused_` one, and TestEveryCodeHasASentence covers them separately.
 FRAME_CODES = {"turn-running", "closed", "gone", "engine-failed",
-               "bundle-broken", "sheet-approved", "sheet-not-approved"}
+               "bundle-broken", "sheet-approved", "sheet-not-approved",
+               "nothing-to-revise"}
 
 
 def frames(text: str) -> list:
@@ -42,6 +44,17 @@ def frames(text: str) -> list:
 
 def kinds(text: str) -> list:
     return [frame["kind"] for frame in frames(text)]
+
+
+def shown(sentence: str) -> str:
+    """A pack sentence as the page actually carries it.
+
+    Jinja escapes on the way out, so a sentence holding an apostrophe is not
+    the string in the markup. Asserting the escaped form keeps the pack the
+    source: picking an apostrophe free fragment by hand works until somebody
+    rewrites the sentence, and then the test passes on the wrong screen.
+    """
+    return str(escape(sentence))
 
 
 def spoken(text: str) -> str:
@@ -1378,7 +1391,7 @@ class TestEveryCodeHasASentence(WebCase):
 
     CODES = ("turn-running", "closed", "not-configured", "nothing-to-send",
              "gone", "engine-failed", "bundle-broken", "sheet-approved",
-             "sheet-not-approved", "unknown")
+             "sheet-not-approved", "nothing-to-revise", "unknown")
     REFUSALS = ("secrets-in-instance", "credential-in-endpoint",
                 "endpoint-in-clear", "endpoint-untrusted", "engine-refused",
                 "interviews-not-a-directory", "env-unreadable")
@@ -1788,8 +1801,19 @@ class DraftCase(SheetCase):
         interview.save(self.root, conversation)
         return interview_id
 
-    def draft(self, interview_id):
-        return self.client.post(f"/interview/{interview_id}/draft")
+    def draft(self, interview_id, text=""):
+        return self.client.post(f"/interview/{interview_id}/draft",
+                                data={"text": text})
+
+    def drafted(self, interview_id=None):
+        """A signed interview with a draft on it, put there directly: these
+        tests are about the revision and the filing, not about the wire that
+        carries a proposal."""
+        interview_id = interview_id or self.signed()
+        conversation = interview.load(self.root, interview_id)
+        interview.write(conversation, dict(DRAFT_ARGS))
+        interview.save(self.root, conversation)
+        return interview_id
 
 
 class TestAskingForASheet(SheetCase):
@@ -2078,6 +2102,277 @@ class TestTheInlineLintPass(DraftCase):
         reply = self.client.post(f"/interview/{interview_id}/draft/lint",
                                  follow_redirects=False)
         self.assertEqual(reply.status_code, 303)
+
+
+class TestTheRevisionRequest(DraftCase):
+    """What somebody types to steer a rewrite. Kept, and kept on the Said
+    side: `references/instance.md` says why, and the screen says so too."""
+
+    scripts = (asks(("c1", "propose_draft", dict(DRAFT_ARGS,
+                                                 body="Autre chose."))),
+               says("done"))
+
+    def test_the_request_reaches_disk_before_a_token_is_spent(self):
+        interview_id = self.drafted()
+        body = self.draft(interview_id, "Ouvre sur le chiffre.").text
+        order = kinds(body)
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual([r.text for r in conversation.revisions],
+                         ["Ouvre sur le chiffre."])
+        # `accepted` is the seam: before it nothing was written, after it the
+        # words are on disk whatever the turn does next.
+        self.assertEqual(order[0], "accepted")
+
+    def test_it_is_not_written_into_the_interview_message_list(self):
+        # That list is the anchoring source. A message the engine appended
+        # would be a quote the engine could forge.
+        interview_id = self.drafted()
+        before = interview.load(self.root, interview_id).messages
+        self.draft(interview_id, "Plus court.")
+        after = interview.load(self.root, interview_id)
+        self.assertEqual(after.messages, before)
+        self.assertEqual(after.person_turns(), [
+            "le canal direct est le seul qui paie, j'ai arrêté les agences"])
+
+    def test_it_counts_as_something_said(self):
+        interview_id = self.drafted()
+        self.draft(interview_id, "c'était quarante, pas trente")
+        conversation = interview.load(self.root, interview_id)
+        self.assertIn("c'était quarante, pas trente", conversation.said())
+
+    def test_a_request_with_no_draft_to_revise_is_refused(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id, "Ouvre sur le chiffre.")
+        self.assertEqual(reply.status_code, 409)
+        self.assertEqual(reply.json()["detail"], "nothing-to-revise")
+        self.assertEqual(interview.load(self.root, interview_id).revisions, [])
+
+    def test_an_empty_request_is_a_plain_rewrite(self):
+        interview_id = self.drafted()
+        self.draft(interview_id, "   ")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.revisions, [])
+        self.assertEqual(conversation.draft.body, "Autre chose.")
+
+    def test_the_turn_reads_the_skill_rule_a_rewrite_forgets(self):
+        # Wired here as well as unit tested, because the wiring is the half
+        # that goes wrong: a section list computed correctly and then not
+        # passed is a guard nobody sends.
+        interview_id = self.drafted()
+        self.draft(interview_id, "Ouvre sur le chiffre.")
+        sent = self.transport.calls[0]["payload"]["system"]
+        self.assertIn("A revision can reintroduce an invented detail", sent)
+
+    def test_a_first_draft_is_not_handed_the_revision_vocabulary(self):
+        self.draft(self.signed())
+        sent = self.transport.calls[0]["payload"]["system"]
+        self.assertNotIn("A revision can reintroduce an invented detail", sent)
+
+    def test_the_screen_shows_what_was_asked_for(self):
+        interview_id = self.drafted()
+        self.draft(interview_id, "Ouvre sur le chiffre.")
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn("Ouvre sur le chiffre.", page.text)
+
+
+class TestTheRevisionUnderTheLock(DraftCase):
+    """The handler refuses what a status code can refuse; the generator
+    re-checks under the lock, because the copy the handler read is only as
+    fresh as losing the race left it."""
+
+    def test_a_draft_that_vanished_between_the_two_is_a_frame(self):
+        from verbatim_app.routes.interview import _engine, _run, lock_for
+        interview_id = self.drafted()
+        request = Bare(self.app)
+        # The draft goes away between the handler's read and the lock: another
+        # tab, a hand edited file. The handler saw one and let the turn start.
+        conversation = interview.load(self.root, interview_id)
+        conversation.draft = None
+        interview.save(self.root, conversation)
+        sent = frames("".join(_run(request, _engine(request), interview_id,
+                                   "Ouvre sur le chiffre.",
+                                   lock_for(self.app, interview_id),
+                                   require="propose_draft", drafting=True)))
+        self.assertEqual([frame["kind"] for frame in sent], ["error"])
+        self.assertEqual(sent[0]["code"], "nothing-to-revise")
+        self.assertEqual(self.transport.calls, [])
+        self.assertEqual(interview.load(self.root, interview_id).revisions, [])
+
+
+class ArchiveCase(DraftCase):
+    def filing(self, **kwargs):
+        fields = dict(date="2026-08-29", slug="agences-quatre-mois",
+                      pillar="3", format="the-post-mortem",
+                      label="VISIBILITY", state="draft", idea="")
+        fields.update(kwargs)
+        return fields
+
+    def file_it(self, interview_id, **kwargs):
+        return self.client.post(f"/interview/{interview_id}/archive",
+                                data=self.filing(**kwargs),
+                                follow_redirects=False)
+
+
+class TestArchiving(ArchiveCase):
+    """The step the skill says decides whether any of this was worth doing."""
+
+    def test_the_post_is_filed_and_the_interview_closes_on_its_name(self):
+        interview_id = self.drafted()
+        reply = self.file_it(interview_id)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(reply.headers["location"],
+                         "/posts/2026-08-29-agences-quatre-mois.md")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.state, interview.CLOSED)
+        self.assertEqual(conversation.post,
+                         "posts/2026-08-29-agences-quatre-mois.md")
+        self.assertTrue(
+            (self.root / "posts"
+             / "2026-08-29-agences-quatre-mois.md").is_file())
+
+    def test_the_filed_post_shows_up_on_the_posts_screen(self):
+        self.file_it(self.drafted())
+        self.assertIn("agences-quatre-mois", self.client.get("/posts").text)
+
+    def test_a_filing_this_engine_cannot_read_back_comes_back_as_a_screen(self):
+        interview_id = self.drafted()
+        for wrong, sentence in (({"slug": "Not A Slug"}, "archive_bad_slug"),
+                                ({"date": "today"}, "archive_bad_date"),
+                                ({"pillar": "9"}, "archive_bad_pillar"),
+                                ({"format": "the-listicle"},
+                                 "archive_bad_format"),
+                                ({"label": "AWARENESS"}, "archive_bad_label"),
+                                ({"state": "posted"}, "archive_bad_state")):
+            page = self.file_it(interview_id, **wrong)
+            self.assertEqual(page.status_code, 200, wrong)
+            self.assertIn(shown(self.app.state.t("interview." + sentence)),
+                          page.text)
+        self.assertEqual(
+            interview.load(self.root, interview_id).state, interview.OPEN)
+        self.assertEqual(list((self.root / "posts").glob("2026-08-29-*")), [])
+
+    def test_a_name_already_taken_stops_the_step(self):
+        interview_id = self.drafted()
+        (self.root / "posts" / "2026-08-29-agences-quatre-mois.md").write_text(
+            "not this one", encoding="utf-8")
+        page = self.file_it(interview_id)
+        self.assertIn(shown(self.app.state.t("interview.archive_name_taken")),
+                      page.text)
+        self.assertEqual(
+            interview.load(self.root, interview_id).state, interview.OPEN)
+
+    def test_archiving_twice_is_refused(self):
+        interview_id = self.drafted()
+        self.file_it(interview_id)
+        page = self.file_it(interview_id, slug="autre-chose")
+        self.assertIn(shown(self.app.state.t("interview.archive_already_closed")),
+                      page.text)
+
+    def test_a_profile_without_a_signature_block_is_a_repair(self):
+        interview_id = self.drafted()
+        text = (self.root / "profile.md").read_text(encoding="utf-8")
+        (self.root / "profile.md").write_text(
+            text.replace("## Signature block", "## Gone"), encoding="utf-8")
+        page = self.file_it(interview_id)
+        self.assertIn(shown(self.app.state.t("interview.archive_signature_missing")),
+                      page.text)
+        self.assertEqual(list((self.root / "posts").glob("2026-08-29-*")), [])
+
+    def test_the_consumed_angle_moves_into_used(self):
+        interview_id = self.drafted()
+        from verbatim_app.instance import Instance
+        instance = Instance(self.root)
+        angle = instance.ideas().angles[0]
+        self.file_it(interview_id, idea=angle.text)
+        bank = instance.ideas()
+        self.assertNotIn(angle.text, [a.text for a in bank.angles])
+        self.assertEqual(bank.used[-1].file,
+                         "posts/2026-08-29-agences-quatre-mois.md")
+
+    def test_a_running_turn_takes_the_lock_and_nothing_is_filed(self):
+        interview_id = self.drafted()
+        lock = self.app.state.locks[interview_id] \
+            if hasattr(self.app.state, "locks") else None
+        from verbatim_app.routes.interview import lock_for
+        held = lock_for(self.app, interview_id)
+        held.acquire()
+        try:
+            reply = self.file_it(interview_id)
+        finally:
+            held.release()
+        self.assertEqual(reply.status_code, 303)
+        self.assertIn("notice=turn-running", reply.headers["location"])
+        self.assertEqual(
+            interview.load(self.root, interview_id).state, interview.OPEN)
+
+
+class TestWhatTheSessionLeavesBeside(DraftCase):
+    """The photo ideas and the tips. Beside the post, never in it, and what
+    did not arrive is shown as missing rather than left out."""
+
+    def test_what_arrived_is_on_the_screen_and_not_in_the_post(self):
+        interview_id = self.signed()
+        conversation = interview.load(self.root, interview_id)
+        interview.write(conversation, dict(
+            DRAFT_ARGS,
+            photos=[{"kind": "portrait", "text": "Devant le tableau."}],
+            tips=[{"kind": "lesson", "text": "Ouvrir sur le chiffre."}]))
+        interview.save(self.root, conversation)
+        page = self.client.get(f"/interview/{interview_id}").text
+        self.assertIn("Devant le tableau.", page)
+        self.assertIn("Ouvrir sur le chiffre.", page)
+        post = page.split('class="notes"')[0]
+        self.assertNotIn("Devant le tableau.", post)
+
+    def test_every_kind_the_skill_asks_for_is_labelled_present_or_not(self):
+        page = self.client.get(f"/interview/{self.drafted()}").text
+        strings = self.app.state.t
+        for kind in interview.PHOTO_KINDS + interview.TIP_KINDS:
+            self.assertIn(shown(strings("interview.note_" + kind)), page, kind)
+        self.assertEqual(page.count(shown(strings("interview.note_missing"))),
+                         len(interview.PHOTO_KINDS) + len(interview.TIP_KINDS))
+
+
+class TestEveryArchiveCodeHasASentence(ArchiveCase):
+    """A code the pack does not name renders as the key, in the middle of a
+    callout. Read out of the module rather than listed by hand, so a refusal
+    added without a sentence fails here instead of on somebody's screen."""
+
+    #: Raised by the route rather than by `archive`, and mapped from the two
+    #: instance failures the step can meet.
+    FROM_THE_ROUTE = ("signature-missing", "instance-unreadable")
+
+    def codes(self):
+        source = (REPO / "app" / "verbatim_app" / "archive.py").read_text(
+            encoding="utf-8")
+        return set(re.findall(r'ArchiveError\("([a-z-]+)"', source)) \
+            | set(self.FROM_THE_ROUTE)
+
+    def test_the_screen_has_a_sentence_for_every_one(self):
+        strings = self.app.state.t
+        found = self.codes()
+        self.assertTrue(found)
+        for code in sorted(found):
+            key = "interview.archive_" + code.replace("-", "_")
+            self.assertNotEqual(strings(key), key, code)
+
+    def test_the_french_pack_has_them_too(self):
+        from verbatim_app.i18n import load_strings
+        strings = load_strings("fr")
+        self.assertEqual(strings.missing, ())
+        for code in sorted(self.codes()):
+            key = "interview.archive_" + code.replace("-", "_")
+            self.assertNotEqual(strings(key), key, code)
+
+
+class TestArchivingInFrench(ArchiveCase):
+    lang = "fr"
+
+    def test_no_english_reaches_the_screen(self):
+        page = self.client.get(f"/interview/{self.drafted()}")
+        self.assertIn(shown(self.app.state.t("interview.archive_hint")), page.text)
+        self.assertNotIn("Archive this post", page.text)
+
 
 
 if __name__ == "__main__":

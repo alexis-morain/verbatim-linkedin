@@ -261,6 +261,12 @@ function page(strings, options) {
     const write = document.place(null, "button", "write-draft");
     write.setAttribute("data-url", "/interview/2026-08-28-01/draft");
   }
+  /* The revision box exists only once a draft is on the page: a request that
+     revises nothing is a stale form, and the server refuses it. Its own flag,
+     so a test can build the screen that offers a first draft and no box. */
+  if (settings.revision) {
+    document.place(null, "textarea", "revision", {value: ""});
+  }
 
   /* An approved sheet ends the questions, so the screen that offers drafting
      has no answer form on it at all. The client has to survive that. */
