@@ -2,6 +2,9 @@
 
 ## 2026-08-29 (soir). Tranche 7.1 : le rendu et la copie
 
+Commit `831ade9`, poussé sur `main`. 22 fichiers, 2000 lignes ajoutées. Sept
+tours de revue à contexte frais, cinq rouges.
+
 Les deux questions du plan d'abord, parce qu'elles décidaient du code.
 
 ### Question 1 : le corps du post reste en texte
