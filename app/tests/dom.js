@@ -187,23 +187,23 @@ function refused(status, body) {
   };
 }
 
-/* Loads interview.js into a fresh realm over a fresh page. The path is
+/* Loads a screen's script into a fresh realm over a fresh page. The path is
    resolved from this file, never from the working directory: the suite has
-   to mean the same thing from anywhere in the repository. */
-function load(page) {
+   to mean the same thing from anywhere in the repository.
+
+   Which script, and which globals it gets, come from the screen that built
+   it. That is the same rule as the DOM above and it is worth keeping: a
+   script handed a global it does not need is a script that can start using
+   it without a test noticing. interview.js gets no clipboard and copy.js
+   gets no network. */
+function load(screen) {
+  const script = screen.script || "interview.js";
   const source = fs.readFileSync(
-    path.join(__dirname, "..", "verbatim_app", "static", "interview.js"),
-    "utf8");
-  const context = vm.createContext({
-    document: page.document,
-    fetch: page.fetch,
-    location: page.location,
-    TextDecoder: TextDecoder,
-    URLSearchParams: URLSearchParams,
-    console: console
-  });
-  vm.runInContext(source, context, {filename: "interview.js"});
-  return page;
+    path.join(__dirname, "..", "verbatim_app", "static", script), "utf8");
+  const context = vm.createContext(Object.assign(
+    {document: screen.document, console: console}, screen.globals || {}));
+  vm.runInContext(source, context, {filename: script});
+  return screen;
 }
 
 /* The interview screen as the template renders it, before a turn has run.
@@ -291,6 +291,101 @@ function page(strings, options) {
     return document.getElementById("turns").children
       .map(function (turn) { return turn.read(); });
   };
+  screen.script = "interview.js";
+  screen.globals = {
+    fetch: screen.fetch,
+    location: screen.location,
+    TextDecoder: TextDecoder,
+    URLSearchParams: URLSearchParams
+  };
+  return screen;
+}
+
+/* A screen carrying copy buttons, as `_copy.html` renders one.
+
+   Each item is one payload the server wrote and one empty slot beside it,
+   which is the whole contract between the template and copy.js: the script
+   makes the button, the server owns the bytes.
+
+   `fold` wraps the payload in a details element, the way a corpus file
+   carries its own markdown; `hidden` is the plain text payload, which has no
+   reason to be on the screen until a copy fails. */
+function copyPage(items, options) {
+  const settings = options || {};
+  const document = new Document();
+  const written = [];
+  const timers = [];
+
+  const screen = {
+    document: document,
+    /* Everything writeText was handed, in order. */
+    written: written,
+    /* Set before a click to make the browser refuse the clipboard: not
+       exotic, it is what an unfocused document does. */
+    refuses: settings.refuses || false
+  };
+
+  const clipboard = {
+    writeText: function (text) {
+      if (screen.refuses) { return Promise.reject(new Error("denied")); }
+      written.push(text);
+      return Promise.resolve();
+    }
+  };
+
+  screen.script = "copy.js";
+  screen.globals = {
+    /* A browser with no clipboard at all is the no-button case, and it is
+       what any origin but loopback and https gets. */
+    navigator: settings.noClipboard ? {} : {clipboard: clipboard},
+    /* Nothing fires on its own. A test runs what is pending, so the suite
+       holds no wall clock and a label nobody restores is a visible fact
+       rather than a flaky one. */
+    setTimeout: function (fn, delay) {
+      timers.push({fn: fn, delay: delay, cleared: false, fired: false});
+      return timers.length;
+    },
+    clearTimeout: function (handle) {
+      const timer = timers[handle - 1];
+      if (timer) { timer.cleared = true; }
+    }
+  };
+
+  (items || []).forEach(function (item) {
+    let parent = null;
+    if (item.fold) {
+      parent = document.place(null, "details", null, {open: false});
+    }
+    /* `slotOnly` is a slot whose payload is not on the page: a template
+       edited in one place and not the other. */
+    if (!item.slotOnly) {
+      document.place(parent, "pre", item.source,
+                     {textContent: item.text, className: "copy-source",
+                      hidden: Boolean(item.hidden)});
+    }
+    const slot = document.place(null, "span", item.source + "-slot",
+                                {className: "copy-slot"});
+    slot.setAttribute("data-source", item.source);
+    slot.setAttribute("data-label", item.label || "Copy");
+    slot.setAttribute("data-done", item.done || "Copied");
+    slot.setAttribute("data-failed", item.failed || "Not copied");
+    slot.setAttribute("data-failed-hint",
+                      item.failedHint || "Copy it by hand.");
+  });
+
+  screen.at = function (id) { return document.getElementById(id); };
+  /* The button the script made for one payload, or null when it made none. */
+  screen.button = function (source) {
+    const slot = document.getElementById(source + "-slot");
+    return slot ? slot.querySelector("button") : null;
+  };
+  screen.buttons = function () { return document.querySelectorAll("button"); };
+  screen.pending = function () {
+    return timers.filter(function (t) { return !t.cleared && !t.fired; });
+  };
+  screen.fire = function () {
+    screen.pending().forEach(function (t) { t.fired = true; t.fn(); });
+  };
   return screen;
 }
 
@@ -301,4 +396,4 @@ function settled() {
   return new Promise(function (resolve) { setImmediate(resolve); });
 }
 
-module.exports = {load, page, streamed, refused, settled};
+module.exports = {load, page, copyPage, streamed, refused, settled};

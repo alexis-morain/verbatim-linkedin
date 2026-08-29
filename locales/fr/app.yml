@@ -46,8 +46,20 @@ overview:
   no_published: "Aucun post publié pour l'instant. Le compteur ne court que sur les posts publiés."
   recent: "Derniers posts"
 
+copy:
+  markdown: "Copier le markdown"
+  text: "Copier en texte brut"
+  post: "Copier le post, prêt à coller"
+  done: "Copié"
+  failed: "Non copié"
+  failed_hint: "Le navigateur a refusé le presse-papier, rien n'a été copié. C'est en général une fenêtre qui n'a pas le focus. Le texte est sur cet écran : sélectionnez-le et copiez-le à la main."
+
+document:
+  raw: "Le fichier lui-même"
+
 profile:
   title: "Profil"
+  raw: "profile.md lui-même"
   hint: "Ceci est profile.md, verbatim. Le fichier est la base : ce que vous enregistrez ici est ce que chaque skill lit."
   save: "Enregistrer profile.md"
   saved: "Enregistré."
@@ -79,7 +91,10 @@ posts:
 post:
   unreadable: "Ce fichier de post est là et ses octets ne reviennent pas en texte. Il a été enregistré dans un autre encodage, ou ses permissions ont changé."
   measure_blocked: "La mesure ne peut pas être écrite tant que le fichier ne se lit pas : l'écrire remplacerait ce qu'il contient par ce qu'on aurait réussi à en lire."
-  body: "Le post, tel que le fichier le porte"
+  body: "Le post"
+  body_hint: "Affiché en texte, jamais en markdown, parce que LinkedIn n'a pas de markdown et que c'est ici que vous décidez de publier. Ce qui est là est ce que le bouton copie et ce qu'un palier de publication reçoit, à l'octet près."
+  notes: "Ce que la session a laissé à côté du post"
+  notes_hint: "Sous la couture, dans le même fichier, et jamais publié avec lui : la fiche, chaque ancre que le moteur a revendiquée et la phrase d'entretien derrière chacune."
   measure: "Mesure, J+7"
   measure_hint: "Trois chiffres, aucun n'est un like. Vide veut dire que personne n'a regardé, zéro que le post n'a rien produit."
   measured_on: "Mesuré le"

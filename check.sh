@@ -73,6 +73,155 @@ prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai
            app/verbatim_app 2>/dev/null || true)"
 if [ -z "$prompts" ]; then ok "clean"; else bad "instruction strings:"; echo "$prompts" | sed 's/^/     /'; fi
 
+step "one markdown parser, in one file"
+# Rendering a file into a page is where an export from another tool becomes
+# markup in somebody's browser, and markup.py is where that boundary is set:
+# html=False, images turned into links, links given a rel, no anchor inside an
+# anchor. A second parser imported somewhere else would be a second boundary,
+# drawn by whoever was in a hurry. The rule is held here rather than by
+# discipline, like the grep above about model instructions.
+#
+# **This one reads the syntax tree, not the lines.** Four greps in a row got
+# it wrong, and each failed from a different side: a comment naming a library
+# is prose, an import inside a `try:` is code, a vendored parser arrives as
+# `from .vendor import mistune`, and no regular expression tells those apart
+# in a repository whose docstrings discuss markdown parsers on every other
+# page. `ast` already knows which is which.
+#
+# One warning for whoever edits the block below: it lives inside a command
+# substitution, so a bare apostrophe anywhere in it, in a comment included,
+# opens a quote bash never closes and the whole script stops parsing. Write
+# `does not` rather than `doesn't`. Learned by breaking it.
+#
+# Two things it still cannot see, and neither is a regular expression away:
+# a library nobody has put on the list, and a module named at run time out of
+# a string, which is `importlib.import_module` and `__import__`. Written here
+# rather than papered over.
+out="$(python3 - 2>&1 <<'PARSERS'
+import ast
+import pathlib
+import sys
+
+#: The second parser somebody might reach for. A list, because nothing here
+#: can know what that will be.
+BANNED = {"markdown_it", "markdown", "markdown2", "mistune", "mistletoe",
+          "marko", "commonmark", "cmarkgfm"}
+#: The one file allowed to hold the boundary.
+BOUNDARY = pathlib.Path("app/verbatim_app/markup.py")
+#: The name of this package, which is the third way to spell a path inside
+#: it, and the one app/tests/ is written in.
+PACKAGE = "verbatim_app"
+
+
+def inside(parts, level=0):
+    """Which components of a module path to weigh.
+
+    A path that leads outside this package names a distribution by its first
+    component, and only that one counts: `from typing import Mapping` must
+    not match on something buried further in. A path that leads inside it can
+    hold a vendored copy at any depth, so every component counts.
+
+    Inside is three spellings of one thing, and all three have to fail
+    together or the guard only teaches which one to use: `from .mistune`,
+    `from verbatim_app.mistune`, and `import verbatim_app.vendor.mistune`.
+    The absolute one matters most, because `app/tests/` is written that way
+    and it is the line somebody copies out of a test.
+    """
+    return parts if (level or parts[:1] == [PACKAGE]) else parts[:1]
+
+
+def hits(source, name="<fixture>"):
+    """Every import of a banned parser in one file, as (line, what)."""
+    found = []
+    for node in ast.walk(ast.parse(source, filename=name)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                for part in inside(alias.name.split(".")):
+                    if part in BANNED:
+                        found.append((node.lineno, alias.name))
+                        break
+        elif isinstance(node, ast.ImportFrom):
+            parts = (node.module or "").split(".")
+            for part in inside(parts, node.level):
+                if part in BANNED:
+                    found.append((node.lineno, node.module))
+                    break
+            for alias in node.names:
+                # `from . import mistune`, `from .vendor import mistune`: the
+                # vendored copy, which is how a second parser arrives with no
+                # line in pyproject.toml to notice it. This branch reads the
+                # imported name, not its alias, so it also fails on a local
+                # symbol that happens to be called `markdown`, and this app
+                # has one: `web.py` gives the templates a global by that
+                # name. A known trade, not a bug. It fails loudly and an
+                # `as` alias settles it, where dropping the branch would
+                # reopen the vendoring hole in silence.
+                if alias.name in BANNED:
+                    found.append((node.lineno, alias.name))
+    return found
+
+
+# The check gets its own fixtures. It has been wrong before, and the next
+# edit to it needs holding. Above the divider: what it must see. Below: what
+# it must leave alone, which is where every earlier version failed.
+FIXTURES = [
+    ("import markdown_it", True),
+    ("import os, markdown", True),
+    ("import os as o, markdown_it as md", True),
+    ("import markdown_it.common", True),
+    ("try:\n    import markdown_it\nexcept ImportError:\n    pass", True),
+    ("if True:\n    from markdown_it import MarkdownIt", True),
+    ("from markdown_it.common.utils import escapeHtml", True),
+    ("from . import markdown_it", True),
+    ("from .vendor import mistune", True),
+    ("from .mistune import Markdown", True),
+    ("from .vendor.mistune import Markdown", True),
+    ("from ..vendor.marko import Parser", True),
+    ("import verbatim_app.mistune", True),
+    ("import verbatim_app.vendor.marko", True),
+    ("from verbatim_app.mistune import Markdown", True),
+    ("from verbatim_app.vendor.mistune import Markdown", True),
+    ("import os, \\\n    marko", True),
+
+    ("from .markup import render  # the only markdown_it entry point", False),
+    ('"""One rule: import markdown_it only in markup.py."""', False),
+    ("# Note: from markdown_it we take only MarkdownIt.", False),
+    ("import markdownify", False),
+    ("from .archive import notes_only, post_only", False),
+    ("from .markup import render", False),
+    ("from .markup import render as markdown", False),
+    ("from typing import Mapping", False),
+    ("from verbatim_app.markup import render", False),
+    ("import verbatim_app.instance", False),
+]
+for source, wanted in FIXTURES:
+    if bool(hits(source)) != wanted:
+        sys.stderr.write("the check itself does not hold on: %r\n" % source)
+        sys.exit(2)
+
+bad = []
+for path in sorted(pathlib.Path("app/verbatim_app").rglob("*.py")):
+    if path == BOUNDARY:
+        continue
+    try:
+        found = hits(path.read_text(encoding="utf-8"), str(path))
+    except (SyntaxError, UnicodeDecodeError, OSError) as broken:
+        sys.stderr.write("%s does not read: %s\n" % (path, broken))
+        sys.exit(2)
+    bad += ["%s:%d: %s" % (path, line, what) for line, what in found]
+if bad:
+    sys.stdout.write("\n".join(bad))
+    sys.exit(1)
+PARSERS
+)"
+# Two exits, two sentences. A file that will not parse is a file to repair,
+# and reporting it as a parser import would send somebody to the wrong place.
+case "$?" in
+  0) ok "clean" ;;
+  1) bad "markdown parser imported outside markup.py:"; echo "$out" | sed 's/^/     /' ;;
+  *) bad "the parser check could not run:"; echo "$out" | sed 's/^/     /' ;;
+esac
+
 step "no sentence reaches a browser from under app/"
 # An HTTPException detail is rendered as the whole page body on a plain form
 # navigation, so a sentence written here is a sentence in the wrong language on
@@ -85,17 +234,20 @@ prose="$(grep -rnoE '(^|[^_[:alnum:]])detail=[^,)]*' app/verbatim_app/routes --i
          | grep -vE 'detail="[a-z0-9-]+"$' || true)"
 if [ -z "$prose" ]; then ok "clean"; else bad "prose in an error detail:"; echo "$prose" | sed 's/^/     /'; fi
 
-step "the interview screen's script"
-# It carries security: the lines that move a sheet digest into the approval
-# form, and the ones that decide a turn is over. Node's own test runner over a
-# hand written DOM, no npm and no node_modules in a Python repository.
+step "the screen scripts"
+# They carry security: the lines that move a sheet digest into the approval
+# form, the ones that decide a turn is over, and the one that decides which
+# bytes reach a clipboard. Node's own test runner over a hand written DOM, no
+# npm and no node_modules in a Python repository.
 if command -v node >/dev/null 2>&1; then
-  if node --test app/tests/interview.test.js >/dev/null 2>&1; then
-    ok "app/tests/interview.test.js"
-  else
-    bad "app/tests/interview.test.js"
-    node --test app/tests/interview.test.js 2>&1 | tail -20 | sed 's/^/     /'
-  fi
+  for t in app/tests/interview.test.js app/tests/copy.test.js; do
+    if node --test "$t" >/dev/null 2>&1; then
+      ok "$t"
+    else
+      bad "$t"
+      node --test "$t" 2>&1 | tail -20 | sed 's/^/     /'
+    fi
+  done
 else
   # announced degradation, not a silent pass
   printf '   skip node not installed, the screen script was not tested\n'

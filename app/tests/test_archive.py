@@ -488,5 +488,49 @@ class TestThePostAloneComesBackOutOfTheFile(ArchiveCase):
         self.assertNotIn("Session notes", only)
 
 
+class TestTheOtherHalfOfTheSeam(ArchiveCase):
+    """`notes_only` is `post_only` read from the other end, and it exists so
+    that the screen showing both never cuts the file twice by two rules. The
+    post screen stops being one block of text: the post as it would go out,
+    and the notes, which are a list and get read as one."""
+
+    def body_of(self, conversation=None):
+        text = archive.compose(conversation or self.drafted(), filing(),
+                               signature=self.instance.signature())
+        _, body = split_front_matter(text)
+        return body
+
+    def test_the_notes_come_back_and_the_post_does_not(self):
+        notes = archive.notes_only(self.body_of())
+        self.assertIn("Angle:", notes)
+        self.assertIn("Anchors offered", notes)
+        self.assertNotIn(BODY, notes)
+        self.assertNotIn(archive.NOTES_MARKER, notes)
+
+    def test_a_body_with_no_seam_has_no_notes(self):
+        # A post file written by hand. There is nothing under the seam
+        # because there is no seam, which is not the same as empty notes on a
+        # file that has one.
+        self.assertEqual(archive.notes_only("A post.\n\nTwo paragraphs.\n"), "")
+
+    def test_a_rule_inside_the_post_does_not_start_the_notes(self):
+        notes = archive.notes_only(
+            self.body_of(self.drafted(body="Before.\n\n---\n\nAfter.")))
+        self.assertNotIn("After.", notes)
+        self.assertIn("Angle:", notes)
+
+    def test_the_two_halves_account_for_the_whole_file(self):
+        """The property that makes them one seam rather than two rules. What
+        is not in the post is in the notes, and nothing is in both."""
+        body = self.body_of()
+        post, notes = archive.post_only(body), archive.notes_only(body)
+        self.assertIn(post, body)
+        self.assertIn(notes, body)
+        self.assertLess(body.index(post), body.index(notes))
+        for line in notes.splitlines():
+            if line.strip():
+                self.assertNotIn(line, post)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

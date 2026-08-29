@@ -46,8 +46,20 @@ overview:
   no_published: "No published post yet. The counter runs over published posts only."
   recent: "Latest posts"
 
+copy:
+  markdown: "Copy the markdown"
+  text: "Copy as plain text"
+  post: "Copy the post, ready to paste"
+  done: "Copied"
+  failed: "Not copied"
+  failed_hint: "The browser refused the clipboard, so nothing was copied. That is usually a window that does not have focus. The text is on this screen: select it and copy it by hand."
+
+document:
+  raw: "The file itself"
+
 profile:
   title: "Profile"
+  raw: "profile.md itself"
   hint: "This is profile.md, verbatim. The file is the database; what you save here is what every skill reads."
   save: "Save profile.md"
   saved: "Saved."
@@ -79,7 +91,10 @@ posts:
 post:
   unreadable: "This post file is there and its bytes will not come back as text. It was saved in another encoding, or its permissions changed."
   measure_blocked: "The measurement cannot be written while the file does not read: writing it would replace what is in there with what could be parsed out of it."
-  body: "The post, as the file holds it"
+  body: "The post"
+  body_hint: "Shown as text, never as markdown, because LinkedIn has no markdown and this is the screen where you decide to publish. What is here is what the copy button copies and what a publishing tier receives, to the byte."
+  notes: "What the session left beside the post"
+  notes_hint: "Under the seam in the same file, and never published with it: the sheet, every anchor the engine claimed and the interview sentence behind each one."
   measure: "Measurement, day 7"
   measure_hint: "Three numbers, none of them is a like. Empty means nobody looked yet, zero means it produced nothing."
   measured_on: "Measured on"

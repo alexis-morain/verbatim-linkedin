@@ -4,6 +4,7 @@ Needs fastapi and httpx, so run through the project environment:
     cd app && uv run --extra test python -m unittest discover -s tests
 """
 
+import html as html_module
 import re
 import shutil
 import sys
@@ -254,6 +255,248 @@ class TestScreens(WebCase):
         page = self.client.get("/")
         self.assertIn("voice.md", page.text)
         self.assertIn("does not pass conformance", page.text)
+
+
+POST_WITH_NOTES = """---
+date: 2026-08-30
+pillar: 2
+format: the-story
+label: TRUST
+hook: |
+  A hook.
+chars: 40
+state: draft
+published_ref: ""
+measured:
+inbound_connections:
+inbound_dms:
+meeting_mentions:
+note: ""
+---
+
+A hook.
+
+The post itself, with a **bold** run and a ## that is not a heading.
+
+Nadia Feriel, fractional CFO.
+
+---
+
+Session notes, not published:
+
+- Interview: interviews/2026-08-30-01, kept as it is.
+- Angle: The migration nobody asked for
+- Anchors offered, the claim then the interview sentence backing it.
+  - 'four months' <- 'I spent four months selling to agencies.'
+"""
+
+
+def copy_source(page: str, element_id: str):
+    """The bytes the server put in the page for a copy button, read back the
+    way the browser would.
+
+    Entities undone, and one leading newline dropped, because that is what an
+    HTML parser does with the first newline after a `<pre>` start tag. The
+    templates write one there for it to eat. A helper that skipped this step
+    would pass while the browser handed back a file short of a byte, which is
+    exactly how the bug was there in the first place.
+    """
+    found = re.search(rf'<pre[^>]*id="{element_id}"[^>]*>(.*?)</pre>',
+                      page, re.S)
+    if not found:
+        return None
+    text = found.group(1)
+    return html_module.unescape(text[1:] if text.startswith("\n") else text)
+
+
+class TestADocumentIsReadAsOne(WebCase):
+    """Everything an instance holds except the body of a post is markdown,
+    and reading markdown by hand is the thing this app exists to stop. The
+    file itself stays on the screen underneath, because a renderer that is
+    the only way in hides whatever it has no shape for."""
+
+    def test_the_profile_is_rendered(self):
+        page = self.client.get("/profile").text
+        self.assertIn("<h2>Status</h2>", page)
+        # profile.md has a table in it, which the commonmark preset has no
+        # rule for. This is why the preset is `default`.
+        self.assertIn("<table>", page)
+
+    def test_the_profile_file_is_still_there_to_edit(self):
+        page = self.client.get("/profile").text
+        self.assertIn("<textarea", page)
+        self.assertIn("## Status", html_module.unescape(page))
+
+    def test_a_corpus_file_is_rendered(self):
+        page = self.client.get("/corpus/2026-07-02-eleven-slides.md").text
+        self.assertIn("<h1>", page)
+
+    def test_a_corpus_file_keeps_its_own_bytes_on_the_screen(self):
+        page = self.client.get("/corpus/2026-07-02-eleven-slides.md").text
+        self.assertIn("<details", page)
+        raw = copy_source(page, "document-markdown")
+        self.assertEqual(
+            raw, Instance(self.root).corpus_text("2026-07-02-eleven-slides.md"))
+
+    def test_a_file_that_opens_on_a_blank_line_keeps_it(self):
+        """The byte an HTML parser eats. Every payload is written with a
+        newline of its own for it to take instead."""
+        text = "\n\nOpened on two blank lines.\n"
+        (self.root / "corpus" / "blank.md").write_text(text, encoding="utf-8")
+        page = self.client.get("/corpus/blank.md").text
+        self.assertEqual(copy_source(page, "document-markdown"), text)
+
+    def test_a_file_that_does_not_read_is_not_rendered_at_all(self):
+        (self.root / "corpus" / "old.md").write_bytes(
+            "Une idée, écrite en 2024.\n".encode("latin-1"))
+        page = self.client.get("/corpus/old.md").text
+        self.assertIn("will not come back as text", page)
+        self.assertIsNone(copy_source(page, "document-markdown"))
+
+
+class TestNothingInAFileBecomesMarkupOnAScreen(WebCase):
+    """The boundary this slice creates. corpus/ takes exports from other
+    tools and profile.md takes whatever somebody pasted; both now reach a
+    browser as HTML."""
+
+    def test_a_script_tag_in_the_profile_is_shown_not_run(self):
+        Instance(self.root).write(
+            "profile.md",
+            "## Status\n\n- filled: yes\n\n<script>alert(1)</script>\n")
+        page = self.client.get("/profile").text
+        self.assertNotIn("<script>alert(1)</script>", page)
+        self.assertIn("&lt;script&gt;", page)
+
+    def test_an_image_in_a_corpus_file_fetches_nothing(self):
+        """A one pixel GIF in an export would report every time its file is
+        opened, from a screen whose own rail says nothing leaves."""
+        (self.root / "corpus" / "tracked.md").write_text(
+            "![](https://pixel.example/p.gif)\n", encoding="utf-8")
+        page = self.client.get("/corpus/tracked.md").text
+        self.assertNotIn("<img", page)
+        self.assertIn("https://pixel.example/p.gif", page)
+
+
+class TestThePostScreenIsTwoThings(WebCase):
+    """The contract already says the file is a post and then the session
+    notes. The screen stops pretending it is one block."""
+
+    def setUp(self):
+        super().setUp()
+        self.name = "2026-08-30-with-notes.md"
+        (self.root / "posts" / self.name).write_text(POST_WITH_NOTES,
+                                                     encoding="utf-8")
+
+    def test_the_post_is_not_rendered(self):
+        """LinkedIn has no markdown, and the `copy` tier pastes these bytes
+        as they stand. A heading on this screen would be a heading nowhere
+        else."""
+        page = self.client.get(f"/posts/{self.name}").text
+        self.assertNotIn("<strong>bold</strong>", page)
+        self.assertIn("**bold**", page)
+
+    def test_the_notes_are_rendered(self):
+        page = self.client.get(f"/posts/{self.name}").text
+        self.assertIn("<li>", page)
+        self.assertIn("The migration nobody asked for", page)
+
+    def test_a_post_with_no_seam_shows_no_notes_section(self):
+        page = self.client.get("/posts/2026-08-25-agency-segment.md").text
+        self.assertIn("I spent four months selling to agencies", page)
+        self.assertNotIn("Session notes", page)
+
+
+class TestWhatTheCopyButtonWouldPutOnTheClipboard(WebCase):
+    """The one that matters. The body of a post file carries the sheet,
+    every anchor the engine claimed and the interview sentence behind each
+    one, and a button that copied the file body would put all of it in a
+    feed."""
+
+    def setUp(self):
+        super().setUp()
+        self.name = "2026-08-30-with-notes.md"
+        (self.root / "posts" / self.name).write_text(POST_WITH_NOTES,
+                                                     encoding="utf-8")
+
+    def test_it_is_exactly_what_publishing_would_send(self):
+        from verbatim_app.archive import post_only
+        page = self.client.get(f"/posts/{self.name}").text
+        self.assertEqual(
+            copy_source(page, "post-text"),
+            post_only(Instance(self.root).post_body(self.name)))
+
+    def test_it_carries_no_session_note(self):
+        page = self.client.get(f"/posts/{self.name}").text
+        payload = copy_source(page, "post-text")
+        self.assertNotIn("Session notes", payload)
+        self.assertNotIn("I spent four months selling to agencies", payload)
+        self.assertNotIn("Anchors offered", payload)
+        self.assertNotIn("interviews/2026-08-30-01", payload)
+
+    def test_it_carries_the_signature(self):
+        self.assertIn("Nadia Feriel, fractional CFO.",
+                      copy_source(self.client.get(f"/posts/{self.name}").text,
+                                  "post-text"))
+
+    def test_a_post_that_does_not_read_offers_no_button(self):
+        broken = "2026-01-01-bytes.md"
+        (self.root / "posts" / broken).write_bytes(
+            b"---\ndate: 2026-01-01\n---\n\n\xff\xfe body\n")
+        page = self.client.get(f"/posts/{broken}").text
+        self.assertIsNone(copy_source(page, "post-text"))
+        self.assertNotIn("data-source", page)
+
+
+class TestTheButtonsThemselvesAreNotInTheHtml(WebCase):
+    """No JS, no button, and the text stays selectable. A button rendered
+    server side would be a dead button on a screen with no script, and this
+    app's rule is that every screen but the interview works without one."""
+
+    def test_a_document_screen_offers_two_payloads_and_no_button(self):
+        page = self.client.get("/profile").text
+        self.assertIn('data-source="document-markdown"', page)
+        self.assertIn('data-source="document-text"', page)
+        self.assertNotIn("<button type=\"button\"", page)
+
+    def test_the_plain_text_payload_has_no_markdown_in_it(self):
+        page = self.client.get("/profile").text
+        text = copy_source(page, "document-text")
+        self.assertNotIn("## ", text)
+        self.assertIn("Nadia Feriel", text)
+
+    def test_a_file_with_nothing_in_it_offers_no_button(self):
+        """Copying the empty string is not a thing anybody meant to do, and
+        the file that is not there already has a line in the report."""
+        (self.root / "profile.md").unlink()
+        reply = self.client.get("/profile")
+        self.assertEqual(reply.status_code, 200)
+        self.assertNotIn("data-source", reply.text)
+        self.assertIn("profile.md is missing", reply.text)
+
+    def test_a_file_of_whitespace_still_shows_itself(self):
+        """What goes is the button, never the file. Three spaces and a tab
+        are still a fact about the instance, and this screen is the only
+        place it shows."""
+        (self.root / "corpus" / "ws.md").write_text("   \n\t\n  \n",
+                                                    encoding="utf-8")
+        page = self.client.get("/corpus/ws.md").text
+        self.assertNotIn("data-source", page)
+        self.assertIn("<details", page)
+        self.assertEqual(copy_source(page, "document-markdown"), "   \n\t\n  \n")
+
+    def test_a_post_with_an_empty_body_offers_no_button(self):
+        """publish.py refuses an empty post. A button offering one would be
+        offering something the next screen along will not take."""
+        name = "2026-01-02-empty.md"
+        (self.root / "posts" / name).write_text(
+            "---\ndate: 2026-01-02\nhook: |\n  x\n---\n\n", encoding="utf-8")
+        page = self.client.get(f"/posts/{name}").text
+        self.assertNotIn("data-source", page)
+
+    def test_the_labels_come_from_the_pack(self):
+        page = self.client.get("/profile").text
+        self.assertIn('data-label="Copy the markdown"', page)
+        self.assertIn('data-failed=', page)
 
 
 class TestFrenchPack(WebCase):

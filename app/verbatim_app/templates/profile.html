@@ -1,7 +1,11 @@
 {% extends "base.html" %}
+{% import "_copy.html" as copy %}
 {% block title %}{{ t('profile.title') }} - {{ t('app.title') }}{% endblock %}
 {% block content %}
 <h1>{{ t('profile.title') }}</h1>
+{{ copy.document(text) }}
+
+<h2>{{ t('profile.raw') }}</h2>
 <p class="hint">{{ t('profile.hint') }}</p>
 {% if saved %}<p class="flash">{{ t('profile.saved') }}</p>{% endif %}
 <form method="post" action="/profile">
@@ -9,3 +13,4 @@
   <button type="submit">{{ t('profile.save') }}</button>
 </form>
 {% endblock %}
+{% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from . import render as _render
+from ..archive import notes_only, post_only
 from ..instance import STATES, InstanceError, UnreadableError
 
 router = APIRouter()
@@ -100,13 +101,21 @@ def post_screen(request: Request, name: str, **extra):
     # A file that is there and will not read is a file to repair, not a file
     # that is missing: 404 would send somebody looking for the wrong thing,
     # and the row that links here is rendered whether or not it reads.
+    #
+    # Cut at the seam here rather than on the screen, and by the same two
+    # functions the publishing step uses. The post is what a tier would
+    # receive, byte for byte, which is what makes the copy button on this
+    # page the `copy` tier brought to the screen rather than a second idea of
+    # where a post stops.
     try:
-        body, unreadable = instance.post_body(name), ""
+        raw = instance.post_body(name)
+        post_text, notes, unreadable = post_only(raw), notes_only(raw), ""
     except UnreadableError as broken:
-        body, unreadable = "", str(broken)
+        post_text, notes, unreadable = "", "", str(broken)
     except InstanceError:
         raise HTTPException(status_code=404)
-    values = dict(post=matches[0], body=body, unreadable=unreadable, saved=0,
+    values = dict(post=matches[0], post_text=post_text, notes=notes,
+                  unreadable=unreadable, saved=0,
                   plan="", shown="", token="", publish_when="",
                   publish_problem="",
                   plan_changed=False, sent="", publish_words="",

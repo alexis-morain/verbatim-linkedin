@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_copy.html" as copy %}
 {% block title %}{{ name }} - {{ t('app.title') }}{% endblock %}
 {% block content %}
 <p><a href="/corpus">&larr; {{ t('corpus.back') }}</a></p>
@@ -9,6 +10,7 @@
   <p class="mono">{{ unreadable }}</p>
 </div>
 {% else %}
-<pre class="post-body">{{ text }}</pre>
+{{ copy.document(text, disclose=True) }}
 {% endif %}
 {% endblock %}
+{% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

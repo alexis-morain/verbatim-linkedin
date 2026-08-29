@@ -30,7 +30,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import __version__
+from . import __version__, markup
 from .i18n import bundle_root, load_strings
 from .instance import Instance
 from .routes import interview as interview_screen
@@ -70,8 +70,13 @@ def create_app(instance_path, lang: str | None = None, *,
     # and does not pretend to be one across restarts.
     app.state.publish_tokens = {}
     app.state.templates = Jinja2Templates(directory=PACKAGE / "templates")
+    # `markdown` returns Markup, so no template ever writes `| safe` for it.
+    # Both come from `markup`, which is the only module in this package
+    # allowed to import a markdown parser; check.sh holds that rule.
     app.state.templates.env.globals.update(t=strings, lang=language,
-                                           instance_root=str(instance.root))
+                                           instance_root=str(instance.root),
+                                           markdown=markup.render,
+                                           plain=markup.plain)
 
     @app.middleware("http")
     async def loopback_only(request: Request, call_next):

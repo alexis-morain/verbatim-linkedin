@@ -188,6 +188,23 @@ def post_only(body: str) -> str:
     return re.sub(r"\n-{3,}\s*\Z", "", post).strip()
 
 
+def notes_only(body: str) -> str:
+    """What the session left beside the post, cut at the same seam.
+
+    The other end of `post_only`, and here rather than in a screen so that
+    the file is cut once by one rule. A screen that split it itself would be
+    a second definition of where a post stops, and the two would drift the
+    day the marker moves.
+
+    The marker line goes with the cut: it is the seam, not a heading. A body
+    with no seam has no notes at all, which is not the same as a file whose
+    notes are empty, and neither is a state to invent one for.
+    """
+    if NOTES_MARKER not in body:
+        return ""
+    return body.split(NOTES_MARKER, 1)[1].strip()
+
+
 def archive(instance: Instance, interview_id: str, filing: Filing, *,
             now: datetime | None = None) -> Result:
     """File the post, close the interview, move the idea. In that order.

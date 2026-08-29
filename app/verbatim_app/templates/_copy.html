@@ -1,0 +1,62 @@
+{# Copy buttons and the bytes they carry.
+
+   The button itself is not here. `static/copy.js` makes it, so a screen with
+   no script has no dead button on it and the text stays selectable, which is
+   this app's rule everywhere but the interview.
+
+   What a button copies is an element the server wrote, never a reading of the
+   rendered document beside it: recomposing markdown out of HTML is copying an
+   approximation of somebody's own file. #}
+
+{% macro slot(source, label) -%}
+<span class="copy-slot" data-source="{{ source }}" data-label="{{ t(label) }}"
+      data-done="{{ t('copy.done') }}" data-failed="{{ t('copy.failed') }}"
+      data-failed-hint="{{ t('copy.failed_hint') }}"></span>
+{%- endmacro %}
+
+{# Every payload below opens on a newline of its own, and it is load bearing.
+   An HTML parser drops the first newline after a `<pre>` start tag, so a file
+   that begins with a blank line comes back through textContent one byte short
+   of itself. The newline written here is the one that gets eaten.
+
+   One byte the parser takes and this cannot give back: a NUL is dropped
+   outright from ordinary character data, so a post file carrying one is
+   copied without it while a publishing tier would still be sent it. Not
+   replaced by U+FFFD, which is what happens in foreign content and raw text
+   and is the wrong thing to go looking for. Nothing on this side can undo it,
+   and a post with a NUL in it is a file to repair rather than a case to round
+   trip. Written down rather than left to be rediscovered.
+
+   A whole document: rendered, then the two payloads.
+
+   `disclose` decides whether the file itself gets a fold on this screen. The
+   profile screen has a textarea holding the same bytes and does not need one;
+   a corpus file has no editor, and a renderer that is the only way in hides
+   whatever it has no shape for.
+
+   A file with nothing in it gets no button. Copying the empty string is not a
+   thing anybody meant to do, and the missing file already has a line in the
+   conformance report saying so. The buttons are what goes: the file itself
+   stays on the screen, because a file of three spaces and a tab is still a
+   fact about the instance and this is the only place it shows. #}
+{% macro document(text, disclose=False) %}
+<div class="document">{{ markdown(text) }}</div>
+{% if text and text.strip() %}
+<div class="copy-bar">
+  {{ slot('document-markdown', 'copy.markdown') }}
+  {{ slot('document-text', 'copy.text') }}
+</div>
+{% endif %}
+{% if disclose %}
+<details class="raw">
+  <summary>{{ t('document.raw') }}</summary>
+  <pre class="copy-source" id="document-markdown">
+{{ text }}</pre>
+</details>
+{% else %}
+<pre class="copy-source" id="document-markdown" hidden>
+{{ text }}</pre>
+{% endif %}
+<pre class="copy-source" id="document-text" hidden>
+{{ plain(text) }}</pre>
+{% endmacro %}

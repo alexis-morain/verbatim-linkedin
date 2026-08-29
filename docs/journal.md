@@ -1,5 +1,186 @@
 # Journal
 
+## 2026-08-29 (soir). Tranche 7.1 : le rendu et la copie
+
+Les deux questions du plan d'abord, parce qu'elles décidaient du code.
+
+### Question 1 : le corps du post reste en texte
+
+Oui, et la raison du plan n'était pas la plus forte. « LinkedIn n'a pas de
+markdown » est vrai mais incomplet : la seule chose qui traverse, `**gras**`,
+traverse dans `publish.to_scheduler_html`, donc sur un palier qui construit du
+HTML. Sur `copy`, le palier par défaut et celui auquel cette tranche ajoute un
+bouton, le texte est collé tel quel et le fil affiche les astérisques. Rendre
+le gras mentirait précisément sur le chemin par défaut.
+
+La demande du 29/08 est payée ailleurs : l'écran d'un post est maintenant deux
+choses. Le post en mono, les notes de session rendues en dessous.
+
+### Question 2 : la bibliothèque, et deux trous qu'elle a montrés
+
+`markdown-it-py`, vérifiée plutôt que crue. `html=False` échappe `<script>`
+et `<img onerror>`. Les destinations `javascript:`, `vbscript:`, `file:` et
+`data:` sont refusées, casse mélangée comprise, et le contournement
+`&#106;avascript:` aussi : chacun de ces cas est une ligne qu'un rendu maison
+devrait trouver seul.
+
+La sonde a trouvé deux choses que le plan ne nomme pas.
+
+**Le preset `commonmark` n'a pas les tableaux**, et `profile.md` en contient
+un. C'est donc `default`.
+
+**`![alt](https://pixel/p.gif)` rend une balise `<img>` qui va la chercher au
+rendu.** `html=False` n'y peut rien. C'est une requête sortante depuis une
+page dont la barre latérale dit « Nothing leaves ». Un pixel dans un export de
+`corpus/` signalerait chaque ouverture du fichier. Les images deviennent un
+lien vers leur source : rien ne part, l'adresse reste cliquable. Vérifié dans
+un vrai navigateur, zéro requête. Les liens portent tous
+`rel="noreferrer noopener"`, même raison un cran plus loin.
+
+### Ce que les revues ont trouvé
+
+Sept tours à contexte frais, cinq rouges. Le deuxième est rouge sur le
+correctif du premier, et quatre le sont sur un garde-fou de trois lignes.
+Quatre défauts d'abord, dont deux que j'avais écrits moi-même.
+
+**Le `<pre>` mange un octet.** Un analyseur HTML supprime le premier retour à
+la ligne après une balise `<pre>` ouvrante. Un fichier qui commence par une
+ligne vide revenait donc par `textContent` amputé d'un octet, alors que le
+bouton promet le fichier octet pour octet. Confirmé dans un navigateur, pas
+déduit. Chaque charge utile écrit maintenant un retour à la ligne sacrificiel,
+et l'assistant de test modélise la suppression : sans ça il aurait continué à
+passer pendant que le navigateur divergeait.
+
+**Une consigne de 116 caractères dans un libellé de bouton.** `copy.failed`
+était une phrase entière écrite dans `button.textContent`. Un bouton large
+comme un paragraphe, et sur l'écran d'un post la phrase disait « le texte est
+ouvert plus bas » alors qu'il est au-dessus. Séparé : `copy.failed` est un
+mot, `copy.failed_hint` est la phrase, et elle s'affiche à côté du bouton.
+Cent pixels au lieu d'un paragraphe.
+
+**Deux ancres imbriquées.** `[![px](pixel.gif)](page)` est une façon ordinaire
+d'écrire une image cliquable, et HTML n'a pas d'ancre dans une ancre : un
+analyseur coupe la paire en deux frères, et il sort un lien extérieur vide et
+incliquable à côté d'un lien vers l'image. Le lien du document disparaissait
+en silence. Une image dans un lien est maintenant un `<span>`, donc c'est
+l'adresse de l'image qui cède, ce qui est la bonne à perdre. La profondeur de
+lien est comptée dans l'`env` du rendu, jamais dans la fermeture : un compteur
+qui survit à un rendu qui lève change ce que le suivant produit. Prouvé sur
+500 rendus alternés, un rendu qui lève au milieu, dix entrées malformées et
+huit fils.
+
+**Un bouton qui copie la chaîne vide.** Sans `profile.md`, l'écran offrait
+quand même les deux boutons. Sur un post au corps vide, il offrait ce que
+`publish.py` refuse (« the post is empty »). Pas de contenu, pas de bouton, et
+le fichier reste à l'écran : trois espaces et une tabulation sont quand même
+un fait sur l'instance, et c'est le seul endroit où il se voit.
+
+### Le frère que je n'avais pas cherché
+
+Le correctif des ancres imbriquées a été écrit pour les images, et la revue
+suivante l'a réfuté en une ligne :
+
+    [voir <https://interne.example/t> ici](https://externe.example/p)
+
+`[a](b)` dans le texte d'un lien est refusé par le parseur, mais **la règle
+d'autolien ne l'est pas**. Une URL collée dans une phrase qui est déjà un lien
+suffit, et le dégât est pire qu'avec une image : le lien extérieur se coupe en
+deux frères, les mots après l'autolien tombent hors des deux, et l'adresse sur
+laquelle un lecteur atterrit est celle du tiers plutôt que celle que le
+document visait. `link_open` posait le compteur sans jamais le lire. Il le lit
+maintenant, et un lien dans un lien rend son contenu sans ancre : rien n'est
+perdu, le texte d'un autolien est son adresse.
+
+C'est la deuxième fois dans la même tranche que « une garde ajoutée seule
+invite à recommencer » se paye, et la première fois qu'elle se paye sur un
+correctif que je venais d'écrire en croyant justement chercher les frères.
+
+### Deux autres, plus petits
+
+Un **tableau dans un élément de liste** était hissé hors de la liste, et
+l'élément restait comme une puce nue : `plain()` écrivait donc un marqueur
+pour du contenu qui n'était plus dessous, exactement le contraire de sa règle.
+Latent, aucun des 71 fichiers du dépôt ne le déclenche.
+
+### Le garde-fou de trois lignes, réfuté cinq fois
+
+Le garde-fou le plus court de la tranche est celui qui m'a repris le plus
+souvent. Version 1 : le nom devait suivre `import` immédiatement, donc
+`import os, markdown` passait alors que `import markdown, os` échouait.
+Version 2, deux greps, une ligne d'import puis un nom n'importe où dessus :
+elle attrapait la virgule et perdait `try: import markdown_it`, qui est le
+shim de dépendance optionnelle le plus ordinaire qui soit, tout en tombant sur
+`from .markup import render  # the only markdown_it entry point`, c'est-à-dire
+sur un commentaire écrit à côté de l'import qu'il décrit. Dans un dépôt dont
+la prose parle de ces bibliothèques à chaque page, c'était le pire échange
+possible.
+
+Version 3, un seul motif construit sur les trois échecs. Réfutée aussi, et
+des deux côtés à la fois : elle manquait `from .vendor import mistune`, qui
+est exactement la façon dont un deuxième parseur arrive sans ligne dans
+`pyproject.toml`, et elle échouait sur « One rule: import markdown_it only in
+markup.py » écrit dans une docstring.
+
+Version 4 : plus de grep du tout. La règle lit l'arbre syntaxique. Un
+commentaire, une docstring et une chaîne de caractères ne sont pas dans
+l'arbre, donc toute la classe de faux positifs disparaît par construction
+plutôt que par un motif plus malin ; et `ast` ne connaît pas les lignes, donc
+la continuation par barre oblique tombe avec le reste. Le contrôle porte ses
+propres fixtures, quinze extraits vérifiés avant qu'il regarde le dépôt, et
+deux codes de sortie : un parseur importé ailleurs, ou le contrôle qui ne peut
+pas tourner. Un fichier qui ne s'analyse pas est un fichier à réparer, pas un
+import à signaler.
+
+La version 4 s'est fait réfuter elle aussi, deux fois, et à chaque fois sur
+la même chose : il y a trois façons d'écrire « un chemin à l'intérieur de ce
+paquet », et fermer la première apprend seulement à écrire la deuxième.
+`from . import mistune` était vu, `from .mistune import Markdown` non ; puis
+celui-là fermé, `from verbatim_app.mistune import Markdown` passait encore, et
+c'est la forme la plus probable de toutes parce que c'est celle dans laquelle
+`app/tests/` est écrit. Un import absolu nomme une distribution par son
+premier morceau, donc seul celui-là compte ; un chemin qui entre dans le
+paquet, relatif ou nommé par le paquet lui-même, peut porter une copie
+embarquée à n'importe quelle profondeur. Une fonction, `inside()`, et les deux
+branches s'en servent.
+
+Et les fixtures ne tenaient pas ces clauses : supprimer un garde les laissait
+vertes. Elles les tiennent maintenant, vérifié en cassant le contrôle six
+façons.
+
+**La leçon n'est pas sur ce grep-là.** Quatre motifs, quatre réfutations, et
+à chaque fois le correctif était un motif un peu plus fin. Ce qu'il fallait,
+c'était changer d'outil : une expression régulière ne distingue pas du code
+d'une phrase, et ce dépôt écrit des phrases sur les parseurs markdown à
+chaque page. La deuxième leçon est arrivée juste après, deux fois :
+changer d'outil ne dispense pas de chercher les frères et sœurs, et une clause
+sans fixture est une clause que personne ne tient. Et une troisième, gratuite
+celle-là : le bloc Python vit dans une substitution de commande, donc une
+apostrophe dans un commentaire ouvre une quote que bash ne referme jamais et
+tout le script cesse d'être analysable. Écrire « does not », pas « doesn't ». Ce qu'il ne rattrape
+toujours pas est écrit au-dessus de lui : une bibliothèque que personne n'a
+listée, et un module nommé à l'exécution depuis une chaîne.
+
+### Deux imprécisions écrites plutôt que corrigées
+
+Un NUL dans un corps de post est jeté des données caractère ordinaires, et
+pas remplacé par U+FFFD, ce qui n'arrive qu'en contenu étranger et en texte
+brut : le presse-papier et le palier diffèrent donc d'un octet, et rien de ce
+côté ne peut le rendre. J'avais écrit l'inverse dans le commentaire, et la
+revue l'a corrigé. Un post avec un NUL est un fichier à réparer.
+
+`plain()` lit l'adresse normalisée, donc un chemin non ASCII sort en
+pourcentage. Il résout vers la même page, et le décoder abîmerait les URL
+encodées exprès.
+
+### Le harnais JS a payé son piège
+
+`app/tests/dom.js` a appris `navigator.clipboard` et les minuteries, et `load`
+prend le script de l'écran qui l'a construit : `interview.js` n'a toujours pas
+de presse-papier, `copy.js` n'a pas de réseau. Le piège nommé du harnais est
+payé.
+
+835 tests app, 55 tests JS, `check.sh` vert.
+
 ## 2026-08-29 (fin). Étape 6 : la publication, le paquet, la release
 
 Commits `1dd0691` et `ead6174`, poussés, **tag `v2.0.0` posé et poussé**.

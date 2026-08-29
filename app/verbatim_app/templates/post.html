@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_copy.html" as copy %}
 {% block title %}{{ post.filename }} - {{ t('app.title') }}{% endblock %}
 {% block content %}
 <p><a href="/posts">&larr; {{ t('post.back') }}</a></p>
@@ -20,7 +21,18 @@
   <p class="mono">{{ unreadable }}</p>
 </div>
 {% else %}
-<pre class="post-body">{{ body }}</pre>
+<p class="hint">{{ t('post.body_hint') }}</p>
+<pre class="post-body" id="post-text">
+{{ post_text }}</pre>
+{% if post_text.strip() %}
+<div class="copy-bar">{{ copy.slot('post-text', 'copy.post') }}</div>
+{% endif %}
+
+{% if notes %}
+<h2>{{ t('post.notes') }}</h2>
+<p class="hint">{{ t('post.notes_hint') }}</p>
+<div class="document notes">{{ markdown(notes) }}</div>
+{% endif %}
 {% endif %}
 
 <h2>{{ t('post.publish') }}</h2>
@@ -119,3 +131,4 @@
 </form>
 {% endif %}
 {% endblock %}
+{% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}
