@@ -1,5 +1,146 @@
 # Journal
 
+## 2026-08-29. Tranche 5.6 : la révision, l'archivage, le smoke test
+
+Commit `1738be5`. L'entretien devient un post : l'app fait le tour complet, de
+la première question au fichier sous `posts/`. 661 tests app, 35 tests JS,
+`check.sh` vert. Revue à contexte frais : sept trouvailles, six corrigées et
+une tranchée.
+
+### La décision de la tranche : une consigne de révision est quelque chose de dit
+
+La question posée à Alexis avant d'écrire une ligne, parce qu'elle amende le
+contrat et qu'elle touche la colonne vertébrale du produit. Trois lectures
+possibles, une retenue : **c'est dit, et ça ancre.**
+
+Le raisonnement qui a emporté la décision est celui du cas concret. Quelqu'un
+tape « c'était quarante, pas trente » dans la boîte de révision, le moteur
+corrige le post et cite la correction. Si la consigne ne rejoint pas la source
+d'ancrage, le panneau affiche « fabriquée » : l'alarme la plus forte de
+l'écran, tirée sur la chose la plus légitime que quelqu'un y fasse. On
+apprendrait aux gens à ignorer l'alarme, ce qui coûte plus cher que tout ce
+qu'elle attrape.
+
+La contrepartie est écrite dans `references/instance.md` plutôt que cachée :
+une fiche approuvée clôt les questions, pas la parole de la personne. Ce
+qu'elle interdit, c'est un tour d'entretien de plus, pas un mot de plus. Et
+seul un POST humain écrit dans `revisions` ; le moteur n'a aucun chemin vers
+cette clé, exactement comme il n'en a aucun vers `approved`.
+
+### Ce qui n'a pas bougé : la liste de messages
+
+La consigne ne va pas dans `conversation.messages`. Cette liste est une requête
+telle qu'elle part sur le fil, et un tour de rédaction n'est pas dessus : il
+part de `material()`, requête neuve, jetée après. Écrire dedans aurait rouvert
+le piège de 5.5, où `timeline()` crédite à la personne tout bloc `text` d'un
+message `user`.
+
+`revisions` est donc une clé à elle, append only, rendue en `## Said` dans le
+transcript, lue par `said()`. `person_turns()` ne bouge pas, donc le compteur
+« réponses : N » du hub ne compte pas les révisions, qui n'en sont pas.
+
+### Le tour de réécriture lit une section de plus
+
+`drafting_sections()` ajoute `Revisions` quand un brouillon existe déjà. C'est
+la section qui porte la règle dont le skill dit lui-même qu'elle est celle
+qu'on oublie : la fiche s'applique aussi à la révision, et une réécriture peut
+réintroduire un détail inventé derrière la garde.
+
+Elle n'est pas envoyée au premier brouillon, et c'est le point intéressant : la
+même section dit d'offrir cinq entrées de vocabulaire quand une révision est
+demandée sans dire quoi. Envoyée sur un premier jet, c'est une consigne de
+produire un menu au lieu d'un post. Deux listes, parce que la différence est
+réelle, et un test sur chacune.
+
+### L'archivage : trois écritures, piège le plus court d'abord
+
+Le fichier du post, l'entretien clos sur son nom, puis l'angle consommé déplacé
+dans `## Used`. L'ordre est l'histoire de la récupération :
+
+- Clore un entretien sur un fichier qui n'existe pas est le pire des trois. Le
+  fichier descend donc en premier.
+- Le laisser ouvert alors que le fichier existe est le deuxième pire : une
+  seconde tentative se cogne à un nom déjà pris et la personne est coincée
+  entre deux moitiés.
+- Une ligne non déplacée dans la banque, c'est dix secondes à la main. Elle est
+  rapportée, elle n'annule rien.
+
+Le cas où la clôture elle-même échoue a son propre code, `closed-nothing`,
+parce que c'est le seul refus où quelque chose a déjà atterri. Un écran qui
+dirait seulement « ça n'a pas marché » enverrait quelqu'un archiver à nouveau
+dans un nom désormais pris.
+
+**La classification est celle de la personne.** Pilier, format, étiquette,
+slug : rien de tout ça ne se dérive d'un corps de texte, et une valeur devinée
+ici est une valeur devinée comptée dans chaque ratio ensuite. `posts/` reste
+hors de `WRITABLE`, donc aucun modèle n'y écrit.
+
+### Les huit livrables du skill, enfin huit
+
+Les deux idées de photo et les trois conseils reviennent, en champs optionnels
+de `propose_draft`, par `kind` et pas par position : une liste de deux chaînes
+ne peut pas dire laquelle des deux manque. Optionnels sur le fil,
+volontairement (refuser le post entier pour une idée de photo absente
+échangerait le post contre une note sur une photo), mais **ce qui manque est
+affiché comme manquant** : personne ne redemande une chose dont on ne lui a pas
+dit qu'elle manquait.
+
+Ils ne sont jamais concaténés au post. L'archivage les range dans les notes de
+session, là où le contrat les met.
+
+### Le smoke test, la preuve que les flux enregistrés ne sont pas
+
+`scripts/smoke.py`, trois sondes, manuel, hors de `check.sh`. Un CI sans clé et
+un check qui se saute en tique verte, c'est exactement l'échec contre lequel ce
+script existe.
+
+Une sonde mérite d'être nommée : **un outil forcé qui ne part pas est DEGRADED,
+pas FAIL.** Les runtimes locaux ignorent `tool_choice`, et le moteur a un
+chemin documenté pour ça, la lecture du bloc `ANCHORS` dans la prose. Une ligne
+verte là-dessus laisserait croire que `tool_choice` marche partout.
+
+Sa propre plomberie est testée contre le transport rejoué : un smoke test qui
+meurt sur une coquille la première fois qu'on le lance sous pression, avec une
+vraie clé, est pire que pas de smoke test. Ce que ça ne prouve pas, c'est ce
+pour quoi le script existe, et c'est écrit dans son en-tête.
+
+`docs/smoke.md` porte la procédure et un tableau de résultats vide. Absent se
+lit « personne n'y a pensé », vide se lit « personne ne l'a lancé », et seul le
+second est vrai.
+
+### Ce que la revue a rapporté
+
+- **Deux refus mal étiquetés.** Une `ideas.md` absente et un disque qui refuse
+  le fichier répondaient tous les deux par la phrase sur le bloc de signature.
+  Trois codes distincts maintenant, et un test qui lit les codes dans le module
+  au lieu de les lister à la main.
+- **`atomic_write` renomme un temporaire dans le dossier**, donc le mode du
+  fichier n'est pas la garde. Le premier test « la banque refuse l'écriture »
+  passait au vert sans rien prouver ; il chmod le dossier maintenant.
+- **Un `if` sur l'état ouvert cachait le seul refus qui ne peut arriver que
+  fermé.** « Cet entretien est déjà devenu un post » était une phrase que
+  personne ne pouvait lire. Sortie de la garde.
+- **Une clôture qui échoue laissait un fichier écrit et rien pour le dire.**
+  C'est devenu `closed-nothing`, la seule phrase de cet écran qui annonce ce
+  qui a quand même atterri.
+- **`date` en paramètre de route masquait `datetime.date`.** Import renommé.
+- **Le template faisait de l'arithmétique de préfixe** sur `photo:` et `tip:`
+  pour retrouver un libellé. Un renommage à un caractère près et l'écran
+  affiche un demi-mot. `panel()` rend la structure.
+- **Le verrou était tenu pendant le rendu de la page de refus.** Relâché avant.
+
+Sabotage vérifié sur neuf gardes neuves : huit rougissent. La neuvième
+(`archive` relit le disque) n'est pas une garde mais la forme de l'API, puisque
+la fonction ne reçoit qu'un identifiant et n'a aucune copie à préférer.
+
+### Ce que la tranche ne fait pas
+
+`lib/publish.py` n'est pas branché : c'est l'étape 6, et `state` part à `draft`
+pour cette raison. La deuxième moitié de l'étape « archive » du skill, ajouter
+à la banque les angles que l'entretien a fait apparaître, reste à la personne :
+c'est un jugement, pas une mécanique. Et le smoke test n'a encore été lancé
+contre aucun endpoint réel, ce que dit son tableau vide.
+
 ## 2026-08-28 (soir, cinquième session). Tranche 5.5 : le brouillon et la traçabilité
 
 Commits `d74ff23` (la tranche) et `6e3f998` (la référence de commit),
