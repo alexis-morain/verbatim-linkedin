@@ -35,6 +35,11 @@ mesure.md
 # Contributor-facing conventions live in CONTRIBUTING.md instead.
 CLAUDE.md
 
+# Same category: planning prose, in the maintainer's language, about what this
+# repository will do next. The engine is English wide and a plan is not part
+# of it. What a plan decided ends up in docs/journal.md, which is shipped.
+plans/
+
 # Local configuration
 .env
 .env.bak.*
