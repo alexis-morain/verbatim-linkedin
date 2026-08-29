@@ -161,16 +161,25 @@ worth naming, because both are shapes a naive writer produces:
 
 **`sheet` is the validation sheet of `linkedin-post`, and its `state` is the
 guard.** The skill says nothing is written until the sheet is approved; this
-key is where that rule lives on disk. It holds the five fields of the sheet
-exactly as the skill defines them (`angle`, `elements`, `moment`,
-`conviction`, `first_lines`), a `state` that is `proposed` or `approved`, and
-the two timestamps (`proposed`, `approved`). Three rules:
+key is where that rule lives on disk. It holds the five fields of the sheet exactly as the skill defines
+them (`angle`, `elements`, `moment`, `conviction`, `first_lines`), a `state`
+that is `proposed` or `approved`, the two timestamps (`proposed`, `approved`),
+and `problems`, what could not be read in the way this sheet arrived. Four
+rules:
 
 - **Approving is the person's decision, made on their screen.** Nothing a
   model can reach writes `approved`: the engine's tool can only propose.
 - **A `proposed` sheet is replaceable, an `approved` sheet is frozen.** If
   something on the sheet is wrong, the person says so and the next proposal
   replaces it; once approved, the sheet is what the draft answers to.
+- **A sheet says which road it came down.** `problems` is empty when the
+  sheet arrived through the tool and carries at least one entry when it was
+  read out of an answer that ignored it, whether or not the reading was
+  clean. The two are not the same object: what a model committed to through a
+  tool call it cannot later be said not to have meant, and a sheet parsed out
+  of free text is a reading somebody should check more slowly. That is a
+  decision the person makes on their screen, so the screen shows it. Like the
+  draft's field of the same name, nothing a model can reach ever writes it.
 - **An approved sheet ends the questions, not the interview.** No further
   interview turn runs, but `state` stays `open`, because `closed` means the
   interview became a post and names the file. The sheet is not transcript
@@ -239,7 +248,12 @@ runtime that ignores a forced tool call answers in prose instead, and the
 engine then reads the `ANCHORS` block out of the answer. That is not a
 hypothetical: `tool_choice` is enforced by the provider on the native wire and
 is advisory on an OpenAI compatible one, so a local runtime takes this path
-several turns out of six, measured rather than assumed. That
+several turns out of six, measured rather than assumed. **The sheet has the
+same fallback**, reading the five labels the skill prints; neither one ever
+guesses a field it could not read, because a field invented to complete a
+sheet is the invention the sheet exists to catch, wearing the sheet's own
+authority. When nothing readable comes back, nothing is written and the
+screen says so rather than leaving somebody to wonder what their click did. That
 path is degraded on purpose and shows it: `body` then holds everything the
 model wrote before the block, hooks and notes included, so the panel marks
 sentences the post itself would never contain. Whatever could not be read

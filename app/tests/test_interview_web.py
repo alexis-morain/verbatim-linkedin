@@ -1983,7 +1983,11 @@ class TestARuntimeThatIgnoresTheRequiredTool(DraftCase):
         self.draft(interview_id)
         problems = interview.load(self.root, interview_id).draft.problems
         self.assertTrue(problems)
-        self.assertIn("no SAID quote", problems[0])
+        # Anywhere in the list, not first: the road this arrived by leads it,
+        # and the parse failures follow.
+        self.assertIn("no SAID quote", " ".join(problems))
+        self.assertIn("propose_draft was required and was not called",
+                      problems[0])
 
 
 class TestProseWithNoBlockIsNotADraft(DraftCase):
@@ -2363,6 +2367,172 @@ class TestEveryArchiveCodeHasASentence(ArchiveCase):
         for code in sorted(self.codes()):
             key = "interview.archive_" + code.replace("-", "_")
             self.assertNotEqual(strings(key), key, code)
+
+
+PROSE_SHEET = """Bien sûr, voici la fiche de validation.
+
+ANGLE
+Le segment abandonné, avec ce qu'il a coûté
+
+CONCRETE ELEMENTS
+- onze conversations
+- deux propositions
+
+THE STRONG MOMENT
+rien de signé au bout de quatre mois
+
+CENTRAL CONVICTION
+"le canal direct est le seul qui paie"
+
+FIRST LINE
+- Quatre mois à vendre aux agences.
+"""
+
+
+class TestATurnWhoseToolDidFire(SheetCase):
+    """The other half of the fallback, and the one that fails quietly. If the
+    engine decided "was it called" by looking at the conversation instead of
+    at the loop, a turn that called the tool would still be parsed for prose,
+    find none, and tell somebody nothing was read while their sheet sits on
+    the screen."""
+
+    scripts = (asks(("c1", "propose_sheet", SHEET_ARGS)), says("voilà"),
+               asks(("c2", "propose_draft", DRAFT_ARGS)), says("voilà"))
+
+    def test_no_refusal_follows_a_sheet_that_landed(self):
+        interview_id = self.open_interview()
+        interview.say(conversation := interview.load(self.root, interview_id),
+                      "quatre mois sur les agences")
+        interview.save(self.root, conversation)
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        sent = frames(reply.text)
+        self.assertIn("sheet", [f["kind"] for f in sent])
+        self.assertEqual([f for f in sent if f["kind"] == "error"], [])
+        self.assertEqual(interview.load(self.root, interview_id).sheet.problems,
+                         ())
+
+    def test_no_refusal_follows_a_draft_that_landed(self):
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.propose(conversation, dict(SHEET_ARGS))
+        interview.approve(conversation, conversation.sheet.digest())
+        interview.save(self.root, conversation)
+        self.transport.scripts = self.transport.scripts[2:]
+        reply = self.client.post(f"/interview/{interview_id}/draft",
+                                 data={"text": ""})
+        sent = frames(reply.text)
+        self.assertIn("draft", [f["kind"] for f in sent])
+        self.assertEqual([f for f in sent if f["kind"] == "error"], [])
+        self.assertEqual(interview.load(self.root, interview_id).draft.problems,
+                         ())
+
+
+class TestARuntimeThatIgnoresTheSheetTool(SheetCase):
+    """`tool_choice` is enforced by the provider on the native wire and
+    advisory on an OpenAI compatible one: two calls in six on Ollama, see
+    docs/smoke.md. Without this path the sheet guard fires on hosted models
+    and quietly does not on local ones."""
+
+    scripts = (says("Une question de plus, d'abord."), says(PROSE_SHEET),
+               says("Une question de plus, d'abord."), says(PROSE_SHEET),
+               says("Une question de plus, d'abord."), says(PROSE_SHEET))
+
+    def test_the_sheet_is_read_out_of_the_prose(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "quatre mois sur les agences")
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        sheet = interview.load(self.root, interview_id).sheet
+        self.assertIsNotNone(sheet)
+        self.assertEqual(sheet.angle,
+                         "Le segment abandonné, avec ce qu'il a coûté")
+        self.assertEqual(sheet.elements,
+                         ("onze conversations", "deux propositions"))
+        self.assertEqual(sheet.conviction,
+                         "le canal direct est le seul qui paie")
+        self.assertIn("sheet", kinds(reply.text))
+
+    def test_the_screen_says_it_was_parsed_rather_than_offered(self):
+        # A sheet read out of free text is the weaker object, and the person
+        # signing it decides with that in front of them or not at all.
+        interview_id = self.open_interview()
+        self.turn(interview_id, "quatre mois sur les agences")
+        self.client.post(f"/interview/{interview_id}/sheet/propose")
+        sheet = interview.load(self.root, interview_id).sheet
+        # The marker is on even though this one parsed cleanly: the road it
+        # came down is a fact of its own.
+        self.assertIn("propose_sheet was required and was not called",
+                      " ".join(sheet.problems))
+        page = self.client.get(f"/interview/{interview_id}").text
+        self.assertIn(shown(self.app.state.t("interview.sheet_problems_hint")),
+                      page)
+
+    def test_it_can_still_be_approved_and_still_guards_the_draft(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "quatre mois sur les agences")
+        self.client.post(f"/interview/{interview_id}/sheet/propose")
+        self.approve(interview_id)
+        self.assertTrue(
+            interview.sheet_approved(interview.load(self.root, interview_id)))
+
+
+class TestAnAnswerThatIsNotASheetAtAll(SheetCase):
+    """Refusing to guess is the point. A field invented here to get past the
+    refusal is the invention the sheet exists to catch."""
+
+    scripts = (says("Une question de plus, d'abord."),
+               says("Bien sûr, je peux préparer cela. Dites-moi quand."))
+
+    def test_nothing_lands_and_the_screen_is_told_why(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "quatre mois sur les agences")
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        self.assertIsNone(interview.load(self.root, interview_id).sheet)
+        sent = frames(reply.text)
+        self.assertEqual(sent[-1]["kind"], "error")
+        self.assertEqual(sent[-1]["code"], "sheet-not-read")
+
+
+class TestAPartialSheetInProse(SheetCase):
+    scripts = (says("Une question de plus, d'abord."),
+               says(PROSE_SHEET.replace(
+                   'CENTRAL CONVICTION\n"le canal direct est le seul qui '
+                   'paie"\n', "")))
+
+    def test_a_missing_field_takes_the_whole_sheet_with_it(self):
+        interview_id = self.open_interview()
+        self.turn(interview_id, "quatre mois sur les agences")
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        self.assertIsNone(interview.load(self.root, interview_id).sheet)
+        self.assertEqual(frames(reply.text)[-1]["code"], "sheet-not-read")
+
+
+class TestARewriteWhoseToolIsIgnored(DraftCase):
+    """The bug the `fired` set fixes. The old reading asked whether a draft
+    existed, and on a rewrite one always does, so the fallback never ran on
+    the turn that needs it most and the prose went into silence."""
+
+    scripts = (says("Voici le post.\n\nQuatre mois pour rien.\n\n"
+                    "ANCHORS\nPOST: Quatre mois pour rien.\n"
+                    "SAID: le canal direct est le seul qui paie\n"),)
+
+    def test_the_prose_still_becomes_the_new_draft(self):
+        interview_id = self.drafted()
+        before = interview.load(self.root, interview_id).draft.body
+        self.draft(interview_id)
+        after = interview.load(self.root, interview_id).draft
+        self.assertNotEqual(after.body, before)
+        self.assertIn("Quatre mois pour rien.", after.body)
+
+
+class TestADraftTurnThatReturnsNothingUsable(DraftCase):
+    scripts = (says("Je préfère poser une question de plus avant d'écrire."),)
+
+    def test_nothing_lands_and_the_screen_is_told_why(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id)
+        self.assertIsNone(interview.load(self.root, interview_id).draft)
+        self.assertEqual(frames(reply.text)[-1]["code"], "draft-not-read")
 
 
 class TestArchivingInFrench(ArchiveCase):

@@ -19,6 +19,11 @@
     {% if engine.block_size %}
     <dt>{{ t('interview.context') }}</dt>
     <dd class="mono">{{ t('interview.context_value', count=engine.block_size) }}</dd>
+    {# The failure this warns about is silent, which is the only reason it is
+       worth a line here. A runtime with a smaller window truncates the block
+       and answers fluently with part of the skill gone, and the skill is the
+       guardrails. Measured on Ollama, docs/smoke.md. #}
+    <dd class="hint">{{ t('interview.context_truncation') }}</dd>
     {% endif %}
   </dl>
   {% if engine.block_error %}

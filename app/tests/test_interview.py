@@ -887,6 +887,46 @@ class TestTheSheet(InterviewCase):
         self.assertEqual(conversation.sheet.angle, "padded")
         self.assertEqual(conversation.sheet.elements, ("one", "two"))
 
+    def test_how_a_sheet_arrived_travels_with_it(self):
+        # The screen shows it: a sheet parsed out of free text is a weaker
+        # object than one a model committed to through a tool.
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(),
+                          problems=["read out of prose"], now=WHEN)
+        self.assertEqual(conversation.sheet.problems, ("read out of prose",))
+        interview.save(self.root, conversation, now=WHEN)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.sheet, conversation.sheet)
+
+    def test_a_model_cannot_write_the_problems_of_its_own_reception(self):
+        conversation = started(self.root)
+        interview.propose(conversation,
+                          dict(proposal(), problems=["nothing went wrong"]),
+                          now=WHEN)
+        self.assertEqual(conversation.sheet.problems, ())
+
+    def test_the_digest_does_not_move_with_how_it_arrived(self):
+        # A signature is over what the sheet says, not over the road it came
+        # down. Otherwise a digest would go stale on something invisible.
+        one = started(self.root)
+        interview.propose(one, proposal(), now=WHEN)
+        two = started(self.root, now=LATER)
+        interview.propose(two, proposal(), problems=["read out of prose"],
+                          now=WHEN)
+        self.assertEqual(one.sheet.digest(), two.sheet.digest())
+
+    def test_a_mangled_problems_list_on_disk_is_refused(self):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(), now=WHEN)
+        interview.save(self.root, conversation, now=WHEN)
+        path = self.directory(conversation) / interview.CONVERSATION
+        for wrong in ("no", [3], {"a": 1}):
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw["sheet"]["problems"] = wrong
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            with self.assertRaises(interview.InterviewError):
+                interview.load(self.root, conversation.id)
+
     def test_approving_freezes_and_stamps(self):
         conversation = started(self.root)
         interview.propose(conversation, proposal(), now=WHEN)

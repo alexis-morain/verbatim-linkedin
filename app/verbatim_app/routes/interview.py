@@ -40,7 +40,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from . import render as _render
-from .. import anchors, archive, interview
+from .. import anchors, archive, interview, prose
 from ..agent import Agent, AgentError, http_transport
 from ..instance import InstanceError, UnreadableError
 from ..providers import (
@@ -599,6 +599,10 @@ def _sheet_fields(sheet) -> dict:
                 elements=list(sheet.elements), moment=sheet.moment,
                 conviction=sheet.conviction,
                 first_lines=list(sheet.first_lines),
+                # How it arrived. A sheet read out of free text is a weaker
+                # object than one a model committed to, and the person about
+                # to sign it decides with that in front of them or not at all.
+                problems=list(sheet.problems),
                 digest=sheet.digest())
 
 
@@ -704,6 +708,12 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
             lambda arguments: interview.propose(conversation, arguments)))
         agent = Agent(engine.settings, tools,
                       transport=request.app.state.transport or http_transport())
+        #: Which required tools actually ran. Read from the loop rather than
+        #: inferred from the conversation afterwards: a rewrite already has a
+        #: draft on it, so "is there a draft" answers yes whether this turn
+        #: produced one or not, and the fallback would never run on the turn
+        #: that needs it most.
+        fired = set()
         # A drafting turn is a fresh request, so this list is thrown away
         # with the generator. Nothing is lost by that: what a draft leaves
         # behind is the `draft` key, and what a revision starts from is the
@@ -737,6 +747,8 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
                 yield _frame("tool_result", id=step.call.id,
                              name=step.call.name, result=step.result,
                              is_error=step.is_error)
+                if not step.is_error:
+                    fired.add(step.call.name)
                 if step.call.name == SHEET_TOOL and not step.is_error:
                     # Already on disk: the save above ran after the tool did.
                     yield _frame("sheet", **_sheet_fields(conversation.sheet))
@@ -754,13 +766,35 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
                 yield _frame("ceiling", turns=agent.max_turns,
                              owing=(not drafting
                                     and _awaiting_answer(conversation)))
-        if drafting and _prose_draft(conversation, messages):
-            # A runtime that ignored the required tool answered in prose, and
-            # the answer carried an anchors block. Local runtimes do exactly
-            # this, so it is a path the multi provider claim has to hold, and
-            # `references/instance.md` says it is degraded and shows it.
-            keep()
-            yield _frame("draft", **panel(conversation))
+        if require and require not in fired:
+            # The runtime ignored the requirement. Not a rare shape: measured
+            # at two calls in six on Ollama, `docs/smoke.md`, because
+            # `tool_choice` is enforced by the provider on the native wire and
+            # advisory on an OpenAI compatible one. So the answer is read as
+            # prose, degraded and showing it, or nothing lands and the screen
+            # says that rather than leaving somebody to guess.
+            said = _last_answer(messages)
+            # The road is a fact of its own, separate from what went wrong on
+            # it. A sheet that parsed cleanly out of prose has no parse
+            # problem to report and is still the weaker object: what the model
+            # committed to through a tool it cannot later claim it did not
+            # mean. So the marker goes on whether or not the parse was clean,
+            # and the pack's heading over this list carries the meaning.
+            road = (f"{require} was required and was not called; "
+                    "this was read out of the answer instead",)
+            if require == DRAFT_TOOL and _prose_draft(conversation, said, road):
+                keep()
+                yield _frame("draft", **panel(conversation))
+            elif require == SHEET_TOOL and (read := prose.sheet(said)).fields:
+                interview.propose(conversation, read.fields,
+                                  problems=road + read.problems)
+                keep()
+                yield _frame("sheet", **_sheet_fields(conversation.sheet))
+            else:
+                yield _frame(
+                    "error",
+                    code=("sheet-not-read" if require == SHEET_TOOL
+                          else "draft-not-read"))
     except (AgentError, ProviderError) as failure:
         # The provider's own words, redacted the same way a subprocess answer
         # is: a gateway that echoes an Authorization header into a debug body
@@ -790,20 +824,12 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
             lock.release()
 
 
-def _prose_draft(conversation, messages) -> bool:
-    """Read a draft out of an answer that ignored the tool, if there is one.
+def _last_answer(messages) -> str:
+    """The text of the last thing the model said on this request.
 
-    Only ever tried once the turn is over and nothing was offered through
-    `propose_draft`, and only when the answer really carried an `ANCHORS`
-    block: prose with no block is somebody's model talking, not a post, and
-    storing it as one would put the engine's chatter in front of the person
-    with a traceability panel drawn around it.
-
-    Whatever could not be read travels with the draft rather than into
-    silence, which is the only thing that makes this path honest.
+    One reader for both fallbacks. Tool blocks are skipped: what is wanted is
+    the prose a runtime wrote instead of calling the tool it was told to call.
     """
-    if conversation.draft is not None:
-        return False
     said = ""
     for message in messages:
         if message.get("role") != "assistant":
@@ -813,6 +839,21 @@ def _prose_draft(conversation, messages) -> bool:
             said = "\n".join(block.get("text", "") for block in content
                               if isinstance(block, dict)
                               and block.get("type") == "text") or said
+    return said
+
+
+def _prose_draft(conversation, said: str, road=()) -> bool:
+    """Read a draft out of an answer that ignored the tool, if there is one.
+
+    Only ever tried once the turn is over and the required tool did not run,
+    and only when the answer really carried an `ANCHORS` block: prose with no
+    block is somebody's model talking, not a post, and storing it as one would
+    put the engine's chatter in front of the person with a traceability panel
+    drawn around it.
+
+    Whatever could not be read travels with the draft rather than into
+    silence, which is the only thing that makes this path honest.
+    """
     out = anchors.split_output(said)
     if not out.block or not out.draft.strip():
         return False
@@ -822,7 +863,7 @@ def _prose_draft(conversation, messages) -> bool:
             {"body": out.draft,
              "anchors": [{"post": anchor.fragment, "said": anchor.quote}
                          for anchor in out.anchors]},
-            problems=out.problems)
+            problems=tuple(road) + tuple(out.problems))
     except interview.InterviewError:
         # The sheet went unapproved underneath, or the block held nothing a
         # draft can be made of. Neither is worth taking the turn down for.
@@ -846,6 +887,7 @@ FRAME_KEYS = (
     "interview.error_bundle_broken", "interview.error_sheet_approved",
     "interview.error_sheet_not_approved",
     "interview.error_nothing_to_revise",
+    "interview.error_sheet_not_read", "interview.error_draft_not_read",
     "interview.error_unknown", "interview.tokens", "interview.spent",
 )
 

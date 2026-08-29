@@ -161,6 +161,15 @@
     });
     refill(document.getElementById("sheet-elements"), frame.elements);
     refill(document.getElementById("sheet-first-lines"), frame.first_lines);
+    /* How this sheet arrived, and it is not decoration. A sheet parsed out of
+       an answer that ignored its tool is a weaker object than one a model
+       committed to, and the person about to sign it decides with that in
+       front of them. Revealed only when there is something to say, and
+       re-hidden when a later proposal arrives clean. */
+    var problems = frame.problems || [];
+    refill(document.getElementById("sheet-problems"), problems);
+    var block = document.getElementById("sheet-problems-block");
+    if (block) { block.hidden = problems.length === 0; }
     /* The form signs what is displayed. Filling the panel without moving
        the digest would recreate, on the live path, exactly the stale
        signature the digest exists to refuse. */

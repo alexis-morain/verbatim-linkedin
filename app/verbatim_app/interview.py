@@ -129,6 +129,11 @@ class Sheet:
     state: str = PROPOSED
     proposed: str = ""
     approved: str = ""
+    #: What could not be read in the way this sheet arrived. Empty when it
+    #: came through the tool; a runtime that answered in prose fills it. The
+    #: person signing this is entitled to know which of the two is in front
+    #: of them, since a sheet parsed out of free text is the weaker object.
+    problems: tuple = ()
 
     def digest(self) -> str:
         """What identifies this sheet: its content, nothing else.
@@ -140,6 +145,10 @@ class Sheet:
         only, no timestamp: two proposals with the same five fields are the
         same decision, and a turn can propose twice inside one second.
         """
+        # `problems` is deliberately out: it says how this sheet arrived, not
+        # what it says. The same five fields are the same decision whichever
+        # road they came down, and a digest that moved with the road would
+        # invalidate a signature over nothing the person can see.
         payload = json.dumps(
             [self.angle, list(self.elements), self.moment, self.conviction,
              list(self.first_lines)], ensure_ascii=False)
@@ -393,7 +402,7 @@ def _sheet_lines(arguments: dict, name: str, most: int = 0) -> tuple:
     return tuple(entry.strip() for entry in value)
 
 
-def propose(conversation: Conversation, arguments: dict,
+def propose(conversation: Conversation, arguments: dict, *, problems=(),
             now: datetime | None = None) -> Sheet:
     """The engine's half of the sheet: propose, never decide.
 
@@ -402,6 +411,11 @@ def propose(conversation: Conversation, arguments: dict,
     refused rather than replacing it: the approved sheet is what the person
     signed, and the guard would be worth nothing if the next turn could swap
     what sits under their signature.
+
+    `problems` is the caller's and never the model's, keyword only for that
+    reason alone, exactly as it is on `write`. It says what could not be read
+    in the way this sheet arrived, and a model that could fill it would be
+    narrating its own reception on the one screen built to doubt it.
     """
     if conversation.state != OPEN:
         raise InterviewError(
@@ -416,6 +430,7 @@ def propose(conversation: Conversation, arguments: dict,
         moment=_sheet_line(arguments, "moment"),
         conviction=_sheet_line(arguments, "conviction"),
         first_lines=_sheet_lines(arguments, "first_lines", most=2),
+        problems=tuple(problems),
         proposed=(now or datetime.now()).strftime(STAMP))
     conversation.sheet = sheet
     return sheet
@@ -813,6 +828,7 @@ def _as_json(conversation: Conversation) -> str:
             "moment": sheet.moment,
             "conviction": sheet.conviction,
             "first_lines": list(sheet.first_lines),
+            "problems": list(sheet.problems),
             "proposed": sheet.proposed,
             "approved": sheet.approved,
         }
@@ -931,12 +947,17 @@ def _check_sheet(data) -> Sheet | None:
         if not isinstance(entries, list) or not all(
                 isinstance(entry, str) for entry in entries):
             raise ValueError("sheet")
+    problems = data.get("problems", [])
+    if not isinstance(problems, list) or not all(
+            isinstance(entry, str) for entry in problems):
+        raise ValueError("sheet")
     return Sheet(
         angle=str(data.get("angle", "")),
         elements=tuple(data["elements"]),
         moment=str(data.get("moment", "")),
         conviction=str(data.get("conviction", "")),
         first_lines=tuple(data["first_lines"]),
+        problems=tuple(problems),
         state=data["state"],
         proposed=str(data.get("proposed", "")),
         approved=str(data.get("approved", "")))

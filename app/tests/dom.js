@@ -246,6 +246,9 @@ function page(strings, options) {
   document.place(sheet, "dd", "sheet-moment");
   document.place(sheet, "dd", "sheet-conviction");
   document.place(sheet, "ul", "sheet-first-lines");
+  const problems = document.place(sheet, "div", "sheet-problems-block",
+                                  {hidden: true});
+  document.place(problems, "ul", "sheet-problems");
   const approve = document.place(sheet, "form", "sheet-approve",
                                  {hidden: true});
   document.place(approve, "input", "sheet-digest", {value: ""});

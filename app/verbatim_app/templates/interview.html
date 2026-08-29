@@ -65,6 +65,14 @@
     <dt class="mono">{{ t('interview.sheet_first_lines') }}</dt>
     <dd><ul id="sheet-first-lines" class="their-words">{% if sheet %}{% for line in sheet.first_lines %}<li>{{ line }}</li>{% endfor %}{% endif %}</ul></dd>
   </dl>
+  {# How it arrived. Hidden until there is something to say, and filled by the
+     script from the same frame that fills the fields above: a sheet parsed out
+     of free text is a weaker object than one a model committed to. #}
+  <div id="sheet-problems-block"{% if not sheet or not sheet.problems %} hidden{% endif %}>
+    <p class="mono">{{ t('interview.sheet_problems') }}</p>
+    <p class="hint">{{ t('interview.sheet_problems_hint') }}</p>
+    <ul class="problems mono" id="sheet-problems">{% if sheet %}{% for problem in sheet.problems %}<li>{{ problem }}</li>{% endfor %}{% endif %}</ul>
+  </div>
   {% if conversation.state == 'open' %}
   <form id="sheet-approve" method="post" action="/interview/{{ conversation.id }}/sheet/approve"{% if not sheet or sheet.state != 'proposed' %} hidden{% endif %}>
     {# The identity of the sheet as this page shows it. The disk can be newer

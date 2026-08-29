@@ -38,6 +38,8 @@ const STRINGS = {
   error_bundle_broken: "bundle-broke", error_sheet_approved: "sheet-done",
   error_sheet_not_approved: "sheet-missing",
   error_nothing_to_revise: "nothing-to-revise",
+  error_sheet_not_read: "no-sheet-in-that",
+  error_draft_not_read: "no-post-in-that",
   error_unknown: "no-name-for",
   tokens: "{input} in, {output} out", spent: "{amount} USD"
 };
@@ -118,6 +120,26 @@ test("a second sheet replaces the lists instead of growing them", async () => {
     screen.at("sheet-first-lines").children.map((li) => li.textContent),
     ["Try this."]);
   assert.strictEqual(screen.at("sheet-digest").value, "0000deadbeef");
+});
+
+test("a sheet read out of prose says so, and a clean one stops saying it",
+     async () => {
+  /* The panel is the screen where somebody decides to sign. A sheet parsed
+     out of an answer that ignored its tool is the weaker object, and the
+     difference has to survive onto the live path, not only onto a reload. */
+  const screen = opened();
+  await turn(screen, "go on", [frame(Object.assign({}, A_SHEET, {
+    problems: ["FIRST LINE carries 3 proposals and the sheet takes 2"]
+  }))]);
+
+  assert.strictEqual(screen.at("sheet-problems-block").hidden, false);
+  assert.deepStrictEqual(
+    screen.at("sheet-problems").children.map((li) => li.textContent),
+    ["FIRST LINE carries 3 proposals and the sheet takes 2"]);
+
+  await turn(screen, "again", [frame(A_SHEET)]);
+  assert.strictEqual(screen.at("sheet-problems-block").hidden, true);
+  assert.deepStrictEqual(screen.at("sheet-problems").children, []);
 });
 
 test("the approve form shows only while the sheet is proposed", async () => {
