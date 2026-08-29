@@ -1,5 +1,103 @@
 # Journal
 
+## 2026-08-29 (suite). Le smoke test lancé, et ce qu'il a trouvé
+
+Commits `ca0aef3` et `0a440a1`, poussés. La session devait s'arrêter à la
+tranche 5.6 ; elle a continué parce que lancer le smoke test pour de vrai a
+sorti trois choses, dont deux qu'aucun test ne pouvait voir.
+
+### Ollama ne demande aucune clé, donc le fil `openai` est prouvé
+
+`problems()` ne lève `key-missing` que hors boucle locale. Il n'y avait donc
+rien à attendre : deux lignes dans `docs/smoke.md`, `qwen2.5:14b` et
+`deepseek-r1:14b`, en quelques minutes et sans un centime.
+
+### `tool_choice` n'est pas une promesse
+
+Même modèle, même requête, six fois : l'outil est appelé **deux fois**. Chez
+le fournisseur natif le serveur l'impose ; sur un endpoint compatible OpenAI
+c'est laissé au modèle, tour par tour. Deux commentaires du code affirmaient
+le contraire, dont celui de `propose_sheet` qui disait que l'exigence « ne
+laisse aucune prose à écrire ». Corrigés plutôt que laissés à mentir.
+
+Conséquence directe : la garde de la 5.5 marchait chez les fournisseurs
+hébergés et pas en local, silencieusement. Le brouillon avait un repli prose,
+la fiche n'en avait pas.
+
+### `prose.py`, le frère de `anchors.split_output`
+
+Le repli manquant. Il lit les cinq libellés que le skill imprime, tolère la
+décoration markdown, et **ne devine jamais un champ absent** : un champ
+complété ici pour passer le refus de `propose` serait l'invention que la fiche
+existe pour attraper, portant l'autorité de la fiche. Cinq libellés ou rien.
+
+Une fiche dit maintenant par quelle route elle est arrivée. `problems` est
+vide quand elle vient de l'outil et porte un marqueur quand elle a été lue,
+parse propre ou non : ce qu'un modèle a engagé par un appel d'outil n'est pas
+le même objet qu'une lecture de sa prose, et la personne qui va signer décide
+avec ça sous les yeux. Hors du condensé, exprès : une signature porte sur ce
+que la fiche dit, pas sur la route.
+
+### Un bug latent sorti avec
+
+Le repli du brouillon demandait « y a-t-il un brouillon ? » pour savoir si
+l'outil avait tiré. Sur une réécriture il y en a toujours un, donc le repli ne
+tournait jamais sur le tour qui en a le plus besoin, et la prose partait en
+silence. Ce qu'un tour a produit se lit maintenant dans la boucle, `fired`,
+jamais de l'état après coup.
+
+### Et la trouvaille sans correctif
+
+En pilotant l'app entière contre Ollama, pas les trois sondes : le tour de
+fiche revenait **sans un seul bloc de texte**. Le bloc système fait ~6 400
+jetons ; Ollama choisit sa fenêtre selon la VRAM et se pose à 4096, son propre
+log le dit au démarrage. Mesuré des deux côtés : `num_ctx=4096` donne
+`prompt_eval=4096`, pile la fenêtre, et le modèle **répond quand même**, en
+français fluide, un tiers du skill en moins ; `num_ctx=16384` donne 6 629,
+tout passe.
+
+C'est pire qu'une erreur. Le skill *est* les garde-fous, et là ils
+disparaissent sans que rien ne le dise. C'est la classe d'échec contre
+laquelle ce projet existe, arrivée par la porte de derrière.
+
+Alexis a tranché : la phrase à l'écran suffit, pas d'heuristique. Le moteur dit
+la taille du bloc et ce qu'une fenêtre plus petite lui fait, et ne prétend pas
+détecter la troncature : compter les jetons réellement envoyés demande le
+tokeniseur du fournisseur, et un verdict tiré d'un ratio signes/jetons serait
+le chiffre inventé qu'on refuse partout ailleurs.
+
+### Ce que le repli ne fait pas, et il faut le dire
+
+Une fois la fenêtre réglée, `qwen2.5:14b` n'a toujours pas produit de fiche. Il
+a répondu « si tu as déjà ces informations, partage-les moi », c'est-à-dire une
+question d'entretien de plus. Le moteur a refusé d'en faire une fiche et l'a
+dit à l'écran, ce qui est le bon comportement et ce qui manquait avant.
+
+Mais ça borne le repli : il lit une fiche écrite au mauvais endroit, il n'en
+invente pas une que le modèle n'a jamais écrite.
+
+### Deux décisions d'Alexis
+
+**Le fil `anthropic` part non testé.** La première version en ligne se teste en
+local et sur OpenAI. Le garde-fou que `docs/smoke.md` appelait bloquant est
+donc levé, et le fichier écrit ce que ça coûte, daté : la forme de requête
+native, son parsing et ses erreurs ne sont couverts que par des flux
+enregistrés, `tool_choice` y est réputé contraignant sans aucune mesure, et
+les prix de `providers.py` n'ont jamais vu de facture.
+
+**Local et hébergé restent à égalité, sans recommandation.** Techniquement il
+n'y avait rien à retirer : `VERBATIM_PROVIDER=openai` plus une base URL couvre
+OpenAI, OpenRouter, Ollama, LM Studio et vLLM, un seul chemin de code. La
+question était donc ce que le projet recommande, et elle touchait une règle
+écrite de `CONTRIBUTING.md`, qui refuse une dépendance à un service hébergé
+dans le chemin par défaut. La règle survit.
+
+La contrepartie assumée est nommée : quelqu'un qui démarre en local sur un 14B
+va se heurter à la fiche. Donc les deux phrases de refus disent maintenant
+**« ce n'est pas vous »**, et nomment la cause habituelle. Le choix se fait sur
+trois capacités du modèle, écrites dans `.env.example` là où on les rencontre,
+pas sur l'endroit où il tourne.
+
 ## 2026-08-29. Tranche 5.6 : la révision, l'archivage, le smoke test
 
 Commit `1738be5`. L'entretien devient un post : l'app fait le tour complet, de

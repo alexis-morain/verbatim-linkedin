@@ -125,6 +125,53 @@ So a `DEGRADED` row means the endpoint is usable, not that every step will
 complete on it. On this model the interview runs; the sheet needs asking more
 than once, or a stronger model.
 
+## Choosing where to point it
+
+The engine speaks two wires, and one of them covers almost everything:
+
+| You want | `VERBATIM_PROVIDER` | `VERBATIM_BASE_URL` |
+|---|---|---|
+| Anthropic, native | `anthropic` | leave empty |
+| OpenAI | `openai` | leave empty |
+| OpenRouter | `openai` | `https://openrouter.ai/api/v1` |
+| Ollama, LM Studio, vLLM | `openai` | the runtime's own, on loopback |
+
+So local inference and a hosted aggregator are **the same code path**, and
+supporting one is supporting the other. Neither is the recommended one: the
+requirements below are what decides, and they are about the model rather than
+about where it runs. Reaching OpenRouter needs nothing new:
+
+```bash
+export VERBATIM_PROVIDER=openai
+export VERBATIM_BASE_URL=https://openrouter.ai/api/v1
+export VERBATIM_API_KEY=sk-or-...
+export VERBATIM_MODEL=anthropic/claude-sonnet-4
+```
+
+Exporting the endpoint yourself is what satisfies the guard: an instance
+`.env` naming a third party host is refused unless that host is also in
+`VERBATIM_ENDPOINT_OK`, because a file that travels between machines does not
+get to decide where a credential goes.
+
+**A model with no price in this engine is not a problem.** Tokens are counted
+either way and the screen says there is no rate rather than inventing one, so
+an OpenRouter model nobody has priced here still shows what it consumed.
+
+**What a model has to be able to do here**, so the choice is made on
+capability rather than on where it runs:
+
+1. Hold a system block of about 6400 tokens without the window cutting it.
+2. Answer a forced tool call by calling the tool, or at least by writing what
+   was asked for in prose, which the two fallbacks then read.
+3. Produce the five field validation sheet when asked, rather than continuing
+   to interview.
+
+Measured so far: `qwen2.5:14b` clears the first once the window is raised,
+misses the second most turns, and failed the third outright. `deepseek-r1:14b`
+fails at the declaration of a tool. Nothing else has been run, hosted or
+local, so this is a list of requirements with two data points against it and
+not a ranking.
+
 ## Results
 
 Append a row per run. The revision is the bundle commit it ran against, so a
