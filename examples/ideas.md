@@ -13,8 +13,6 @@ When an interview turns up a new angle, add it here before closing the session.
 
 - [P1] `VISIBILITY` The board deck that reports last quarter turns a room of
   expensive people into an audience. Material: the eleven slides we deleted.
-- [P1] `TRUST` Founders think finance is a reporting function until the first
-  time it is a negotiating one. Material: the five week diligence stall.
 
 ## Pillar 2. What I actually do in the room
 
@@ -30,8 +28,6 @@ When an interview turns up a new angle, add it here before closing the session.
 - [P3] `VISIBILITY` I spent four months selling to agencies. Eleven
   conversations, two proposals, nothing signed. Material: the abandoned segment,
   with what it cost to find out.
-- [P3] `TRUST` I priced my first three mandates wrong, in the same direction
-  every time. Material: rate card history.
 - [P3] `VISIBILITY` A mandate I ended after six weeks, and the sentence in the
   first meeting that should have told me. Material: needs a call before
   publishing, the client is not public.
@@ -39,5 +35,10 @@ When an interview turns up a new angle, add it here before closing the session.
 ## Used
 
 <!-- date | pillar | angle | file -->
+2026-06-16 | P3 | I priced my first three mandates wrong, in the same direction every time | posts/2026-06-16-priced-it-wrong.md
+2026-06-30 | P1 | Founders think finance is a reporting function until the first time it is a negotiating one | posts/2026-06-30-finance-is-a-negotiation.md
+2026-07-13 | P2 | Nine engagements, and not one of them started with the model | posts/2026-07-13-nine-engagements-no-model.md
+2026-07-27 | P2 | I built the same board pack twice in one month | posts/2026-07-27-built-it-twice.md
+2026-08-04 | P2 | The four things I need before I put a number on a mandate | posts/2026-08-04-four-things-before-i-quote.md
 2026-08-18 | P2 | Eleven hours for a first board pack | posts/2026-08-18-board-pack-hours.md
 2026-08-29 | P1 | Your model is not wrong, your commentary is | posts/2026-08-29-commentary-not-model.md

@@ -18,7 +18,7 @@ structure.
 | `pillars.md` | Pillars written as postures with effect labels, and a ratio derived from a stated objective. |
 | `ideas.md` | Angles with funnel labels and named material, not subjects. |
 | `corpus/` | One published post, as reference material. |
-| `posts/` | Three posts: one measured at J+7, one published and not measured yet, one still a draft with its session notes under it. |
+| `posts/` | Eight posts: six measured, one published and not measured yet, one still a draft with its session notes under it. |
 
 ## What to notice
 
@@ -34,8 +34,18 @@ target that was already walked away from.
 it was read from. A trait without a quote is a guess, and it does not belong in
 the file.
 
-**One measurement line is empty on purpose**, in `posts/`, with a note saying
-why. A record that pretends to be complete is worse than one that admits a gap.
+**The measured numbers are invented, exactly like everything else here.** They
+are calibrated in their order of magnitude and in nothing else: one digit,
+often zero, because that is the scale a real person writing to a few thousand
+people works at. They are not results, they are not a benchmark, and no post
+below caused the numbers written under it. A reader who takes these lines for
+evidence of what LinkedIn returns has learned something false about this
+channel, from a persona who does not exist.
+
+**One post is measured at zero everywhere**, and one measurement line is empty
+on purpose, each with a note saying why. Zero means the post produced nothing;
+empty means nobody has looked yet. A record that pretends to be complete is
+worse than one that admits a gap.
 
 **One post is still a draft**, which is where archiving leaves every post: it
 is filed, it is counted nowhere, and publishing is a separate step. Read what

@@ -108,6 +108,20 @@
 {% if unreadable %}
 <p class="empty">{{ t('post.measure_blocked') }}</p>
 {% else %}
+{% if post.measured %}
+{# Once the line is filled, the three numbers are what this screen is for and
+   the form is what you open to fix a typo. Nothing here says provisional or
+   confirmed: that is a property of a bucket, and it lives on /measure. #}
+<h3>{{ t('post.measured_block') }}</h3>
+<dl class="measured">
+  <div><dt>{{ t('measure.connections') }}</dt><dd>{% if post.inbound_connections is none %}<span class="empty">{{ t('posts.not_measured') }}</span>{% else %}{{ post.inbound_connections }}{% endif %}</dd></div>
+  <div><dt>{{ t('measure.dms') }}</dt><dd>{% if post.inbound_dms is none %}<span class="empty">{{ t('posts.not_measured') }}</span>{% else %}{{ post.inbound_dms }}{% endif %}</dd></div>
+  <div><dt>{{ t('measure.meetings') }}</dt><dd>{% if post.meeting_mentions is none %}<span class="empty">{{ t('posts.not_measured') }}</span>{% else %}{{ post.meeting_mentions }}{% endif %}</dd></div>
+</dl>
+<p class="hint"><span class="mono">{{ post.measured }}</span>{% if post.note %} {{ post.note }}{% endif %}</p>
+<details class="raw">
+  <summary>{{ t('post.correct') }}</summary>
+{% endif %}
 <form method="post" action="/posts/{{ post.filename }}/measure" class="measure">
   <label>{{ t('post.measured_on') }}
     <input type="date" name="measured" value="{{ post.measured or '' }}">
@@ -129,6 +143,7 @@
   </label>
   <button type="submit">{{ t('post.save') }}</button>
 </form>
+{% if post.measured %}</details>{% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

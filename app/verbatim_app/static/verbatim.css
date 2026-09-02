@@ -644,3 +644,55 @@ form.status button { justify-self: start; }
 .angle-add { display: grid; gap: 0.3rem; max-width: 40rem; }
 .angle-add label { color: var(--muted); margin-top: 0.8rem; }
 .angle-add button { justify-self: start; }
+
+/* --------------------------------------------------------------- measuring */
+/* Three figures a person wrote down about their own post, so mono at a size
+   that says these are the point of the screen. Rules between the cells, no
+   card and no shadow: a card here would make three counts look like a
+   dashboard, and this record is deliberately not one. */
+
+.measured {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0.75rem 0 1rem;
+  max-width: 34rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.measured > div {
+  display: flex;
+  /* The label is written after the figure and read under it. Column reverse
+     rather than a dd before its dt, which would be the wrong list. */
+  flex-direction: column-reverse;
+  padding: 0.75rem 1rem 0.75rem 0;
+  border-left: 1px solid var(--line);
+}
+.measured > div:first-child { border-left: 0; padding-left: 0; }
+.measured > div:not(:first-child) { padding-left: 1rem; }
+.measured dt {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.measured dd {
+  font-family: var(--mono);
+  font-size: 2rem;
+  line-height: 1.1;
+  margin: 0 0 0.2rem;
+}
+
+/* The totals, under the table of published posts. A sentence, on the same
+   heavy rule the callout uses, because it is a reading of the table above and
+   not a fourth row of it. */
+.totals {
+  border-top: 3px solid var(--ink);
+  padding-top: 0.6rem;
+  margin-top: 0;
+}
+
+/* The status of a pattern, in the vocabulary the states already speak.
+   Muted twice on purpose: not enough and provisional are both "do not act on
+   this yet", and giving them two colours would invent a difference. */
+.status-none, .status-provisional { color: var(--muted); }
+.status-emerging { color: var(--accent); }
+.status-confirmed { color: var(--ok); }

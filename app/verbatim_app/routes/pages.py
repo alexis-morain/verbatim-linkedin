@@ -55,10 +55,13 @@ def overview(request: Request):
         bank = instance.ideas()
     except InstanceError:
         bank = None
+    view = instance.measurement(date.today())
     return _render(
         request, "overview.html",
         next_session=bank.next_session if bank else "",
         counter=instance.pillar_counter(),
+        measured={b.key: b.measured for b in view.by_pillar},
+        due=len(view.due),
         posts=instance.posts()[:5],
     )
 
@@ -304,6 +307,14 @@ def remove_angle(request: Request, text: str = Form("")):
     except InstanceError:
         return RedirectResponse("/ideas?problem=angle-gone", status_code=303)
     return RedirectResponse("/ideas?saved=1", status_code=303)
+
+
+@router.get("/measure")
+def measure(request: Request):
+    # Today comes from the clock here and from a test elsewhere: what is due
+    # is the one thing on this screen that depends on the day.
+    return _render(request, "measure.html",
+                   view=request.app.state.instance.measurement(date.today()))
 
 
 @router.get("/posts")

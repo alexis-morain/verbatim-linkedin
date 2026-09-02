@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ t('measure.title') }} - {{ t('app.title') }}{% endblock %}
+{% macro number(value) %}{% if value is none %}<span class="empty">{{ t('posts.not_measured') }}</span>{% else %}{{ value }}{% endif %}{% endmacro %}
+{% macro breakdown(heading, buckets, kind) %}
+<h2>{{ heading }}</h2>
+{% if buckets %}
+<table>
+  <thead>
+    <tr>
+      <th>{{ t('measure.key') }}</th>
+      <th>{{ t('measure.posts') }}</th>
+      <th>{{ t('measure.measured_count') }}</th>
+      <th>{{ t('measure.connections') }}</th>
+      <th>{{ t('measure.dms') }}</th>
+      <th>{{ t('measure.meetings') }}</th>
+      <th>{{ t('measure.status') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for bucket in buckets %}
+    <tr>
+      <th scope="row"{% if kind == 'pillar' %} class="mono"{% endif %}>
+        {%- if kind == 'pillar' %}P{{ bucket.key }}
+        {%- elif kind == 'format' %}{{ t('interview.format_' + bucket.key.replace('-', '_')) }}
+        {%- else %}{{ t('interview.label_' + bucket.key.lower()) }}{% endif -%}
+      </th>
+      <td class="mono">{{ bucket.posts }}</td>
+      <td class="mono">{{ bucket.measured }}</td>
+      {% if bucket.measured < 2 %}
+      <td colspan="3" class="empty">{{ t('measure.not_enough') }}</td>
+      {% else %}
+      <td class="mono">{{ number(bucket.sums.connections) }}</td>
+      <td class="mono">{{ number(bucket.sums.dms) }}</td>
+      <td class="mono">{{ number(bucket.sums.meetings) }}</td>
+      {% endif %}
+      <td><span class="state status-{{ bucket.status }}">{{ t('measure.status_' + bucket.status) }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endmacro %}
+{% block content %}
+<h1>{{ t('measure.title') }}</h1>
+<p class="hint">{{ t('measure.hint') }}</p>
+
+<h2>{{ t('measure.due') }}</h2>
+{% if view.due %}
+<p class="hint">{{ t('measure.due_hint') }}</p>
+<ul class="postlist">
+  {% for post in view.due %}
+  <li>
+    <a href="/posts/{{ post.filename }}"><span class="mono">{{ post.date }}</span>
+    {{ post.hook.splitlines()[0] if post.hook else post.filename }}</a>
+    <span class="state empty">{{ t('posts.not_measured') }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">{{ t('measure.no_due') }}</p>
+{% endif %}
+
+<h2>{{ t('measure.published') }}</h2>
+{% if view.rows %}
+<table>
+  <thead>
+    <tr>
+      <th>{{ t('posts.date') }}</th>
+      <th>{{ t('posts.pillar') }}</th>
+      <th>{{ t('posts.format') }}</th>
+      <th>{{ t('posts.label') }}</th>
+      <th>{{ t('measure.connections') }}</th>
+      <th>{{ t('measure.dms') }}</th>
+      <th>{{ t('measure.meetings') }}</th>
+      <th>{{ t('posts.measured') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for post in view.rows %}
+    <tr>
+      <td class="mono"><a href="/posts/{{ post.filename }}">{{ post.date }}</a></td>
+      <td class="mono">{% if post.pillar is not none %}P{{ post.pillar }}{% endif %}</td>
+      <td>{% if post.format %}{{ t('interview.format_' + post.format.replace('-', '_')) }}{% endif %}</td>
+      <td>{% if post.label %}{{ t('interview.label_' + post.label.lower()) }}{% endif %}</td>
+      <td class="mono">{{ number(post.inbound_connections) }}</td>
+      <td class="mono">{{ number(post.inbound_dms) }}</td>
+      <td class="mono">{{ number(post.meeting_mentions) }}</td>
+      <td class="mono">{% if post.measured %}{{ post.measured }}{% else %}<span class="empty">{{ t('posts.not_measured') }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if view.measured %}
+{# A field no measured post carried is not a zero, so the word for an empty
+   line goes into the sentence rather than a figure nobody wrote. #}
+<p class="totals">{{ t('measure.totals',
+    measured=view.measured, posts=view.rows | length,
+    connections=view.totals.connections if view.totals.connections is not none else t('posts.not_measured'),
+    dms=view.totals.dms if view.totals.dms is not none else t('posts.not_measured'),
+    meetings=view.totals.meetings if view.totals.meetings is not none else t('posts.not_measured')) }}</p>
+{% endif %}
+{% else %}
+<p class="empty">{{ t('measure.none_published') }}</p>
+{% endif %}
+
+{{ breakdown(t('measure.by_pillar'), view.by_pillar, 'pillar') }}
+{{ breakdown(t('measure.by_format'), view.by_format, 'format') }}
+{{ breakdown(t('measure.by_label'), view.by_label, 'label') }}
+
+<h2>{{ t('measure.guards') }}</h2>
+<p>{{ t('measure.guard_pillar') }}</p>
+<p class="hint">{% if view.single_pillar %}{{ t('measure.guard_bites') }}{% else %}{{ t('measure.guard_clear') }}{% endif %}</p>
+<p>{{ t('measure.guard_format') }}</p>
+<p class="hint">{% if view.single_format %}{{ t('measure.guard_bites') }}{% else %}{{ t('measure.guard_clear') }}{% endif %}</p>
+{% endblock %}
