@@ -4,7 +4,8 @@
 {% macro breakdown(heading, buckets, kind) %}
 <h2>{{ heading }}</h2>
 {% if buckets %}
-<table>
+<div class="wide">
+<table class="figures">
   <thead>
     <tr>
       <th>{{ t('measure.key') }}</th>
@@ -38,6 +39,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endmacro %}
 {% block content %}
@@ -51,7 +53,7 @@
   {% for post in view.due %}
   <li>
     <a href="/posts/{{ post.filename }}"><span class="mono">{{ post.date }}</span>
-    {{ post.hook.splitlines()[0] if post.hook else post.filename }}</a>
+    {{ post.hook.split() | join(' ') if post.hook else post.filename }}</a>
     <span class="state empty">{{ t('posts.not_measured') }}</span>
   </li>
   {% endfor %}
@@ -62,7 +64,8 @@
 
 <h2>{{ t('measure.published') }}</h2>
 {% if view.rows %}
-<table>
+<div class="wide">
+<table class="figures">
   <thead>
     <tr>
       <th>{{ t('posts.date') }}</th>
@@ -99,6 +102,7 @@
     dms=view.totals.dms if view.totals.dms is not none else t('posts.not_measured'),
     meetings=view.totals.meetings if view.totals.meetings is not none else t('posts.not_measured')) }}</p>
 {% endif %}
+</div>
 {% else %}
 <p class="empty">{{ t('measure.none_published') }}</p>
 {% endif %}

@@ -73,10 +73,16 @@ def create_app(instance_path, lang: str | None = None, *,
     # `markdown` returns Markup, so no template ever writes `| safe` for it.
     # Both come from `markup`, which is the only module in this package
     # allowed to import a markdown parser; check.sh holds that rule.
+    # A static file is named with the version on its query string. Browsers
+    # cache a stylesheet by URL, so an upgrade that changed the CSS used to
+    # serve yesterday's look over today's markup until somebody hard
+    # reloaded, and a screen laid out against the wrong stylesheet is the
+    # kind of bug nobody reports because it fixes itself the next day.
     app.state.templates.env.globals.update(t=strings, lang=language,
                                            instance_root=str(instance.root),
                                            markdown=markup.render,
-                                           plain=markup.plain)
+                                           plain=markup.plain,
+                                           asset=lambda name: f"/static/{name}?v={__version__}")
 
     @app.middleware("http")
     async def loopback_only(request: Request, call_next):

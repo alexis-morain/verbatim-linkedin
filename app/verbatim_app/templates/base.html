@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ t('app.title') }}{% endblock %}</title>
-  <link rel="stylesheet" href="/static/verbatim.css">
+  <link rel="stylesheet" href="{{ asset('verbatim.css') }}">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 <body>
@@ -24,7 +24,7 @@
         <a href="/corpus"{% if request.url.path.startswith('/corpus') %} aria-current="page"{% endif %}>{{ t('nav.corpus') }}</a>
       </nav>
       <div class="rail-foot">
-        <p class="mono">{{ t('app.instance') }}<br>{{ instance_root }}</p>
+        <p class="mono">{{ t('app.instance') }}<br><span class="path">{{ instance_root }}</span></p>
         <p>{{ t('app.local_notice') }}</p>
       </div>
     </aside>

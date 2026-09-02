@@ -127,7 +127,7 @@ body {
   font-size: 0.85rem;
   line-height: 1.45;
 }
-.rail-foot .mono { word-break: break-all; }
+.rail-foot .path { overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------------------ main */
 
@@ -171,6 +171,28 @@ a { color: var(--accent); }
   font-size: 1.05rem;
 }
 
+/* The overview breaks the one column the other cold screens keep. Two
+   columns of unequal width: the wide one holds what to do next, the narrow
+   one what the instance says about itself, and the first heading of each
+   sits on the same line so the split reads as one page. Under the
+   breakpoint they stack, the wide one first. */
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: 1rem 3.5rem;
+  align-items: start;
+}
+.overview h2:first-child { margin-top: 0.5rem; }
+.overview-side { border-left: 1px solid var(--line); padding-left: 2rem; }
+.overview-side h2 { font-size: 1rem; }
+.callout.lead { font-size: 1.25rem; line-height: 1.4; }
+
+@media (max-width: 980px) {
+  .overview { grid-template-columns: minmax(0, 1fr); }
+  .overview-side { border-left: 0; padding-left: 0; }
+  .overview-side h2:first-child { margin-top: 2rem; }
+}
+
 /* ---------------------------------------------------------------- tables */
 
 table { border-collapse: collapse; width: 100%; }
@@ -204,6 +226,7 @@ thead th { font-family: var(--mono); font-size: 0.78rem; font-weight: 400; color
 .postlist a { text-decoration: none; color: var(--ink); }
 .postlist a:hover { color: var(--accent); }
 .postlist .mono { color: var(--muted); margin-right: 0.5rem; }
+.postlist .state { white-space: nowrap; }
 
 .angles { list-style: none; padding: 0; margin: 0; }
 .angles li { padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
@@ -680,6 +703,12 @@ form.status button { justify-self: start; }
   line-height: 1.1;
   margin: 0 0 0.2rem;
 }
+
+/* A table of figures takes the page, not the measure of a paragraph: eight
+   columns in 68ch wrap every date in two. The wrapper keeps it out of the
+   `main > table` rule, and a figure or a date never breaks. */
+.wide { max-width: 100%; overflow-x: auto; }
+.figures td.mono, .figures th.mono, .figures .state { white-space: nowrap; }
 
 /* The totals, under the table of published posts. A sentence, on the same
    heavy rule the callout uses, because it is a reading of the table above and
