@@ -15,10 +15,11 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
-from .shown import shown
+from .measure import view as _measure_view
+from .sections import _status_line, sections_of
 
 try:
     import yaml as _yaml
@@ -136,87 +137,6 @@ class PostMeta:
         if self.unreadable:
             return ()
         return tuple(k for k in MEASURE_KEYS if k not in self.present_keys)
-
-
-#: Days between publishing and filling the measurement line. The one number
-#: `references/measure.md` fixes: earlier and the count is still moving, later
-#: and nobody remembers.
-MEASURE_DAYS = 7
-
-
-def pattern_status(measured: int) -> str:
-    """How much a pattern supported by this many measured posts authorises.
-
-    The table of `references/measure.md`, and the whole point of it is that
-    three data points do not become a theory. Nothing here averages: the
-    status is a count, so a bucket cannot look stronger by having produced a
-    bigger number once.
-    """
-    if measured >= 7:
-        return "confirmed"
-    if measured >= 4:
-        return "emerging"
-    if measured >= 2:
-        return "provisional"
-    return "none"
-
-
-@dataclass
-class Sums:
-    """The three numbers added up over a set of measured posts.
-
-    A field is `None` when no measured post carried it, which is not the same
-    fact as zero and is never rendered as one. Sums and counts only: no mean
-    lives in this file, because a mean over one post is a figure the record
-    does not hold.
-    """
-    connections: int | None = None
-    dms: int | None = None
-    meetings: int | None = None
-
-
-@dataclass
-class Bucket:
-    key: str
-    posts: int
-    measured: int
-    sums: Sums
-    status: str
-
-
-@dataclass
-class MeasureView:
-    rows: list = field(default_factory=list)
-    measured: int = 0
-    totals: Sums = field(default_factory=Sums)
-    due: list = field(default_factory=list)
-    by_pillar: list = field(default_factory=list)
-    by_format: list = field(default_factory=list)
-    by_label: list = field(default_factory=list)
-    #: The two guards of `references/measure.md`, as facts about right now.
-    #: They are not applied here: a screen that silently drops a pattern
-    #: teaches nothing, so the guard is shown and the reader applies it.
-    single_pillar: bool = False
-    single_format: bool = False
-
-
-@dataclass
-class Section:
-    """One `## ` section of a document, and the span it occupies.
-
-    The span is what makes an edit local: a screen that saves one section
-    rewrites those characters and leaves every other byte of somebody's file
-    where it was.
-    """
-    heading: str
-    body: str
-    start: int
-    end: int
-    digest: str
-    unvalidated: bool = False
-    #: Another section carries the same heading, so this one cannot be
-    #: addressed by it. Shown rather than guessed between.
-    duplicate: bool = False
 
 
 @dataclass
@@ -784,34 +704,11 @@ class Instance:
                 counter[post.pillar] = counter.get(post.pillar, 0) + 1
         return counter
 
-    def measurement(self, today: date) -> MeasureView:
-        """Everything `references/measure.md` counts, recomputed here and now.
-
-        Over `state: published` alone, like every count in this system. A
-        draft and a scheduled post are in no list and no total: a file exists
-        as soon as a post is drafted, and counting one would report a channel
-        that has not happened yet.
-
-        `today` is passed in rather than read from the clock. What is due
-        depends on the day, and a screen whose content changes with the wall
-        clock is a screen no test can pin down.
-        """
-        rows = [p for p in self.posts() if p.state == "published"]
-        measured = [p for p in rows if p.measured]
-        due = [p for p in rows
-               if not p.measured and _is_due(p.date, today)]
-        return MeasureView(
-            rows=rows,
-            measured=len(measured),
-            totals=_sums(measured),
-            due=due,
-            by_pillar=_buckets(rows, lambda p: None if p.pillar is None
-                               else str(p.pillar)),
-            by_format=_buckets(rows, lambda p: p.format),
-            by_label=_buckets(rows, lambda p: p.label),
-            single_pillar=_one_of(measured, lambda p: p.pillar),
-            single_format=_one_of(measured, lambda p: p.format),
-        )
+    def measurement(self, today: date):
+        """Everything `references/measure.md` counts, recomputed here and now:
+        `measure.view` over the published posts, with `today` passed in so a
+        test can pin the day."""
+        return _measure_view(self.posts(), today)
 
     def update_post_measurement(self, filename: str, *, measured,
                                 inbound_connections, inbound_dms,
@@ -956,65 +853,6 @@ class Instance:
         return gaps
 
 
-def _is_due(when, today: date) -> bool:
-    """Is this post old enough that its line should already be filled.
-
-    A date this cannot read makes the post not due. Guessing at one would put
-    a post on the list to act on because of a typo, and the conformance report
-    already says which file has an unreadable key.
-    """
-    try:
-        published = date.fromisoformat(str(when))
-    except (TypeError, ValueError):
-        return False
-    return published <= today - timedelta(days=MEASURE_DAYS)
-
-
-def _sums(posts) -> Sums:
-    """The three fields added up, each over the posts that carried it."""
-    def total(name):
-        values = [getattr(p, name) for p in posts
-                  if getattr(p, name) is not None]
-        return sum(values) if values else None
-
-    return Sums(connections=total("inbound_connections"),
-                dms=total("inbound_dms"),
-                meetings=total("meeting_mentions"))
-
-
-def _buckets(rows, key) -> list:
-    """One bucket per value of `key`, ordered by it.
-
-    A row whose key is empty joins no bucket. The front matter of that post
-    is incomplete, which the conformance report says by name; inventing a
-    bucket for it would put a count under a heading nobody wrote.
-    """
-    grouped: dict = {}
-    for post in rows:
-        name = key(post)
-        if name:
-            grouped.setdefault(name, []).append(post)
-    buckets = []
-    for name, posts in grouped.items():
-        measured = [p for p in posts if p.measured]
-        buckets.append(Bucket(key=name, posts=len(posts),
-                              measured=len(measured), sums=_sums(measured),
-                              status=pattern_status(len(measured))))
-    buckets.sort(key=lambda b: b.key)
-    return buckets
-
-
-def _one_of(posts, key) -> bool:
-    """Do all these posts share one value of `key`, with at least two of them.
-
-    One post is not a pattern, so it cannot be a pattern trapped in one
-    pillar either, and saying a guard bites on a single post would read as a
-    finding about a channel that has published once.
-    """
-    values = {key(p) for p in posts if key(p) is not None}
-    return len(posts) >= 2 and len(values) == 1
-
-
 ANGLE_LINE = re.compile(r"^-\s+\[P(\d+)\]\s+(?:`(\w+)`|(\w+))\s+(.*)$")
 
 
@@ -1058,93 +896,6 @@ def _section(text: str, heading: str) -> str | None:
     rest = text[m.end():]
     nxt = re.search(r"^## ", rest, re.MULTILINE)
     return rest[:nxt.start()] if nxt else rest
-
-
-# ------------------------------------------------------------------ sections
-
-#: A section opens on `## `. Deeper headings belong to the section above them,
-#: which is what a person editing one expects to keep.
-HEADING = re.compile(r"^## (.*)$", re.MULTILINE)
-
-#: An HTML comment, taken out before a placeholder is looked for: the template
-#: explains its placeholders in comments, and a comment is instructions to the
-#: person rather than a hole in their profile.
-COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-
-#: What the template writes where somebody's own words go. Angle brackets
-#: around anything but a comment, over several lines if that is how it was
-#: wrapped.
-PLACEHOLDER = re.compile(r"<(?!!--)[^<>]+>", re.DOTALL)
-
-
-def _blank_stripped(raw: str) -> str:
-    lines = raw.split("\n")
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
-    return "\n".join(lines)
-
-
-def _unvalidated(body: str) -> bool:
-    """Whether this section is still the template talking.
-
-    Two ways: nothing in it, or a placeholder nobody replaced. Both are the
-    same fact for a reader, which is that no skill may quote this section.
-    """
-    if not body.strip():
-        return True
-    return PLACEHOLDER.search(COMMENT.sub("", body)) is not None
-
-
-def sections_of(text: str) -> list:
-    """Every `## ` section of a document, in order, with its span.
-
-    The preamble is not one: it is the title and whatever sits under it, and
-    nothing addresses it by a heading.
-    """
-    marks = list(HEADING.finditer(text))
-    seen: dict = {}
-    found = []
-    for index, mark in enumerate(marks):
-        heading = mark.group(1).strip()
-        # The span opens on the newline that ends the heading line, so a
-        # rewrite of it never touches the heading itself.
-        start = mark.end()
-        end = marks[index + 1].start() if index + 1 < len(marks) else len(text)
-        body = _blank_stripped(text[start:end])
-        seen[heading] = seen.get(heading, 0) + 1
-        found.append(Section(heading=heading, body=body, start=start, end=end,
-                             digest=shown(heading, body),
-                             unvalidated=_unvalidated(body)))
-    for section in found:
-        section.duplicate = seen[section.heading] > 1
-    return found
-
-
-def _status_line(text: str, key: str, value: str) -> str:
-    """Rewrite one `- key:` line of the Status block, textually.
-
-    Inside the block's own span, so a line of the same shape further down the
-    file is not the one that moves. A block with no such key and no keys at
-    all is a block to repair: nothing is invented into it here, and the
-    conformance report already says so.
-    """
-    found = [s for s in sections_of(text) if s.heading == "Status"]
-    if not found:
-        return text
-    section = found[0]
-    span = text[section.start:section.end]
-    line = f"- {key}: {value}"
-    pattern = re.compile(rf"^-\s+{key}:.*$", re.MULTILINE)
-    if pattern.search(span):
-        span = pattern.sub(lambda _: line, span, count=1)
-    else:
-        keys = list(re.finditer(r"^-\s+\w+:.*$", span, re.MULTILINE))
-        if not keys:
-            return text
-        span = span[:keys[-1].end()] + "\n" + line + span[keys[-1].end():]
-    return text[:section.start] + span + text[section.end:]
 
 
 # -------------------------------------------------------------------- angles

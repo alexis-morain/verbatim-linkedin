@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app import instance as inst  # noqa: E402
+from verbatim_app import measure, sections  # noqa: E402
 from verbatim_app.instance import (  # noqa: E402
     Instance, InstanceError, atomic_write,
 )
@@ -423,7 +424,7 @@ class TestSections(InstanceCase):
         # that ship real content: the Status keys and the companion table.
         text = (REPO / "references" / "profile.template.md").read_text(
             encoding="utf-8")
-        for section in inst.sections_of(text):
+        for section in sections.sections_of(text):
             if section.heading in ("Status", "Companion files"):
                 continue
             self.assertTrue(section.unvalidated, section.heading)
@@ -434,7 +435,7 @@ class TestSections(InstanceCase):
 
     def test_a_placeholder_inside_a_comment_does_not_count(self):
         text = "## A\n\n<!-- write <your name> here -->\nNadia.\n"
-        self.assertFalse(inst.sections_of(text)[0].unvalidated)
+        self.assertFalse(sections.sections_of(text)[0].unvalidated)
 
     def test_a_repeated_heading_is_marked_on_both(self):
         self.instance.write("voice.md", "# V\n\n## Traits\n\na\n\n## Traits\n\nb\n")
@@ -830,7 +831,7 @@ class TestMeasurement(InstanceCase):
         self.assertEqual((visibility.posts, visibility.measured), (2, 1))
 
     def test_the_four_statuses_are_the_thresholds_of_measure_md(self):
-        self.assertEqual([inst.pattern_status(n) for n in range(0, 9)],
+        self.assertEqual([measure.pattern_status(n) for n in range(0, 9)],
                          ["none", "none", "provisional", "provisional",
                           "emerging", "emerging", "emerging", "confirmed",
                           "confirmed"])

@@ -26,8 +26,8 @@ from . import render as _render
 from ..archive import notes_only, post_only
 from ..instance import (
     LABELS, PILLARS, STATES, InstanceError, SectionChanged, UnreadableError,
-    sections_of,
 )
+from ..sections import sections_of
 
 router = APIRouter()
 
