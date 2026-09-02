@@ -183,8 +183,12 @@ th, td {
 thead th { font-family: var(--mono); font-size: 0.78rem; font-weight: 400; color: var(--muted); }
 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 1.5rem; margin: 0 0 1rem; }
-.facts dt { color: var(--muted); }
-.facts dd { margin: 0; }
+/* Columns by role, not by turn. A term followed by two descriptions, which
+   is what a figure with a hint under it is, would otherwise push the next
+   term into the value column and every row after it one cell to the right:
+   the engine panel did exactly that once its context row grew a hint. */
+.facts dt { color: var(--muted); grid-column: 1; }
+.facts dd { margin: 0; grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
 
 /* ----------------------------------------------------------------- lists */
 

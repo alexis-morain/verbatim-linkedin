@@ -1,7 +1,7 @@
 ---
 name: linkedin-setup
 description: "Onboards a person: builds their editorial profile, their pillars and their idea bank from a short interview, then hands over to the first post. Triggers: set up my LinkedIn profile, define my pillars, I want to start posting. Not for writing a post (use linkedin-post)."
-version: 0.1.1
+version: 0.1.2
 ---
 
 # Setup
@@ -191,6 +191,12 @@ ends on a published post has produced a habit. The difference between those two
 outcomes is the difference between this working and not.
 
 Then set the next session, with a date and an idea attached to it.
+
+And only then, write the `## Status` block at the top of `profile.md` for
+real: `filled: yes`, `source: interview`, `updated` set to today, and the two
+language codes settled in step 0. Five lines, and they are the whole seam
+between the engine and this person. Every consumer reads them before it reads
+anything else, so they are the last thing this skill writes, not the first.
 
 ## Rules
 
