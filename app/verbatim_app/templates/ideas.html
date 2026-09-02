@@ -3,13 +3,16 @@
 {% block content %}
 <h1>{{ t('ideas.title') }}</h1>
 
+{% if problem %}<p class="degraded">{{ t(problem) }}</p>{% endif %}
+{% if saved %}<p class="flash">{{ t('profile.saved') }}</p>{% endif %}
+
 {% if bank and bank.next_session %}
 <h2>{{ t('ideas.next_session') }}</h2>
 <p class="callout">{{ bank.next_session }}</p>
 {% endif %}
 
 {% if sections %}
-  {% for section, angles in sections.items() %}
+  {% for section, angles in sections.items() %}{% set block = loop.index %}
   <h2>{{ section }}</h2>
   <ul class="angles">
     {% for angle in angles %}
@@ -17,12 +20,72 @@
       <span class="badge mono">P{{ angle.pillar }}</span>
       <span class="badge badge-{{ (angle.label or '')|lower }} mono">{{ angle.label }}</span>
       {{ angle.text }}
+      <div class="angle-acts">
+        {# Opens an interview with this line in the box, and writes nothing.
+           An angle leaves the bank when a post is archived, never before. #}
+        <form method="post" action="/interview">
+          <input type="hidden" name="seed" value="{{ angle.text }}">
+          <button type="submit" class="copy-button">{{ t('ideas.write_this') }}</button>
+        </form>
+        <form method="post" action="/ideas/remove">
+          <input type="hidden" name="text" value="{{ angle.text }}">
+          <button type="submit" class="quiet">{{ t('ideas.remove') }}</button>
+        </form>
+      </div>
+      <details class="edit">
+        <summary>{{ t('ideas.edit') }}</summary>
+        <form method="post" action="/ideas/edit">
+          <input type="hidden" name="old" value="{{ angle.text }}">
+          <label for="pillar-{{ block }}-{{ loop.index }}">{{ t('ideas.pillar') }}</label>
+          <select id="pillar-{{ block }}-{{ loop.index }}" name="pillar">
+            {% for pillar in pillars %}
+            <option value="{{ pillar }}"{% if pillar == angle.pillar %} selected{% endif %}>{{ pillar }}</option>
+            {% endfor %}
+          </select>
+          <label for="label-{{ block }}-{{ loop.index }}">{{ t('ideas.label') }}</label>
+          <select id="label-{{ block }}-{{ loop.index }}" name="label">
+            {% for label in labels %}
+            <option value="{{ label }}"{% if label == angle.label %} selected{% endif %}>{{ t('interview.label_' + label|lower) }}</option>
+            {% endfor %}
+          </select>
+          <label for="text-{{ block }}-{{ loop.index }}">{{ t('ideas.text') }}</label>
+          <input type="text" id="text-{{ block }}-{{ loop.index }}" name="text" value="{{ angle.text }}">
+          <button type="submit">{{ t('ideas.edit_do') }}</button>
+        </form>
+      </details>
     </li>
     {% endfor %}
   </ul>
   {% endfor %}
 {% else %}
 <p class="empty">{{ t('ideas.empty') }}</p>
+{% endif %}
+
+{% if bank %}
+<h2>{{ t('ideas.add') }}</h2>
+<form class="angle-add" method="post" action="/ideas/add">
+  <label for="section">{{ t('ideas.section') }}</label>
+  <select id="section" name="section">
+    {% for section in sections %}
+    <option value="{{ section }}">{{ section }}</option>
+    {% endfor %}
+  </select>
+  <label for="pillar">{{ t('ideas.pillar') }}</label>
+  <select id="pillar" name="pillar">
+    {% for pillar in pillars %}
+    <option value="{{ pillar }}">{{ pillar }}</option>
+    {% endfor %}
+  </select>
+  <label for="label">{{ t('ideas.label') }}</label>
+  <select id="label" name="label">
+    {% for label in labels %}
+    <option value="{{ label }}">{{ t('interview.label_' + label|lower) }}</option>
+    {% endfor %}
+  </select>
+  <label for="text">{{ t('ideas.text') }}</label>
+  <input type="text" id="text" name="text">
+  <button type="submit">{{ t('ideas.add_do') }}</button>
+</form>
 {% endif %}
 
 {% if bank and bank.used %}

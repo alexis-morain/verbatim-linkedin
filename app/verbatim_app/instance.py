@@ -17,6 +17,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .shown import shown
+
 try:
     import yaml as _yaml
 except ImportError:  # the fallback below covers the shipped format
@@ -36,6 +38,15 @@ class UnreadableError(InstanceError):
     """
 
 
+class SectionChanged(InstanceError):
+    """The section on disk is not the one the screen showed.
+
+    Its own type because the caller has something to say about it that no
+    other refusal shares: nothing was written, and what is on disk now is
+    what has to be read again before deciding.
+    """
+
+
 class NameTaken(InstanceError):
     """The file is already there and this write would replace it.
 
@@ -51,6 +62,12 @@ class NameTaken(InstanceError):
 # or is somebody's raw corpus, which is never rewritten.
 WRITABLE = ("profile.md", "voice.md", "pillars.md", "ideas.md", "linkedin-page.md")
 COMPANIONS = ("voice.md", "pillars.md", "ideas.md")
+
+#: A language code names a directory under `locales/`, so the Status block
+#: takes what a path segment takes. The same shape `skills.py` checks, written
+#: again rather than imported: this module is standard library only and does
+#: not reach into the bundle loader.
+LANGUAGE = re.compile(r"\A[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?\Z")
 
 # The full front matter key set from references/measure.md. A post file
 # missing one of these gets reported, never silently completed.
@@ -118,6 +135,25 @@ class PostMeta:
         if self.unreadable:
             return ()
         return tuple(k for k in MEASURE_KEYS if k not in self.present_keys)
+
+
+@dataclass
+class Section:
+    """One `## ` section of a document, and the span it occupies.
+
+    The span is what makes an edit local: a screen that saves one section
+    rewrites those characters and leaves every other byte of somebody's file
+    where it was.
+    """
+    heading: str
+    body: str
+    start: int
+    end: int
+    digest: str
+    unvalidated: bool = False
+    #: Another section carries the same heading, so this one cannot be
+    #: addressed by it. Shown rather than guessed between.
+    duplicate: bool = False
 
 
 @dataclass
@@ -364,6 +400,79 @@ class Instance:
             raise InstanceError(f"{name} is not a file this consumer may write")
         atomic_write(self._child(self.root, name), text)
 
+    # -- sections of a document
+
+    def sections(self, name: str) -> list:
+        """The `## ` sections of one contract file, with their spans."""
+        if name not in WRITABLE:
+            raise InstanceError(f"{name} is not a file this consumer may write")
+        return sections_of(self.read(name))
+
+    def replace_section(self, name: str, heading: str, text: str,
+                        shown_digest: str, *, today: str) -> None:
+        """Rewrite one section and leave every other byte where it was.
+
+        `shown_digest` is the section as the screen showed it. The disk can be
+        newer than the screen, one tab or two, and a save that lands on a
+        section somebody never read replaces words they did not mean to
+        replace. A mismatch writes nothing and the screen says what is there
+        now.
+
+        On `profile.md` this also moves the Status line `updated`, because a
+        section of the profile is what that date is about. `filled` and
+        `source` are not touched by anything here: the first is somebody
+        saying the profile is real and the second says which road it came
+        down, and neither is a consequence of editing a paragraph.
+        """
+        if name not in WRITABLE:
+            raise InstanceError(f"{name} is not a file this consumer may write")
+        raw = self.read(name)
+        found = [s for s in sections_of(raw) if s.heading == heading]
+        if not found:
+            raise InstanceError(f"{name} has no section {heading!r}")
+        if len(found) > 1:
+            raise InstanceError(
+                f"{name} carries {heading!r} more than once, so nothing can "
+                "be addressed by it; give the sections different headings")
+        section = found[0]
+        if section.digest != shown_digest:
+            raise SectionChanged(
+                f"the section {heading!r} of {name} changed since it was read")
+        # The blank line after the heading is the file's own convention, and
+        # a save that dropped it would drift every edited section away from
+        # the ones nobody touched.
+        body = text.strip("\n")
+        if not body.strip():
+            block = "\n"
+        elif section.end < len(raw):
+            block = "\n\n" + body + "\n\n"
+        else:
+            block = "\n\n" + body + "\n"
+        new = raw[:section.start] + block + raw[section.end:]
+        if name == "profile.md":
+            new = _status_line(new, "updated", today)
+        self.write(name, new)
+
+    def update_status(self, *, interface_language: str,
+                      output_language_default: str, today: str) -> None:
+        """The two language axes of the Status block, and the date.
+
+        A language code names a directory under `locales/`, so it is checked
+        as the path segment it becomes. Refused before anything is written:
+        half a Status block is worse than none.
+        """
+        for value in (interface_language, output_language_default):
+            if not LANGUAGE.match(value):
+                raise InstanceError(
+                    f"{value!r} is not a language code. It names a directory "
+                    "under locales/, so it is two or three letters, "
+                    "optionally a region.")
+        text = self.read("profile.md")
+        text = _status_line(text, "interface_language", interface_language)
+        text = _status_line(text, "output_language_default",
+                            output_language_default)
+        self.write("profile.md", _status_line(text, "updated", today))
+
     # -- profile
 
     def status(self) -> Status | None:
@@ -521,8 +630,8 @@ class Instance:
             # one would write a line nothing can read back, and mangling
             # somebody's own words to fit the format is worse than saying so.
             raise InstanceError(
-                "this angle carries a '|', which is the separator of the "
-                "used line; edit the angle in ideas.md, then archive again")
+                PIPE_REASON + "; edit the angle in ideas.md, then archive "
+                "again")
         kept = lines[:start] + lines[end:]
         used = f"{date} | P{entry.pillar} | {entry.text} | {file}"
         marker = None
@@ -542,6 +651,68 @@ class Instance:
                 end_of -= 1
             kept.insert(end_of, used)
         self.write("ideas.md", "\n".join(kept).rstrip("\n") + "\n")
+
+    def add_angle(self, section: str, pillar: int, label: str,
+                  text: str) -> None:
+        """One more angle in the bank, at the end of its section.
+
+        A section nobody has yet is created rather than refused: the bank is
+        the one file a session is never allowed to leave poorer, and a heading
+        somebody typed is a heading they meant. It goes above `## Used`, which
+        stays the last thing in the file.
+        """
+        text = _checked_angle(pillar, label, text)
+        section = _checked_section(section)
+        lines = self.read("ideas.md").splitlines()
+        line = _angle_line(pillar, label, text)
+        tail = _section_tail(lines, section)
+        if tail is not None:
+            lines.insert(tail, line)
+        else:
+            block = [f"## {section}", "", line]
+            marker = None
+            for index, existing in enumerate(lines):
+                if existing.strip().lower() == "## used":
+                    marker = index
+            if marker is None:
+                lines = lines + [""] + block
+            else:
+                if marker and lines[marker - 1].strip():
+                    block = [""] + block
+                lines = lines[:marker] + block + [""] + lines[marker:]
+        self._write_ideas(lines)
+
+    def edit_angle(self, old_text: str, *, pillar: int, label: str,
+                   text: str) -> None:
+        """Rewrite one angle in place, addressed by its own text.
+
+        By text and not by position: the screen that offers this was drawn
+        before the click, and an index would move an angle somebody never
+        looked at.
+        """
+        text = _checked_angle(pillar, label, text)
+        lines, _, start, end = self._angle_span(old_text)
+        lines[start:end] = [_angle_line(pillar, label, text)]
+        self._write_ideas(lines)
+
+    def remove_angle(self, text: str) -> None:
+        """Drop one angle. The used side is append only and is not touched."""
+        lines, _, start, end = self._angle_span(text)
+        del lines[start:end]
+        self._write_ideas(lines)
+
+    def _angle_span(self, text: str):
+        lines = self.read("ideas.md").splitlines()
+        found = [(angle, start, end)
+                 for angle, start, end in _scan_angles(lines)
+                 if angle.text == text]
+        if not found:
+            raise InstanceError(f"no such angle in the bank: {text!r}")
+        angle, start, end = found[0]
+        return lines, angle, start, end
+
+    def _write_ideas(self, lines) -> None:
+        self.write("ideas.md", "\n".join(lines).rstrip("\n") + "\n")
 
     def pillar_counter(self) -> dict:
         counter: dict = {}
@@ -736,3 +907,165 @@ def _section(text: str, heading: str) -> str | None:
     rest = text[m.end():]
     nxt = re.search(r"^## ", rest, re.MULTILINE)
     return rest[:nxt.start()] if nxt else rest
+
+
+# ------------------------------------------------------------------ sections
+
+#: A section opens on `## `. Deeper headings belong to the section above them,
+#: which is what a person editing one expects to keep.
+HEADING = re.compile(r"^## (.*)$", re.MULTILINE)
+
+#: An HTML comment, taken out before a placeholder is looked for: the template
+#: explains its placeholders in comments, and a comment is instructions to the
+#: person rather than a hole in their profile.
+COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+
+#: What the template writes where somebody's own words go. Angle brackets
+#: around anything but a comment, over several lines if that is how it was
+#: wrapped.
+PLACEHOLDER = re.compile(r"<(?!!--)[^<>]+>", re.DOTALL)
+
+
+def _blank_stripped(raw: str) -> str:
+    lines = raw.split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)
+
+
+def _unvalidated(body: str) -> bool:
+    """Whether this section is still the template talking.
+
+    Two ways: nothing in it, or a placeholder nobody replaced. Both are the
+    same fact for a reader, which is that no skill may quote this section.
+    """
+    if not body.strip():
+        return True
+    return PLACEHOLDER.search(COMMENT.sub("", body)) is not None
+
+
+def sections_of(text: str) -> list:
+    """Every `## ` section of a document, in order, with its span.
+
+    The preamble is not one: it is the title and whatever sits under it, and
+    nothing addresses it by a heading.
+    """
+    marks = list(HEADING.finditer(text))
+    seen: dict = {}
+    found = []
+    for index, mark in enumerate(marks):
+        heading = mark.group(1).strip()
+        # The span opens on the newline that ends the heading line, so a
+        # rewrite of it never touches the heading itself.
+        start = mark.end()
+        end = marks[index + 1].start() if index + 1 < len(marks) else len(text)
+        body = _blank_stripped(text[start:end])
+        seen[heading] = seen.get(heading, 0) + 1
+        found.append(Section(heading=heading, body=body, start=start, end=end,
+                             digest=shown(heading, body),
+                             unvalidated=_unvalidated(body)))
+    for section in found:
+        section.duplicate = seen[section.heading] > 1
+    return found
+
+
+def _status_line(text: str, key: str, value: str) -> str:
+    """Rewrite one `- key:` line of the Status block, textually.
+
+    Inside the block's own span, so a line of the same shape further down the
+    file is not the one that moves. A block with no such key and no keys at
+    all is a block to repair: nothing is invented into it here, and the
+    conformance report already says so.
+    """
+    found = [s for s in sections_of(text) if s.heading == "Status"]
+    if not found:
+        return text
+    section = found[0]
+    span = text[section.start:section.end]
+    line = f"- {key}: {value}"
+    pattern = re.compile(rf"^-\s+{key}:.*$", re.MULTILINE)
+    if pattern.search(span):
+        span = pattern.sub(lambda _: line, span, count=1)
+    else:
+        keys = list(re.finditer(r"^-\s+\w+:.*$", span, re.MULTILINE))
+        if not keys:
+            return text
+        span = span[:keys[-1].end()] + "\n" + line + span[keys[-1].end():]
+    return text[:section.start] + span + text[section.end:]
+
+
+# -------------------------------------------------------------------- angles
+
+#: The three funnel labels of `references/instance.md`. A fourth one would be
+#: an angle nothing counts.
+LABELS = ("VISIBILITY", "TRUST", "ACTION")
+
+PILLARS = (1, 2, 3)
+
+#: Why a pipe cannot be in an angle. The advice differs between adding one and
+#: archiving one, the reason does not.
+PIPE_REASON = ("this angle carries a '|', which is the separator of the used "
+               "line")
+
+
+def _angle_line(pillar: int, label: str, text: str) -> str:
+    return f"- [P{pillar}] `{label}` {text}"
+
+
+def _checked_angle(pillar: int, label: str, text: str) -> str:
+    """The three things an angle line cannot be written without.
+
+    Whitespace is collapsed rather than refused: the box somebody types in
+    takes a newline, and the bank is one line per angle.
+    """
+    if pillar not in PILLARS:
+        raise InstanceError(f"{pillar!r} is not one of the three pillars")
+    if label not in LABELS:
+        raise InstanceError(f"{label!r} is not one of {', '.join(LABELS)}")
+    text = " ".join(text.split())
+    if not text:
+        raise InstanceError("an angle with no text is not an angle")
+    if "|" in text:
+        raise InstanceError(PIPE_REASON + "; write it without one")
+    return text
+
+
+def _checked_section(heading: str) -> str:
+    """A section name that can only ever become one heading line.
+
+    Found in review: the text of an angle was checked and the section it
+    went into was not, so a name carrying a line break could write a second
+    heading, `## Used` included, and forge an archive row nothing archived.
+    One line, no heading marker of its own, and never the used side, which
+    only archiving writes.
+    """
+    if "\n" in heading or "\r" in heading or "#" in heading:
+        raise InstanceError("a section is one heading line, without its '## '")
+    heading = " ".join(heading.split())
+    if not heading:
+        raise InstanceError("a section needs a name")
+    if heading.lower() == "used":
+        raise InstanceError("the used side is written by archiving alone")
+    return heading
+
+
+def _section_tail(lines, heading: str):
+    """Where a new angle goes in an existing section, or None.
+
+    One past its last line that carries anything, so an added angle lands
+    under the ones already there rather than under the blank line separating
+    two sections.
+    """
+    for index, line in enumerate(lines):
+        if line.startswith("## ") and line[3:].strip() == heading.strip():
+            end = len(lines)
+            for after in range(index + 1, len(lines)):
+                if lines[after].startswith("## "):
+                    end = after
+                    break
+            while end > index + 1 and not lines[end - 1].strip():
+                end -= 1
+            return end
+    return None

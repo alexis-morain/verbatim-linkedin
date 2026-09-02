@@ -1,16 +1,55 @@
 {% extends "base.html" %}
 {% import "_copy.html" as copy %}
+{% import "_sections.html" as blocks %}
 {% block title %}{{ t('profile.title') }} - {{ t('app.title') }}{% endblock %}
 {% block content %}
 <h1>{{ t('profile.title') }}</h1>
-{{ copy.document(text) }}
-
-<h2>{{ t('profile.raw') }}</h2>
 <p class="hint">{{ t('profile.hint') }}</p>
+
+{% if missing %}
+<p class="empty">{{ t('profile.missing') }}</p>
+{% elif unreadable %}
+<div class="gaps">
+  <p>{{ t('profile.unreadable') }}</p>
+  <p class="mono">{{ unreadable }}</p>
+</div>
+{% else %}
+{% if problem %}<p class="degraded">{{ t(problem) }}</p>{% endif %}
 {% if saved %}<p class="flash">{{ t('profile.saved') }}</p>{% endif %}
-<form method="post" action="/profile">
-  <textarea name="content" rows="34" spellcheck="false">{{ text }}</textarea>
-  <button type="submit">{{ t('profile.save') }}</button>
+
+<h2>{{ t('profile.status') }}</h2>
+<p class="hint">{{ t('profile.status_hint') }}</p>
+{% if status %}
+<form class="status" method="post" action="/profile/status">
+  <dl class="facts">
+    <dt>{{ t('overview.filled') }}</dt>
+    <dd class="mono">{% if status.filled %}{{ t('overview.yes') }}{% else %}{{ t('overview.no') }}{% endif %}</dd>
+    <dt>{{ t('overview.source') }}</dt>
+    <dd class="mono">{{ status.source }}</dd>
+    <dt>{{ t('overview.updated') }}</dt>
+    <dd class="mono">{{ status.updated }}</dd>
+  </dl>
+  <label for="interface_language">{{ t('profile.interface_language') }}</label>
+  <input type="text" id="interface_language" name="interface_language"
+         value="{{ status.interface_language }}" spellcheck="false">
+  <label for="output_language_default">{{ t('profile.output_language_default') }}</label>
+  <input type="text" id="output_language_default" name="output_language_default"
+         value="{{ status.output_language_default }}" spellcheck="false">
+  <button type="submit">{{ t('profile.status_save') }}</button>
 </form>
+{% endif %}
+
+{{ blocks.editor(sections, '/profile/section') }}
+
+<h2>{{ t('profile.whole_file') }}</h2>
+<details class="raw">
+  <summary>{{ t('profile.raw') }}</summary>
+  {{ copy.document(text) }}
+  <form method="post" action="/profile">
+    <textarea name="content" rows="34" spellcheck="false">{{ text }}</textarea>
+    <button type="submit">{{ t('profile.save') }}</button>
+  </form>
+</details>
+{% endif %}
 {% endblock %}
 {% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

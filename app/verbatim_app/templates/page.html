@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_copy.html" as copy %}
+{% block title %}{{ t('page.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('page.title') }}</h1>
+<p class="hint">{{ t('page.hint') }}</p>
+{% if missing %}
+<p class="empty">{{ t('page.missing') }}</p>
+{% elif unreadable %}
+<div class="gaps">
+  <p>{{ t('profile.unreadable') }}</p>
+  <p class="mono">{{ unreadable }}</p>
+</div>
+{% else %}
+{{ copy.document(text, disclose=True) }}
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

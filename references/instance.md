@@ -90,6 +90,11 @@ The angle bank. The contract points:
 
 A session never closes leaving the bank poorer than it found it.
 
+A consumer may add, edit and remove angles. **An angle is addressed by its
+text**, never by its position: the screen offering the edit was drawn before
+the click, and a line number would move an angle nobody looked at. The used
+side stays append only, and nothing but archiving writes there.
+
 ## corpus/
 
 The posts the person had published before this engine existed, one file each,

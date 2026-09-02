@@ -35,6 +35,7 @@ import json
 import threading
 from datetime import date as _date
 from dataclasses import dataclass, replace
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -165,7 +166,13 @@ def hub(request: Request):
 
 
 @router.post("/interview")
-def begin(request: Request):
+def begin(request: Request, seed: str = Form("")):
+    """Start one, optionally with a line already in the box.
+
+    `seed` is an angle the person clicked in their own bank. It is carried in
+    the URL and put in the answer box, and nothing writes it: what starts an
+    interview is somebody pressing send, not somebody opening a screen.
+    """
     engine = _engine(request)
     if not engine.ready:
         # This one is a plain form navigation, so an error body would be the
@@ -184,7 +191,10 @@ def begin(request: Request):
         # The directory is refused, so there is nowhere to start one. The hub
         # says why, out of the pack.
         return RedirectResponse("/interview", status_code=303)
-    return RedirectResponse(f"/interview/{conversation.id}", status_code=303)
+    landing = f"/interview/{conversation.id}"
+    if seed.strip():
+        landing += "?seed=" + quote(seed)
+    return RedirectResponse(landing, status_code=303)
 
 
 #: Notices a redirect may carry back to the screen. A whitelist, because the
@@ -298,15 +308,20 @@ def _screen(request: Request, conversation, **extra):
                   lint_failed=False, archive_problem="",
                   formats=archive.FORMATS, labels=archive.LABELS,
                   states=archive.STATES, pillars=archive.PILLARS,
-                  today=_date.today().isoformat(),
+                  today=_date.today().isoformat(), seed="",
                   strings=_frame_strings(request.app.state.t))
     fields.update(extra)
     return _render(request, "interview.html", **fields)
 
 
 @router.get("/interview/{interview_id}")
-def screen(request: Request, interview_id: str):
-    return _screen(request, _conversation(request, interview_id))
+def screen(request: Request, interview_id: str, seed: str = ""):
+    conversation = _conversation(request, interview_id)
+    # Only into an empty conversation. Half way through an interview the box
+    # holds what somebody is typing, and a line dropped into it from a link
+    # would be the engine putting words in their mouth.
+    return _screen(request, conversation,
+                   seed=seed if not conversation.messages else "")
 
 
 @router.post("/interview/{interview_id}/discard")

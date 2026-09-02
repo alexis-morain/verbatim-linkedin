@@ -27,7 +27,6 @@ Standard library only, like the rest of the engine seam.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import shutil
@@ -38,6 +37,7 @@ from pathlib import Path
 from .anchors import Anchor, verify
 from .instance import atomic_write
 from .providers import Usage
+from .shown import shown
 
 #: Bumped when the stored shape changes in a way a reader has to know about.
 VERSION = 1
@@ -152,7 +152,7 @@ class Sheet:
         payload = json.dumps(
             [self.angle, list(self.elements), self.moment, self.conviction,
              list(self.first_lines)], ensure_ascii=False)
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+        return shown(payload)
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,30 @@
+{# One document, section by section.
+
+   The whole file is still saveable, further down, folded. This is the form
+   somebody uses: it carries the digest of the section as it was drawn, and a
+   save that does not match it writes nothing. A heading the file carries
+   twice gets no form at all, because there is nothing to address it by. #}
+
+{% macro editor(sections, action) %}
+{% for section in sections %}
+<section class="section">
+  <h2>{{ section.heading }}{% if section.unvalidated %}
+    <span class="badge badge-unvalidated mono">{{ t('profile.unvalidated') }}</span>{% endif %}</h2>
+  {% if section.unvalidated %}<p class="hint">{{ t('profile.unvalidated_hint') }}</p>{% endif %}
+  <div class="document">{{ markdown(section.body) }}</div>
+  {% if section.duplicate %}
+  <p class="hint">{{ t('profile.duplicate') }}</p>
+  {% else %}
+  <details class="edit">
+    <summary>{{ t('profile.section_edit') }}</summary>
+    <form method="post" action="{{ action }}">
+      <input type="hidden" name="heading" value="{{ section.heading }}">
+      <input type="hidden" name="shown" value="{{ section.digest }}">
+      <textarea name="content" rows="12" spellcheck="false">{{ section.body }}</textarea>
+      <button type="submit">{{ t('profile.section_save') }}</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% endfor %}
+{% endmacro %}

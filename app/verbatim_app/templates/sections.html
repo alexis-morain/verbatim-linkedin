@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_sections.html" as blocks %}
+{% block title %}{{ t(screen + '.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t(screen + '.title') }}</h1>
+{% if screen == 'voice' %}<p class="hint">{{ t('voice.hint') }}</p>{% endif %}
+
+{% if missing %}
+<p class="empty">{{ t(screen + '.missing') }}</p>
+{% elif unreadable %}
+<div class="gaps">
+  <p>{{ t('profile.unreadable') }}</p>
+  <p class="mono">{{ unreadable }}</p>
+</div>
+{% else %}
+{% if problem %}<p class="degraded">{{ t(problem) }}</p>{% endif %}
+{% if saved %}<p class="flash">{{ t('profile.saved') }}</p>{% endif %}
+{{ blocks.editor(sections, '/' + screen + '/section') }}
+
+{# The escape hatch, and the way out of a heading the file carries twice:
+   the duplicate notice points here, so it has to exist on every screen
+   that shows the notice. #}
+<h2>{{ t('profile.whole_file') }}</h2>
+<details class="raw">
+  <summary>{{ name }}</summary>
+  <form method="post" action="/{{ screen }}">
+    <textarea name="content" rows="34" spellcheck="false">{{ text }}</textarea>
+    <button type="submit">{{ t('profile.section_save_whole') }}</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}
