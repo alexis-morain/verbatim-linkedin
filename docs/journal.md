@@ -1,5 +1,97 @@
 # Journal
 
+## 2026-09-02. Session autonome : 7.2, 7.3, les prompts, l'estimation, le découpage
+
+Consigne d'Alexis, en une ligne : « continue le projet verbatim en autonomie,
+améliore tout le système, les prompts, l'architecture, l'UX/UI ». Base
+`f10fa0d`, 835 tests app. Fin de session : **929 tests app, 55 JS**,
+`check.sh` vert, dix commits sur `main`.
+
+### Les trois questions du plan de finition, tranchées
+
+Le plan du 29/08 en laissait trois en suspens. Une session autonome ne peut
+pas les laisser là, donc elles sont décidées et tracées dans
+`plans/2026-09-02-session-autonome.md`, hors dépôt. En bref : `voice.md`
+s'édite par section et le bandeau ne bouge pas, parce qu'il dit combien de
+posts portent le fichier et pas qui a touché la dernière ligne ; l'estimation
+de coût est une fourchette, quatre à six tours, à un ratio annoncé à l'écran ;
+le `Dockerfile` est retiré du plan, un conteneur n'apporte rien à une app qui
+lit un dossier local et une clé dans l'environnement.
+
+### Comment la session a tourné
+
+Deux chantiers en parallèle, chacun dans un worktree git, un builder par
+tranche avec un brief complet, puis une revue à contexte frais par tranche
+avant fusion. Les deux revues ont trouvé du vrai.
+
+**7.2, réfutée puis corrigée.** Le champ `section` du formulaire d'ajout
+d'angle n'était pas vérifié : un nom portant un retour à la ligne écrivait
+`## Used` et une ligne d'archive forgée dessous, et l'angle demandé
+disparaissait pendant que l'écran disait « enregistré ». Le texte de l'angle
+était vérifié, la section non : la garde ajoutée seule, encore. Fermé par
+`_checked_section`, une ligne, sans dièse, jamais « used ». Deux autres
+trous : les éditeurs de `voice.md` et `pillars.md` n'avaient pas la trappe
+fichier entier alors que la phrase sur un titre en double y renvoyait ; et
+le formulaire fichier entier écrasait un `profile.md` illisible depuis un
+onglet périmé, alors que la phrase du pack promettait le contraire. Une seule
+fonction `_save_whole` pour les trois écrans, qui lit avant d'écrire.
+
+**7.3, confirmée avec un chiffre faux.** La fixture du post-mortem disait
+« seize heures » contre ses propres onze plus neuf. Dans le jeu d'exemples
+dont toute la leçon est qu'un chiffre non mesuré ne s'écrit pas, c'était la
+phrase à corriger, et `chars` avec. Trois détails d'écran : une ligne mesurée
+aux trois champs vides rendait trois cellules blanches sous « ce que ce post
+a produit », un pilier absent imprimait `PNone`, et le pack disait « plus de
+sept jours » là où la règle est « sept jours ou plus ».
+
+### Ce qui a été livré
+
+- **Le condensé partagé.** `shown.py`, une fonction, et la fiche de
+  validation, le plan de publication et l'éditeur de section passent par
+  elle. Trois copies de la même phrase, c'était le moment où la quatrième
+  diverge, et le plan le disait.
+- **L'édition par section.** `sections_of` donne les spans, `replace_section`
+  ne réécrit que le span, octet pour octet ailleurs, contre un condensé. Le
+  bloc Status est un formulaire : `updated` bouge à chaque enregistrement du
+  profil, `filled` et `source` jamais. Sections non validées marquées par le
+  chevron du gabarit. Banque d'idées : ajouter, modifier, retirer, et
+  « écrire celui-ci » qui ouvre un entretien avec l'angle dans la boîte et
+  n'écrit rien.
+- **L'écran Mesure.** Cinq fixtures de plus sous Nadia, tous les formats
+  couverts, un post à zéro partout. Le calcul ne moyenne jamais : sommes et
+  comptes, statut par seuil, les deux gardes affichées et non appliquées.
+  Sur un post mesuré, les trois chiffres sont le bloc qu'on voit, le
+  formulaire derrière « corriger ».
+- **Les prompts.** `linkedin-post` 0.2.1 dit ce qui passe par un outil quand
+  un outil est offert : la fiche seule, sans question de plus ; le corps
+  seul, sans les accroches ni le transcript. Adossé à la mesure de
+  `docs/smoke.md` où `qwen2.5:14b` continuait d'interviewer. `linkedin-setup`
+  0.1.2 écrit le bloc Status en dernier, cinq lignes nommées.
+- **L'estimation avant l'entretien.** Fourchette quatre à six tours, ratio de
+  quatre signes par jeton mesuré une fois sur Ollama, tarif d'entrée, seulement
+  pour un modèle tarifé. Et un bug d'écran trouvé en la posant : le panneau
+  moteur était décalé d'une cellule depuis le 29/08, un terme suivi de deux
+  descriptions cassait l'alternance de la grille.
+- **La vue d'ensemble en deux colonnes**, ce qu'il y a à faire à gauche, ce
+  que l'instance dit d'elle à droite. Les fichiers statiques portent la
+  version dans leur URL : une mise à jour ne sert plus la feuille de style de
+  la veille. Les tableaux de mesure sortent de la mesure de paragraphe.
+- **`instance.py` découpé** : `measure.py` et `sections.py`, 973 lignes
+  restantes. Raté une première fois : la fusion a emporté les deux modules
+  neufs et pas l'édition qui les faisait utiliser, parce que l'agent n'avait
+  indexé que les fichiers nouveaux et que le worktree a été supprimé de
+  force avant de le voir. Refait à la main. Leçon : `git add -A` avant de
+  committer le travail d'un agent, et `git diff --stat` avant de supprimer un
+  worktree.
+
+### Ce qui reste
+
+PyPI et la page de release, jeton d'Alexis. Le fil `anthropic`, toujours non
+testé. `linkedin-measure`, gaté sur des relevés réels. Les tests d'écran de
+Mesure lisent l'horloge pour la liste « à remplir », ce qui passe et passera,
+mais la couture `today` s'arrête à la route. Le faux positif « non validée »
+sur un chevron dans un `code` reste, il ne coûte qu'un badge.
+
 ## 2026-08-29 (soir). Tranche 7.1 : le rendu et la copie
 
 Commit `831ade9`, poussé sur `main`. 22 fichiers, 2000 lignes ajoutées. Sept

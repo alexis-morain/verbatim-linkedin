@@ -51,8 +51,12 @@ it needs no Python at all.
 **As a local web app**, `verbatim`, which drives the same skills against the
 same directory and gives you screens for the parts that are decisions rather
 than conversation: the validation sheet you approve, the traceability panel
-above, the archive form, the publish plan. It binds to 127.0.0.1 and nothing
-about it is hosted.
+above, the archive form, the publish plan. It also edits the files one
+section at a time, keeps the idea bank, and reads the measurement store
+across posts: what is due at J+7, sums per pillar, format and objective,
+and the status of every pattern at the thresholds of
+[`references/measure.md`](references/measure.md), with nothing averaged. It
+binds to 127.0.0.1 and nothing about it is hosted.
 
 ```bash
 uvx verbatim-linkedin ~/my-profile     # or: pipx install verbatim-linkedin
@@ -121,7 +125,9 @@ uv run --project app verbatim ~/my-profile
 ```
 
 It needs a model to run an interview, and it is told which one by three
-environment variables rather than by an account. `.env.example` documents them.
+environment variables rather than by an account. Before the first turn it
+shows an order of magnitude for four to six turns at the model's input rate,
+and says on the same line what that figure rests on. `.env.example` documents them.
 Local and hosted are the same code path and neither is the recommended one:
 what decides is whether the model can hold a 6400 token system block, answer a
 forced tool call, and produce a five field validation sheet when asked.
@@ -141,9 +147,11 @@ deliberately not in the maintainer's field.
 | [`linkedin-profile`](skills/linkedin-profile/) | Audits and rewrites the nine sections of your public LinkedIn page, headline and About first, from material you can prove. |
 | [`verbatim`](app/) | The local app: the same skills, driven from screens, over the same directory. |
 
-One more is deliberately held back: a measurement skill that reads the store
-across posts. It waits for real measured posts to be built against, because a
-measurement skill written from imagined data measures the imagination.
+One more is deliberately held back: a measurement skill that advises on the
+store across posts. The app's Measure screen computes what the files say; the
+skill would say what it means, and it waits for real measured posts to be
+built against, because advice written from imagined data measures the
+imagination.
 
 ## Languages
 
