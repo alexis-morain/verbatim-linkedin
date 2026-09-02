@@ -13,6 +13,9 @@ app:
 nav:
   overview: "Overview"
   profile: "Profile"
+  voice: "Voice"
+  pillars: "Pillars"
+  page: "LinkedIn page"
   ideas: "Ideas"
   interview: "Interview"
   posts: "Posts"
@@ -60,9 +63,39 @@ document:
 profile:
   title: "Profile"
   raw: "profile.md itself"
-  hint: "This is profile.md, verbatim. The file is the database; what you save here is what every skill reads."
+  hint: "One section at a time. The file is the database, and what you save here is what every skill reads."
   save: "Save profile.md"
   saved: "Saved."
+  missing: "profile.md is not in this instance. Run linkedin-setup; nothing here invents one."
+  unreadable: "This file is there and its bytes will not come back as text. It was saved in another encoding, or its permissions changed. Nothing is guessed and nothing is written over it."
+  status: "Status"
+  status_hint: "updated moves on its own whenever a section of this file is saved. filled and source are not edited here: the first is you saying the profile is real, the second says which road it came down, and neither follows from rewriting a paragraph."
+  interface_language: "Language you are interviewed in"
+  output_language_default: "Language posts are written in by default"
+  status_save: "Save the Status block"
+  bad_language: "That is not a language code, and nothing was written. It names a directory under locales/, so it is two or three letters, optionally a region: en, fr, pt-BR."
+  section_edit: "Edit this section"
+  section_save: "Save this section"
+  section_changed: "This section changed between the moment this screen was drawn and your save, so nothing was written. What is above is the section as it stands now: read it again before saving over it."
+  unvalidated: "unvalidated"
+  unvalidated_hint: "Empty, or still carrying the template's angle brackets. No skill quotes a section in this state."
+  duplicate: "Two sections carry this heading, so nothing can address one of them rather than the other. Rename one in the whole file below, then edit them here."
+  whole_file: "The whole file"
+  section_save_whole: "Save the whole file"
+
+voice:
+  title: "Voice"
+  hint: "Style traits, each one followed by the quote it was read from. A trait without a quote is a guess and does not belong in the file. Editing here does not touch the provisional banner: that comes off after a rewrite on five to ten published posts, not before."
+  missing: "voice.md is not in this instance. That is a migration gap to repair, not a file to do without."
+
+pillars:
+  title: "Pillars"
+  missing: "pillars.md is not in this instance. That is a migration gap to repair, not a file to do without."
+
+page:
+  title: "LinkedIn page"
+  hint: "Your public page as it was actually applied, written by linkedin-profile and read here. Nothing on this screen changes it."
+  missing: "No linkedin-page.md yet. It appears the first time linkedin-profile applies something, so the next run can diff against the page instead of asking you to paste it again."
 
 ideas:
   title: "Idea bank"
@@ -73,6 +106,18 @@ ideas:
   used_angle: "Angle"
   used_file: "File"
   empty: "The bank is empty. A session never closes leaving it poorer than it found it."
+  add: "Add an angle"
+  section: "Pillar section"
+  pillar: "Pillar"
+  label: "Funnel label"
+  text: "The angle as a position, and the material that already exists for it"
+  add_do: "Add to the bank"
+  edit: "Edit this angle"
+  edit_do: "Save this angle"
+  remove: "Remove"
+  write_this: "Write this one"
+  bad_angle: "Nothing was written. An angle is one line: a pillar from 1 to 3, one of the three labels, and text carrying no pipe, which is the separator of the used line."
+  angle_gone: "That angle is not in the bank any more. Reload this screen and pick again."
 
 posts:
   title: "Posts"

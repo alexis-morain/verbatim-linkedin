@@ -51,7 +51,6 @@ open.
 
 from __future__ import annotations
 
-import hashlib
 import secrets
 import threading
 from datetime import datetime
@@ -63,6 +62,7 @@ from .pages import post_screen
 from ..agent import ToolRefused
 from ..archive import post_only
 from ..instance import STATES, InstanceError, UnreadableError
+from ..shown import shown as shown_digest
 from ..tools import ToolUnfinished, publish_plan_text, publish_send
 
 router = APIRouter()
@@ -136,8 +136,7 @@ def _shown(plan: str, post: str) -> str:
     the post the plan is about. Both, because the plan quotes the first line
     and the length rather than the whole post, and the whole post is what
     would be sent."""
-    payload = plan + "\0" + post
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return shown_digest(plan, post)
 
 
 def _publishable(request: Request, name: str) -> str:

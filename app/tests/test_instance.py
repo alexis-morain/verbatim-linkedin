@@ -22,6 +22,7 @@ from verbatim_app import instance as inst  # noqa: E402
 from verbatim_app.instance import (  # noqa: E402
     Instance, InstanceError, atomic_write,
 )
+from verbatim_app.shown import shown  # noqa: E402
 
 
 class InstanceCase(unittest.TestCase):
@@ -395,6 +396,262 @@ class TestFrontMatterFallback(InstanceCase):
             self.assertEqual(inst.parse_front_matter_fallback(block),
                              inst.parse_front_matter(block))
 
+
+
+class TestSections(InstanceCase):
+    """A document edited section by section, the whole file never rewritten."""
+
+    def headings(self, name):
+        return [s.heading for s in self.instance.sections(name)]
+
+    def test_the_preamble_is_not_a_section(self):
+        self.assertEqual(self.headings("profile.md")[0], "Status")
+
+    def test_a_section_body_stops_at_the_next_heading(self):
+        section = [s for s in self.instance.sections("profile.md")
+                   if s.heading == "Core conviction"][0]
+        self.assertTrue(section.body.startswith("A startup's financial model"))
+        self.assertNotIn("## What I fight", section.body)
+        self.assertEqual(section.digest,
+                         shown(section.heading, section.body))
+
+    def test_the_template_has_nothing_filled_in(self):
+        # The gabarit is placeholders from end to end, minus the two sections
+        # that ship real content: the Status keys and the companion table.
+        text = (REPO / "references" / "profile.template.md").read_text(
+            encoding="utf-8")
+        for section in inst.sections_of(text):
+            if section.heading in ("Status", "Companion files"):
+                continue
+            self.assertTrue(section.unvalidated, section.heading)
+
+    def test_a_written_profile_has_nothing_unvalidated(self):
+        for section in self.instance.sections("profile.md"):
+            self.assertFalse(section.unvalidated, section.heading)
+
+    def test_a_placeholder_inside_a_comment_does_not_count(self):
+        text = "## A\n\n<!-- write <your name> here -->\nNadia.\n"
+        self.assertFalse(inst.sections_of(text)[0].unvalidated)
+
+    def test_a_repeated_heading_is_marked_on_both(self):
+        self.instance.write("voice.md", "# V\n\n## Traits\n\na\n\n## Traits\n\nb\n")
+        self.assertTrue(all(s.duplicate for s in self.instance.sections("voice.md")))
+
+    def test_a_middle_section_leaves_every_other_byte_alone(self):
+        raw = self.instance.read("pillars.md")
+        section = [s for s in self.instance.sections("pillars.md")
+                   if s.heading.startswith("Pillar 2")][0]
+        self.instance.replace_section("pillars.md", section.heading,
+                                      "Rewritten.", section.digest,
+                                      today="2026-09-02")
+        after = self.instance.read("pillars.md")
+        moved = [s for s in self.instance.sections("pillars.md")
+                 if s.heading.startswith("Pillar 2")][0]
+        self.assertEqual(raw[:section.start], after[:section.start])
+        self.assertEqual(raw[section.end:], after[moved.end:])
+        self.assertEqual(moved.body, "Rewritten.")
+        # The file's own shape: a blank line after the heading, one before
+        # the next.
+        self.assertIn("## " + section.heading + "\n\nRewritten.\n\n## ", after)
+
+    def test_the_last_section_leaves_every_byte_before_it_alone(self):
+        raw = self.instance.read("pillars.md")
+        section = self.instance.sections("pillars.md")[-1]
+        self.instance.replace_section("pillars.md", section.heading,
+                                      "The last word.", section.digest,
+                                      today="2026-09-02")
+        after = self.instance.read("pillars.md")
+        self.assertEqual(raw[:section.start], after[:section.start])
+        self.assertTrue(after.endswith("The last word.\n"))
+
+    def test_a_digest_from_a_stale_screen_writes_nothing(self):
+        raw = self.instance.read("profile.md")
+        with self.assertRaises(inst.SectionChanged):
+            self.instance.replace_section("profile.md", "Core conviction",
+                                          "Something else.", "0" * 16,
+                                          today="2026-09-02")
+        self.assertEqual(self.instance.read("profile.md"), raw)
+
+    def test_an_unknown_or_repeated_heading_is_refused(self):
+        with self.assertRaises(InstanceError):
+            self.instance.replace_section("profile.md", "Nowhere", "x", "0" * 16,
+                                          today="2026-09-02")
+        self.instance.write("voice.md", "# V\n\n## Traits\n\na\n\n## Traits\n\nb\n")
+        digest = self.instance.sections("voice.md")[0].digest
+        with self.assertRaises(InstanceError):
+            self.instance.replace_section("voice.md", "Traits", "x", digest,
+                                          today="2026-09-02")
+
+    def test_saving_a_profile_section_moves_updated_and_nothing_else(self):
+        before = self.instance.status()
+        section = [s for s in self.instance.sections("profile.md")
+                   if s.heading == "What I fight"][0]
+        self.instance.replace_section("profile.md", section.heading,
+                                      "The deck that forecasts nothing.",
+                                      section.digest, today="2026-09-02")
+        after = self.instance.status()
+        self.assertEqual(after.updated, "2026-09-02")
+        self.assertNotEqual(before.updated, after.updated)
+        self.assertEqual(after.source, before.source)
+        self.assertEqual(after.filled, before.filled)
+        self.assertEqual(after.interface_language, before.interface_language)
+
+    def test_saving_another_file_moves_nothing_in_the_profile(self):
+        before = self.instance.read("profile.md")
+        section = self.instance.sections("pillars.md")[0]
+        self.instance.replace_section("pillars.md", section.heading, "Two.",
+                                      section.digest, today="2026-09-02")
+        self.assertEqual(self.instance.read("profile.md"), before)
+
+    def test_an_emptied_section_keeps_its_heading(self):
+        section = [s for s in self.instance.sections("profile.md")
+                   if s.heading == "What I fight"][0]
+        self.instance.replace_section("profile.md", section.heading, "",
+                                      section.digest, today="2026-09-02")
+        again = [s for s in self.instance.sections("profile.md")
+                 if s.heading == "What I fight"][0]
+        self.assertEqual(again.body, "")
+        self.assertTrue(again.unvalidated)
+
+    def test_only_a_contract_file_has_sections(self):
+        with self.assertRaises(InstanceError):
+            self.instance.sections("evil.txt")
+
+
+class TestStatusForm(InstanceCase):
+    def test_the_two_language_lines_are_rewritten(self):
+        self.instance.update_status(interface_language="fr",
+                                    output_language_default="en",
+                                    today="2026-09-02")
+        status = self.instance.status()
+        self.assertEqual(status.interface_language, "fr")
+        self.assertEqual(status.output_language_default, "en")
+        self.assertEqual(status.updated, "2026-09-02")
+        self.assertEqual(status.source, "interview")
+        self.assertTrue(status.filled)
+
+    def test_a_region_is_a_language_code_and_a_sentence_is_not(self):
+        self.instance.update_status(interface_language="pt-BR",
+                                    output_language_default="en",
+                                    today="2026-09-02")
+        self.assertEqual(self.instance.status().interface_language, "pt-BR")
+        raw = self.instance.read("profile.md")
+        with self.assertRaises(InstanceError):
+            self.instance.update_status(interface_language="French please",
+                                        output_language_default="en",
+                                        today="2026-09-03")
+        self.assertEqual(self.instance.read("profile.md"), raw)
+
+    def test_nothing_here_writes_filled_or_source(self):
+        raw = self.instance.read("profile.md")
+        self.instance.update_status(interface_language="en",
+                                    output_language_default="en",
+                                    today="2026-09-02")
+        after = self.instance.read("profile.md")
+        self.assertIn("- filled: yes", after)
+        self.assertIn("- source: interview", after)
+        self.assertEqual(raw.replace("- updated: 2026-08-20",
+                                     "- updated: 2026-09-02"), after)
+
+
+class TestAngleEditing(InstanceCase):
+    def texts(self):
+        return [angle.text for angle in self.instance.ideas().angles]
+
+    def test_an_added_angle_comes_back_out_of_the_bank(self):
+        self.instance.add_angle("Pillar 2. What I actually do in the room",
+                                2, "ACTION", "The call I refuse to take.")
+        angles = self.instance.ideas().angles
+        added = [a for a in angles if a.text == "The call I refuse to take."]
+        self.assertEqual(len(added), 1)
+        self.assertEqual(added[0].pillar, 2)
+        self.assertEqual(added[0].label, "ACTION")
+        self.assertEqual(added[0].section,
+                         "Pillar 2. What I actually do in the room")
+
+    def test_an_added_angle_is_the_last_line_of_its_section(self):
+        section = "Pillar 1. The argument, not the arithmetic"
+        self.instance.add_angle(section, 1, "TRUST", "Last in.")
+        in_section = [a.text for a in self.instance.ideas().angles
+                      if a.section == section]
+        self.assertEqual(in_section[-1], "Last in.")
+
+    def test_a_section_name_cannot_carry_a_second_heading(self):
+        # Found in review: a name with a line break wrote `## Used` and a
+        # forged archive row under it, and the angle itself vanished.
+        before = self.instance.read("ideas.md")
+        for name in ("Evil\n\n## Used\n\n2020-01-01 | P9 | forged | posts/z.md",
+                     "## Pillar 4", "Used", "used", "", "   "):
+            with self.assertRaises(InstanceError, msg=repr(name)):
+                self.instance.add_angle(name, 1, "TRUST", "x")
+        self.assertEqual(self.instance.read("ideas.md"), before)
+
+    def test_a_section_that_does_not_exist_is_created_before_used(self):
+        self.instance.add_angle("Pillar 4. Off the map", 3, "TRUST", "New one.")
+        text = self.instance.read("ideas.md")
+        self.assertLess(text.index("## Pillar 4. Off the map"),
+                        text.index("## Used"))
+        self.assertIn("New one.", self.texts())
+
+    def test_an_edited_angle_keeps_its_place_and_its_section(self):
+        old = [a for a in self.instance.ideas().angles if a.pillar == 2][0]
+        self.instance.edit_angle(old.text, pillar=3, label="ACTION",
+                                 text="Rewritten angle.")
+        angles = self.instance.ideas().angles
+        self.assertNotIn(old.text, [a.text for a in angles])
+        found = [a for a in angles if a.text == "Rewritten angle."][0]
+        self.assertEqual(found.pillar, 3)
+        self.assertEqual(found.label, "ACTION")
+        self.assertEqual(found.section, old.section)
+
+    def test_a_removed_angle_is_gone_and_the_others_are_not(self):
+        before = self.texts()
+        self.instance.remove_angle(before[0])
+        self.assertEqual(self.texts(), before[1:])
+
+    def test_a_wrapped_angle_goes_whole(self):
+        # The bank wraps its lines, and half an angle left behind is the
+        # failure `_scan_angles` exists against.
+        wrapped = [a for a in self.instance.ideas().angles
+                   if "Material: the eleven slides" in a.text][0]
+        self.instance.remove_angle(wrapped.text)
+        self.assertNotIn("the eleven slides",
+                         self.instance.read("ideas.md").split("## Used")[0])
+
+    def test_an_angle_nobody_has_is_refused(self):
+        for call in (lambda: self.instance.remove_angle("not in the bank"),
+                     lambda: self.instance.edit_angle("not in the bank",
+                                                      pillar=1, label="TRUST",
+                                                      text="x")):
+            with self.assertRaises(InstanceError):
+                call()
+
+    def test_a_pillar_or_a_label_the_contract_does_not_have_is_refused(self):
+        raw = self.instance.read("ideas.md")
+        for pillar, label in ((4, "TRUST"), (1, "AUTHORITY"), (0, "TRUST")):
+            with self.assertRaises(InstanceError):
+                self.instance.add_angle("Pillar 3. Decisions in public",
+                                        pillar, label, "x")
+        self.assertEqual(self.instance.read("ideas.md"), raw)
+
+    def test_a_pipe_is_refused_the_way_archiving_refuses_it(self):
+        with self.assertRaises(InstanceError):
+            self.instance.add_angle("Pillar 3. Decisions in public", 3, "TRUST",
+                                    "before | after")
+        with self.assertRaises(InstanceError):
+            self.instance.add_angle("Pillar 3. Decisions in public", 3, "TRUST",
+                                    "   ")
+
+    def test_archiving_still_moves_an_angle_added_here(self):
+        self.instance.add_angle("Pillar 3. Decisions in public", 3, "TRUST",
+                                "The mandate I priced wrong twice.")
+        self.instance.use_idea("The mandate I priced wrong twice.",
+                               date="2026-09-02", file="posts/2026-09-02-x.md")
+        bank = self.instance.ideas()
+        self.assertNotIn("The mandate I priced wrong twice.",
+                         [a.text for a in bank.angles])
+        self.assertEqual(bank.used[-1].angle,
+                         "The mandate I priced wrong twice.")
 
 
 class TestAtomicWrite(unittest.TestCase):

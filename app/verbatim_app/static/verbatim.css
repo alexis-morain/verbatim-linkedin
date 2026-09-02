@@ -595,3 +595,52 @@ select:focus-visible, textarea:focus-visible, input:focus-visible {
 @media (max-width: 980px) {
   .draft-columns { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
 }
+
+/* --------------------------------------------------------- editing a file */
+/* One section of somebody's own document, with the form that saves it. The
+   heading takes the heavy top rule .callout carries, which is the one
+   signature device here: it says where a section starts without a box around
+   it and without a second colour. */
+
+.section { margin: 2.5rem 0 0; max-width: 68ch; }
+.section > h2 {
+  border-top: 3px solid var(--ink);
+  padding-top: 0.6rem;
+  margin: 0 0 0.75rem;
+}
+.section > .hint { margin: -0.5rem 0 0.75rem; }
+.section .document { margin-bottom: 0.75rem; }
+
+/* Not a state and not chrome: the file says the template is still talking
+   here, and no skill will quote it. The alarm is the accurate colour. */
+.badge-unvalidated {
+  border-color: var(--alarm);
+  color: var(--alarm);
+  margin-left: 0.4rem;
+  vertical-align: 0.15em;
+}
+
+/* Folded like details.raw, and for the same reason: the editor is not what
+   somebody came to read. */
+details.edit { margin: 0 0 1rem; }
+details.edit > summary {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+details.edit > summary:hover { color: var(--accent); }
+details.edit form { margin-top: 0.75rem; }
+
+/* The Status block: read only facts, then the two lines that are editable. */
+form.status { display: grid; gap: 0.3rem; max-width: 34rem; }
+form.status .facts { margin-bottom: 0.75rem; }
+form.status label { color: var(--muted); margin-top: 0.8rem; }
+form.status button { justify-self: start; }
+
+.angle-acts { display: flex; gap: 0.5rem; margin: 0.4rem 0 0; }
+.angle-acts form { margin: 0; }
+
+.angle-add { display: grid; gap: 0.3rem; max-width: 40rem; }
+.angle-add label { color: var(--muted); margin-top: 0.8rem; }
+.angle-add button { justify-self: start; }

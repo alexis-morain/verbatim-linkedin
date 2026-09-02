@@ -14,6 +14,9 @@
       <nav>
         <a href="/"{% if request.url.path == '/' %} aria-current="page"{% endif %}>{{ t('nav.overview') }}</a>
         <a href="/profile"{% if request.url.path == '/profile' %} aria-current="page"{% endif %}>{{ t('nav.profile') }}</a>
+        <a href="/voice"{% if request.url.path == '/voice' %} aria-current="page"{% endif %}>{{ t('nav.voice') }}</a>
+        <a href="/pillars"{% if request.url.path == '/pillars' %} aria-current="page"{% endif %}>{{ t('nav.pillars') }}</a>
+        <a href="/page"{% if request.url.path == '/page' %} aria-current="page"{% endif %}>{{ t('nav.page') }}</a>
         <a href="/ideas"{% if request.url.path == '/ideas' %} aria-current="page"{% endif %}>{{ t('nav.ideas') }}</a>
         <a href="/interview"{% if request.url.path.startswith('/interview') %} aria-current="page"{% endif %}>{{ t('nav.interview') }}</a>
         <a href="/posts"{% if request.url.path.startswith('/posts') %} aria-current="page"{% endif %}>{{ t('nav.posts') }}</a>

@@ -13,6 +13,9 @@ app:
 nav:
   overview: "Vue d'ensemble"
   profile: "Profil"
+  voice: "Voix"
+  pillars: "Piliers"
+  page: "Page LinkedIn"
   ideas: "Idées"
   interview: "Entretien"
   posts: "Posts"
@@ -60,9 +63,39 @@ document:
 profile:
   title: "Profil"
   raw: "profile.md lui-même"
-  hint: "Ceci est profile.md, verbatim. Le fichier est la base : ce que vous enregistrez ici est ce que chaque skill lit."
+  hint: "Une section à la fois. Le fichier est la base : ce que vous enregistrez ici est ce que chaque skill lit."
   save: "Enregistrer profile.md"
   saved: "Enregistré."
+  missing: "profile.md n'est pas dans cette instance. Lancez linkedin-setup ; rien ici n'en invente un."
+  unreadable: "Ce fichier est là et ses octets ne reviennent pas en texte. Il a été enregistré dans un autre encodage, ou ses permissions ont changé. Rien n'est deviné et rien n'est écrit par-dessus."
+  status: "Status"
+  status_hint: "updated bouge tout seul dès qu'une section de ce fichier est enregistrée. filled et source ne s'éditent pas ici : le premier, c'est vous qui dites que le profil est réel, le second dit par quelle route il est arrivé, et réécrire un paragraphe n'entraîne ni l'un ni l'autre."
+  interface_language: "Langue dans laquelle vous êtes interviewé"
+  output_language_default: "Langue dans laquelle les posts sont écrits par défaut"
+  status_save: "Enregistrer le bloc Status"
+  bad_language: "Ce n'est pas un code de langue, et rien n'a été écrit. Il nomme un dossier sous locales/ : deux ou trois lettres, éventuellement une région, comme en, fr, pt-BR."
+  section_edit: "Modifier cette section"
+  section_save: "Enregistrer cette section"
+  section_changed: "Cette section a changé entre le moment où cet écran a été tiré et votre enregistrement, donc rien n'a été écrit. Ce qui est au-dessus est la section telle qu'elle est maintenant : relisez-la avant d'écrire par-dessus."
+  unvalidated: "non validée"
+  unvalidated_hint: "Vide, ou portant encore les chevrons du gabarit. Aucun skill ne cite une section dans cet état."
+  duplicate: "Deux sections portent ce titre, donc rien ne peut désigner l'une plutôt que l'autre. Renommez-en une dans le fichier entier ci-dessous, puis modifiez-les ici."
+  whole_file: "Le fichier entier"
+  section_save_whole: "Enregistrer le fichier entier"
+
+voice:
+  title: "Voix"
+  hint: "Des traits de style, chacun suivi de la phrase d'où il a été lu. Un trait sans citation est une supposition et n'a rien à faire dans le fichier. Modifier ici ne touche pas le bandeau provisoire : il tombe après une réécriture sur cinq à dix posts publiés, pas avant."
+  missing: "voice.md n'est pas dans cette instance. C'est un trou de migration à réparer, pas un fichier dont on se passe."
+
+pillars:
+  title: "Piliers"
+  missing: "pillars.md n'est pas dans cette instance. C'est un trou de migration à réparer, pas un fichier dont on se passe."
+
+page:
+  title: "Page LinkedIn"
+  hint: "Votre page publique telle qu'elle a été appliquée, écrite par linkedin-profile et lue ici. Rien sur cet écran ne la change."
+  missing: "Pas encore de linkedin-page.md. Il apparaît la première fois que linkedin-profile applique quelque chose, pour que la fois suivante compare à la page au lieu de vous demander de tout recoller."
 
 ideas:
   title: "Banque d'idées"
@@ -73,6 +106,18 @@ ideas:
   used_angle: "Angle"
   used_file: "Fichier"
   empty: "La banque est vide. Une session ne se ferme jamais en la laissant plus pauvre."
+  add: "Ajouter un angle"
+  section: "Section de pilier"
+  pillar: "Pilier"
+  label: "Étiquette de tunnel"
+  text: "L'angle posé comme une position, et la matière qui existe déjà pour lui"
+  add_do: "Ajouter à la banque"
+  edit: "Modifier cet angle"
+  edit_do: "Enregistrer cet angle"
+  remove: "Retirer"
+  write_this: "Écrire celui-là"
+  bad_angle: "Rien n'a été écrit. Un angle tient sur une ligne : un pilier de 1 à 3, une des trois étiquettes, et un texte sans barre verticale, qui est le séparateur de la ligne des angles utilisés."
+  angle_gone: "Cet angle n'est plus dans la banque. Rechargez cet écran et choisissez à nouveau."
 
 posts:
   title: "Posts"
