@@ -121,6 +121,22 @@ class TestTheHub(WebCase):
     def test_an_interview_can_be_started(self):
         self.assertIn('action="/interview"', self.client.get("/interview").text)
 
+    def test_the_hub_gives_an_order_of_magnitude_before_the_first_turn(self):
+        # Four to six turns of the block alone, at the input rate, counted at
+        # the one ratio the engine states on the same screen. Low and high,
+        # two decimals, and the sentence that says it is not a quote.
+        page = self.client.get("/interview").text
+        self.assertIn("roughly", page)
+        found = re.search(r"roughly ([0-9]+\.[0-9]{2}) to ([0-9]+\.[0-9]{2}) USD",
+                          page)
+        self.assertIsNotNone(found, page)
+        low, high = float(found.group(1)), float(found.group(2))
+        self.assertLess(low, high)
+        # Six turns over four, give or take the rounding of two figures that
+        # are both under a dollar on this block.
+        self.assertAlmostEqual(high, low * 1.5, delta=0.02)
+        self.assertIn("4 characters per token", page)
+
 
 class TestAnUnpricedModel(WebCase):
     environ = {"VERBATIM_PROVIDER": "openai", "VERBATIM_MODEL": "qwen2.5:14b",
@@ -131,6 +147,9 @@ class TestAnUnpricedModel(WebCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("qwen2.5:14b", page.text)
         self.assertIn("no price", page.text.lower())
+        # And no estimate either: a range over a rate nobody has is the
+        # invented figure, twice.
+        self.assertNotIn("roughly", page.text)
 
     def test_a_local_endpoint_needs_no_key(self):
         # is_loopback, so key-missing is not a problem here and the screen

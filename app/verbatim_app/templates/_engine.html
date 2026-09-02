@@ -25,6 +25,14 @@
        guardrails. Measured on Ollama, docs/smoke.md. #}
     <dd class="hint">{{ t('interview.context_truncation') }}</dd>
     {% endif %}
+    {% if engine.estimate %}
+    {# A range, two decimals, and the sentence that says where it comes from.
+       Shown only with a rate and a block: the hub sizes the block, the
+       interview screen does not, and neither shows a figure it cannot back. #}
+    <dt>{{ t('interview.estimate') }}</dt>
+    <dd class="mono">{{ t('interview.estimate_value', low='%.2f'|format(engine.estimate[0]), high='%.2f'|format(engine.estimate[1])) }}</dd>
+    <dd class="hint">{{ t('interview.estimate_hint', ratio=engine.ratio) }}</dd>
+    {% endif %}
   </dl>
   {% if engine.block_error %}
   {# A skill citing a file that is not in the tree. `check.sh` fails on it, so

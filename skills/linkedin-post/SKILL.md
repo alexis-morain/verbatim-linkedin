@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.2.0
+version: 0.2.1
 ---
 
 # Write a post
@@ -72,6 +72,14 @@ experience before it reaches a draft.
 Produce the sheet, then ask whether to go with it. Do not draft until there is
 an answer.
 
+**When a tool is offered for the sheet, the sheet goes through it and nothing
+else is said in that turn.** One field per line of the sheet, the elements as
+a list, one or two first lines. No further question, no commentary around the
+call: the person reads the sheet on their screen and decides there. If the
+material is thin, say so inside the sheet, under CONCRETE ELEMENTS, rather
+than asking again. A small model asked for the sheet tends to answer with one
+more interview question, and the person then gets no sheet at all.
+
 ```
 ANGLE               one line, restated with the material collected
 CONCRETE ELEMENTS   one bullet per fact from the interview, nothing else
@@ -120,6 +128,14 @@ Then produce, in this order:
    word in the language of the interview. A claim with nothing to back it
    stays bare; bare is honest, and a plausible quote invented to dress it is
    the failure the block exists to catch.
+
+**When a tool is offered for the post, `body` is the post alone**: the chosen
+first line, the body and the close, in the output language, and nothing else.
+The other hooks, the character count and the transcript stay out of it. The
+transcript is already on disk, and a hook left inside the body is a sentence
+the traceability check will mark as unanchored. The photo ideas and the tips
+go in their own fields; the anchors block becomes the `anchors` field, one
+pair per entry, under the same rules.
 
 **The signature block is not generated, it is concatenated.** It is appended
 after a blank line, without passing through the model. A generated signature

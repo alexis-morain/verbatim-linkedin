@@ -22,11 +22,15 @@ dangling tool call. That property was built into the loop in slice 5.1; this
 is the screen where it gets paid for, because a browser closing mid interview
 is the normal case.
 
-**Cost is shown as rate and running total, never as a forecast.** The engine
-knows the price per million for the models in its table and the exact size of
-what it sends every turn. It does not know how many turns somebody will take,
-and a made up estimate over somebody's real bill is the failure `providers.py`
-already refuses when it declines to guess a price.
+**Cost is shown as rate, running total, and one order of magnitude before
+the first turn.** The engine knows the price per million for the models in its
+table and the exact size of what it sends every turn. It does not know how
+many turns somebody will take, nor how many tokens its block is in the
+provider's own tokeniser, so the figure before the first turn is a range over
+the four to six turns the skill states, counted at a ratio the same screen
+names, and only for a model that has a rate. A single number to the cent over
+a conversation nobody has had yet would be the invented figure `providers.py`
+refuses when it declines to guess a price.
 """
 
 from __future__ import annotations
@@ -76,6 +80,17 @@ def forget_lock(app, interview_id: str) -> None:
 
 # ------------------------------------------------------------------ the engine
 
+#: Characters per token behind the estimate below. One measurement, in
+#: `docs/smoke.md`: 25 400 characters of block read as 6 629 prompt tokens on
+#: Ollama, which is about four. The provider's own tokeniser is the only exact
+#: figure, and the screen says this is not it.
+CHARS_PER_TOKEN = 4
+
+#: The length of an interview as the skill states it: four to six turns. The
+#: bounds of the range, never a middle.
+TURNS = (4, 6)
+
+
 @dataclass
 class Engine:
     """What would answer, and what stops it from answering."""
@@ -95,6 +110,22 @@ class Engine:
         if self.settings is None:
             return None
         return PRICES.get(self.settings.model)
+
+    @property
+    def estimate(self):
+        """Dollars, low and high, for the block alone sent on each of four
+        to six turns at the input rate. What is typed and what comes back are
+        left out: both are small next to the block, and the screen says so.
+        None without a rate or without a block, since a range over a price
+        nobody has is the invented figure twice over."""
+        if not self.rate or not self.block_size:
+            return None
+        tokens = self.block_size / CHARS_PER_TOKEN
+        return tuple(tokens * turns * self.rate[0] / 1e6 for turns in TURNS)
+
+    @property
+    def ratio(self) -> int:
+        return CHARS_PER_TOKEN
 
 
 def _engine(request: Request, *, sized: bool = False) -> Engine:
