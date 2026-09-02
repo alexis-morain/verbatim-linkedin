@@ -184,6 +184,7 @@ measurement, not a current promise.
 |---|---|---|---|---|---|
 | 2026-08-29 | openai | qwen2.5:14b | Ollama, 127.0.0.1:11434 | pass / degraded (2 of 6 runs) / pass | `c77ea20` |
 | 2026-08-29 | openai | deepseek-r1:14b | Ollama, 127.0.0.1:11434 | pass / fail / pass | `c77ea20` |
+| 2026-09-02 | openai | qwen2.5:14b | Ollama, 127.0.0.1:11434 | pass / pass (1 of 1 run; advisory, see the 2 of 6 above) / pass | `b290998` |
 
 ## What the first release ships untested, and on purpose
 

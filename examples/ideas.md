@@ -25,9 +25,6 @@ When an interview turns up a new angle, add it here before closing the session.
 
 ## Pillar 3. Decisions in public
 
-- [P3] `VISIBILITY` I spent four months selling to agencies. Eleven
-  conversations, two proposals, nothing signed. Material: the abandoned segment,
-  with what it cost to find out.
 - [P3] `VISIBILITY` A mandate I ended after six weeks, and the sentence in the
   first meeting that should have told me. Material: needs a call before
   publishing, the client is not public.
@@ -41,4 +38,5 @@ When an interview turns up a new angle, add it here before closing the session.
 2026-07-27 | P2 | I built the same board pack twice in one month | posts/2026-07-27-built-it-twice.md
 2026-08-04 | P2 | The four things I need before I put a number on a mandate | posts/2026-08-04-four-things-before-i-quote.md
 2026-08-18 | P2 | Eleven hours for a first board pack | posts/2026-08-18-board-pack-hours.md
+2026-08-25 | P3 | I spent four months selling to agencies | posts/2026-08-25-agency-segment.md
 2026-08-29 | P1 | Your model is not wrong, your commentary is | posts/2026-08-29-commentary-not-model.md

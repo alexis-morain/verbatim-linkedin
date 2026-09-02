@@ -5,6 +5,7 @@ Needs fastapi and httpx, so run through the project environment:
 """
 
 import html as html_module
+from datetime import date
 import re
 import shutil
 import sys
@@ -23,6 +24,9 @@ from verbatim_app.web import create_app  # noqa: E402
 
 class WebCase(unittest.TestCase):
     lang = None
+    #: The day every screen is drawn on. Pinned, so what is due at J+7 in the
+    #: fixture is the same list on every machine on every day.
+    today = date(2026, 9, 2)
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-web-")
@@ -36,7 +40,8 @@ class WebCase(unittest.TestCase):
         # checkout had one.
         shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
-        self.client = TestClient(create_app(self.root, lang=self.lang),
+        self.client = TestClient(create_app(self.root, lang=self.lang,
+                                            today=lambda: self.today),
                                  base_url="http://127.0.0.1:8747")
 
     def tearDown(self):
@@ -186,7 +191,7 @@ class TestScreens(WebCase):
 
     def test_ideas_screen_lists_the_bank(self):
         page = self.client.get("/ideas")
-        self.assertEqual(page.text.count('class="badge mono"'), 6)
+        self.assertEqual(page.text.count('class="badge mono"'), 5)
         self.assertIn("VISIBILITY", page.text)
         self.assertIn("Used", page.text)
 

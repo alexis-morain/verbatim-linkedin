@@ -23,6 +23,7 @@ budget is reachable from any tab they have open.
 from __future__ import annotations
 
 import os
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -43,7 +44,7 @@ LOCAL = ("127.0.0.1", "localhost")
 
 
 def create_app(instance_path, lang: str | None = None, *,
-               environ=None, transport=None) -> FastAPI:
+               environ=None, transport=None, today=None) -> FastAPI:
     instance = Instance(instance_path)
     status = instance.status()
     language = lang or (status.interface_language if status else "en")
@@ -57,6 +58,11 @@ def create_app(instance_path, lang: str | None = None, *,
     app.state.t = strings
     app.state.environ = os.environ if environ is None else environ
     app.state.transport = transport
+    # The third seam, next to the environment and the transport: what day it
+    # is. What is due at J+7 and the date a section write stamps both depend
+    # on it, and a screen that reads the wall clock is a screen no test can
+    # pin down; the model layer already takes the day as an argument.
+    app.state.today = today or date.today
     app.state.bundle = bundle_root()
     app.state.turn_locks = {}
     app.state.publish_locks = {}

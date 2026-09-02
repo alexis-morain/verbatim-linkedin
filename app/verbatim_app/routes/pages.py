@@ -17,8 +17,6 @@ another tab.
 
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
@@ -55,7 +53,7 @@ def overview(request: Request):
         bank = instance.ideas()
     except InstanceError:
         bank = None
-    view = instance.measurement(date.today())
+    view = instance.measurement(request.app.state.today())
     return _render(
         request, "overview.html",
         next_session=bank.next_session if bank else "",
@@ -98,7 +96,7 @@ def _save_section(request: Request, name: str, back: str, heading: str,
     """One section written, or nothing written and the screen saying why."""
     try:
         request.app.state.instance.replace_section(
-            name, heading, content, shown, today=date.today().isoformat())
+            name, heading, content, shown, today=request.app.state.today().isoformat())
     except SectionChanged:
         # The code travels in the URL, the sentence lives in the pack.
         return RedirectResponse(f"{back}?problem=section-changed",
@@ -168,7 +166,7 @@ def save_status(request: Request, interface_language: str = Form(""),
         request.app.state.instance.update_status(
             interface_language=interface_language.strip(),
             output_language_default=output_language_default.strip(),
-            today=date.today().isoformat())
+            today=request.app.state.today().isoformat())
     except UnreadableError:
         return RedirectResponse("/profile", status_code=303)
     except InstanceError:
@@ -314,7 +312,7 @@ def measure(request: Request):
     # Today comes from the clock here and from a test elsewhere: what is due
     # is the one thing on this screen that depends on the day.
     return _render(request, "measure.html",
-                   view=request.app.state.instance.measurement(date.today()))
+                   view=request.app.state.instance.measurement(request.app.state.today()))
 
 
 @router.get("/posts")

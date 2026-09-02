@@ -84,9 +84,22 @@ sept jours » là où la règle est « sept jours ou plus ».
   committer le travail d'un agent, et `git diff --stat` avant de supprimer un
   worktree.
 
+### Le complément, sans clé
+
+Le smoke test `anthropic` demandait la clé d'Alexis : coffre verrouillé,
+rien dans l'environnement, et une clé n'a pas à passer par un transcript.
+Fait à la place : le fil `openai` relancé sur Ollama à la révision courante,
+trois `pass`, l'outil requis ayant tiré sur ce tour (une exécution, contre
+deux sur six le 29/08 : la ligne le dit). Le montée en 2.1.0 et le tag ont
+été refusés à l'exécution, ils attendent Alexis. Trois choses de plus : la
+couture `today` monte jusqu'à `create_app`, les tests d'écran ne lisent plus
+l'horloge ; `examples/voice.md` dit que sept posts sont sortis depuis sa
+rédaction et que le bandeau attend la réécriture ; l'angle des agences,
+consommé par le post du 25/08, rejoint enfin le côté utilisé.
+
 ### Ce qui reste
 
-PyPI et la page de release, jeton d'Alexis. Le fil `anthropic`, toujours non
+PyPI et la page de release, jeton d'Alexis, avec `v2.1.0` à poser d'abord. Le fil `anthropic`, toujours non
 testé. `linkedin-measure`, gaté sur des relevés réels. Les tests d'écran de
 Mesure lisent l'horloge pour la liste « à remplir », ce qui passe et passera,
 mais la couture `today` s'arrête à la route. Le faux positif « non validée »

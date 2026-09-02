@@ -127,5 +127,19 @@ class TestAMeasuredLineWithNoFigures(WebCase):
         self.assertIn('<dl class="measured">', page)
         self.assertEqual(page.count('<dd><span class="empty">not yet</span></dd>'), 3)
 
+
+class TestTheDayIsASeam(WebCase):
+    """The screens are drawn on the day the app is given, not the wall clock:
+    on the sixth day after the unmeasured post, nothing is due anywhere."""
+    from datetime import date as _d
+    today = _d(2026, 8, 31)
+
+    def test_nothing_is_due_the_day_before_the_seventh(self):
+        page = self.client.get("/measure").text
+        due_list = page.split("Published posts")[0]
+        self.assertNotIn("2026-08-25-agency-segment.md", due_list)
+        self.assertIn("Nothing to fill in", due_list)
+        self.assertNotIn('href="/measure"', self.client.get("/").text.split("<main>")[1])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

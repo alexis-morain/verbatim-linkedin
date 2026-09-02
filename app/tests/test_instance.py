@@ -350,7 +350,7 @@ class TestIdeas(InstanceCase):
 
     def test_angles_carry_pillar_and_funnel_label(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.angles), 6)
+        self.assertEqual(len(bank.angles), 5)
         first = bank.angles[0]
         self.assertEqual(first.pillar, 1)
         self.assertEqual(first.label, "VISIBILITY")
@@ -360,7 +360,7 @@ class TestIdeas(InstanceCase):
 
     def test_used_entries_are_parsed(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.used), 7)
+        self.assertEqual(len(bank.used), 8)
         self.assertEqual(bank.used[0].file, "posts/2026-06-16-priced-it-wrong.md")
         self.assertEqual(bank.used[-1].file,
                          "posts/2026-08-29-commentary-not-model.md")

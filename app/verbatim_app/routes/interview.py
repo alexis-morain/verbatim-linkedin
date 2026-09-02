@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import json
 import threading
-from datetime import date as _date
 from dataclasses import dataclass, replace
 from urllib.parse import quote
 
@@ -339,7 +338,7 @@ def _screen(request: Request, conversation, **extra):
                   lint_failed=False, archive_problem="",
                   formats=archive.FORMATS, labels=archive.LABELS,
                   states=archive.STATES, pillars=archive.PILLARS,
-                  today=_date.today().isoformat(), seed="",
+                  today=request.app.state.today().isoformat(), seed="",
                   strings=_frame_strings(request.app.state.t))
     fields.update(extra)
     return _render(request, "interview.html", **fields)

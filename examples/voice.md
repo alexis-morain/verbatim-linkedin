@@ -4,6 +4,10 @@
 > traits below are indicative. Every skill reading this file defers to the hard
 > rules in `locales/en/style.md` when the two disagree. The banner comes off at
 > five to ten posts, after a rewrite, not before.
+>
+> Seven posts have been published through the engine since this file was
+> written, and the rewrite on that corpus has not happened yet. The banner
+> stays until it does: a count is not a rewrite.
 
 ## Hard rules
 

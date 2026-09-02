@@ -14,7 +14,7 @@ structure.
 | File | Shows |
 |---|---|
 | `profile.md` | A filled `references/profile.template.md`, including the `Status` block set to `filled: yes`. |
-| `voice.md` | A voice file built on three posts, carrying the provisional banner because three is fewer than five. |
+| `voice.md` | A voice file built on three posts, carrying the provisional banner because three is fewer than five, and saying that the seven posts published since have not been folded in yet. |
 | `pillars.md` | Pillars written as postures with effect labels, and a ratio derived from a stated objective. |
 | `ideas.md` | Angles with funnel labels and named material, not subjects. |
 | `corpus/` | One published post, as reference material. |
