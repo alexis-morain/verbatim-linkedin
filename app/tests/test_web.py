@@ -47,7 +47,8 @@ class TestOneBadFileDoesNotTakeTheAppDown(WebCase):
     """Every screen renders the conformance report, so a file nobody can read
     decides whether one row is wrong or the whole app is gone."""
 
-    SCREENS = ("/", "/profile", "/ideas", "/posts", "/corpus", "/interview")
+    SCREENS = ("/", "/profile", "/ideas", "/posts", "/measure", "/corpus",
+               "/interview")
 
     def all_screens_render(self):
         for path in self.SCREENS:
@@ -185,7 +186,7 @@ class TestScreens(WebCase):
 
     def test_ideas_screen_lists_the_bank(self):
         page = self.client.get("/ideas")
-        self.assertEqual(page.text.count('class="badge mono"'), 8)
+        self.assertEqual(page.text.count('class="badge mono"'), 6)
         self.assertIn("VISIBILITY", page.text)
         self.assertIn("Used", page.text)
 

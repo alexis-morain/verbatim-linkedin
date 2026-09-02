@@ -31,12 +31,18 @@
     <tr>
       <th scope="row">{{ t('overview.pillar') }} {{ pillar }}</th>
       <td class="mono">{{ count }} {{ t('overview.published') }}</td>
+      <td class="mono">{{ measured.get(pillar | string, 0) }} {{ t('overview.measured') }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 {% else %}
 <p class="empty">{{ t('overview.no_published') }}</p>
+{% endif %}
+
+{% if due %}
+<p class="callout">{{ t('overview.due_link') }}
+<a href="/measure">{{ t('nav.measure') }}</a></p>
 {% endif %}
 
 {% if posts %}

@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -105,7 +106,9 @@ class TestPosts(InstanceCase):
     def test_posts_are_parsed_and_sorted_newest_first(self):
         posts = self.instance.posts()
         self.assertEqual([p.date for p in posts],
-                         ["2026-08-29", "2026-08-25", "2026-08-18"])
+                         ["2026-08-29", "2026-08-25", "2026-08-18",
+                          "2026-08-04", "2026-07-27", "2026-07-13",
+                          "2026-06-30", "2026-06-16"])
         # The newest is a draft: listed like any other, counted like none.
         self.assertEqual(posts[0].state, "draft")
         agency = self.named("2026-08-25-agency-segment.md")
@@ -124,7 +127,7 @@ class TestPosts(InstanceCase):
         self.assertEqual(measured.inbound_connections, 3)
 
     def test_pillar_counter_runs_over_published_only(self):
-        self.assertEqual(self.instance.pillar_counter(), {2: 1, 3: 1})
+        self.assertEqual(self.instance.pillar_counter(), {1: 1, 2: 4, 3: 2})
         draft = self.root / "posts" / "2026-08-27-draft.md"
         draft.write_text(
             (self.root / "posts" / "2026-08-25-agency-segment.md")
@@ -132,7 +135,7 @@ class TestPosts(InstanceCase):
             .replace("state: published", "state: draft"),
             encoding="utf-8",
         )
-        self.assertEqual(self.instance.pillar_counter(), {2: 1, 3: 1})
+        self.assertEqual(self.instance.pillar_counter(), {1: 1, 2: 4, 3: 2})
 
     def test_post_body_is_the_text_after_front_matter(self):
         body = self.instance.post_body("2026-08-18-board-pack-hours.md")
@@ -345,7 +348,7 @@ class TestIdeas(InstanceCase):
 
     def test_angles_carry_pillar_and_funnel_label(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.angles), 8)
+        self.assertEqual(len(bank.angles), 6)
         first = bank.angles[0]
         self.assertEqual(first.pillar, 1)
         self.assertEqual(first.label, "VISIBILITY")
@@ -355,9 +358,9 @@ class TestIdeas(InstanceCase):
 
     def test_used_entries_are_parsed(self):
         bank = self.instance.ideas()
-        self.assertEqual(len(bank.used), 2)
-        self.assertEqual(bank.used[0].file, "posts/2026-08-18-board-pack-hours.md")
-        self.assertEqual(bank.used[1].file,
+        self.assertEqual(len(bank.used), 7)
+        self.assertEqual(bank.used[0].file, "posts/2026-06-16-priced-it-wrong.md")
+        self.assertEqual(bank.used[-1].file,
                          "posts/2026-08-29-commentary-not-model.md")
 
 
@@ -452,6 +455,154 @@ class TestAtomicWrite(unittest.TestCase):
             os.replace = original
         self.assertEqual(seen, ["the previous one\n"])
 
+
+class TestMeasurement(InstanceCase):
+    """The numbers of references/measure.md, over the example instance.
+
+    The expected values below are read off the eight fixture posts, so a
+    fixture edited without a reason will fail here rather than quietly move
+    what the measure screen reports.
+    """
+
+    TODAY = date(2026, 9, 2)
+
+    def bucket(self, buckets, key):
+        return [b for b in buckets if b.key == key][0]
+
+    def test_rows_are_the_published_posts_newest_first(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertEqual([p.filename for p in view.rows][:2],
+                         ["2026-08-25-agency-segment.md",
+                          "2026-08-18-board-pack-hours.md"])
+        self.assertEqual(len(view.rows), 7)
+        self.assertEqual(view.measured, 6)
+
+    def test_the_draft_is_in_no_list_and_no_count(self):
+        view = self.instance.measurement(self.TODAY)
+        names = [p.filename for p in view.rows] + [p.filename for p in view.due]
+        self.assertNotIn("2026-08-29-commentary-not-model.md", names)
+        self.assertEqual(sum(b.posts for b in view.by_pillar), 7)
+        # A scheduled post is not a published one either.
+        scheduled = self.root / "posts" / "2026-08-30-scheduled.md"
+        scheduled.write_text(
+            (self.root / "posts" / "2026-08-25-agency-segment.md")
+            .read_text(encoding="utf-8")
+            .replace("state: published", "state: scheduled"),
+            encoding="utf-8")
+        self.assertEqual(len(self.instance.measurement(self.TODAY).rows), 7)
+
+    def test_totals_run_over_measured_rows_only(self):
+        totals = self.instance.measurement(self.TODAY).totals
+        self.assertEqual(
+            (totals.connections, totals.dms, totals.meetings), (13, 5, 2))
+
+    def test_a_field_counted_on_no_measured_row_is_none_not_zero(self):
+        empty = Instance(Path(self.tmp) / "empty")
+        (empty.root / "posts").mkdir(parents=True)
+        (empty.root / "posts" / "2026-01-01-x.md").write_text(
+            "---\ndate: 2026-01-01\nstate: published\nmeasured:\n---\n\nx\n",
+            encoding="utf-8")
+        totals = empty.measurement(self.TODAY).totals
+        self.assertIsNone(totals.connections)
+        self.assertIsNone(totals.dms)
+
+    def test_zero_counts_as_measured(self):
+        view = self.instance.measurement(self.TODAY)
+        zeroed = [p for p in view.rows
+                  if p.filename == "2026-07-27-built-it-twice.md"][0]
+        self.assertEqual(zeroed.inbound_connections, 0)
+        self.assertNotIn(zeroed, view.due)
+        # It carries the bucket it is in, and it moves no sum.
+        self.assertEqual(self.bucket(view.by_pillar, "2").measured, 4)
+
+    def test_an_unmeasured_published_post_is_due_once_it_is_old_enough(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertEqual([p.filename for p in view.due],
+                         ["2026-08-25-agency-segment.md"])
+        self.assertIsNone(
+            [p for p in view.rows
+             if p.filename == "2026-08-25-agency-segment.md"][0].measured)
+
+    def test_nothing_is_due_before_the_seventh_day(self):
+        self.assertEqual(self.instance.measurement(date(2026, 8, 30)).due, [])
+        self.assertEqual(self.instance.measurement(date(2026, 6, 1)).due, [])
+
+    def test_a_post_whose_date_cannot_be_read_is_not_guessed_at(self):
+        (self.root / "posts" / "2026-08-25-agency-segment.md").write_text(
+            "---\ndate: whenever\nstate: published\nmeasured:\n---\n\nx\n",
+            encoding="utf-8")
+        self.assertEqual(self.instance.measurement(self.TODAY).due, [])
+
+    def test_buckets_per_pillar(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertEqual([b.key for b in view.by_pillar], ["1", "2", "3"])
+        one = self.bucket(view.by_pillar, "1")
+        self.assertEqual((one.posts, one.measured, one.status), (1, 1, "none"))
+        two = self.bucket(view.by_pillar, "2")
+        self.assertEqual((two.posts, two.measured, two.status),
+                         (4, 4, "emerging"))
+        self.assertEqual(
+            (two.sums.connections, two.sums.dms, two.sums.meetings), (8, 3, 1))
+        three = self.bucket(view.by_pillar, "3")
+        self.assertEqual((three.posts, three.measured, three.status),
+                         (2, 1, "none"))
+
+    def test_buckets_per_format(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertEqual([b.key for b in view.by_format],
+                         ["counter-intuitive-number", "the-breakdown",
+                          "the-post-mortem", "the-stance", "the-story"])
+        breakdown = self.bucket(view.by_format, "the-breakdown")
+        self.assertEqual((breakdown.posts, breakdown.measured,
+                          breakdown.status), (2, 2, "provisional"))
+        mortem = self.bucket(view.by_format, "the-post-mortem")
+        self.assertEqual((mortem.posts, mortem.measured, mortem.status),
+                         (2, 1, "none"))
+
+    def test_buckets_per_label(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertEqual([b.key for b in view.by_label],
+                         ["ACTION", "TRUST", "VISIBILITY"])
+        trust = self.bucket(view.by_label, "TRUST")
+        self.assertEqual((trust.posts, trust.measured, trust.status),
+                         (3, 3, "provisional"))
+        self.assertEqual(
+            (trust.sums.connections, trust.sums.dms, trust.sums.meetings),
+            (4, 1, 1))
+        visibility = self.bucket(view.by_label, "VISIBILITY")
+        self.assertEqual((visibility.posts, visibility.measured), (2, 1))
+
+    def test_the_four_statuses_are_the_thresholds_of_measure_md(self):
+        self.assertEqual([inst.pattern_status(n) for n in range(0, 9)],
+                         ["none", "none", "provisional", "provisional",
+                          "emerging", "emerging", "emerging", "confirmed",
+                          "confirmed"])
+
+    def test_the_guards_do_not_bite_on_this_instance(self):
+        view = self.instance.measurement(self.TODAY)
+        self.assertFalse(view.single_pillar)
+        self.assertFalse(view.single_format)
+
+    def test_a_guard_bites_when_every_measured_post_is_one_shape(self):
+        for name in ("2026-06-16-priced-it-wrong.md",
+                     "2026-06-30-finance-is-a-negotiation.md",
+                     "2026-08-18-board-pack-hours.md"):
+            (self.root / "posts" / name).unlink()
+        view = self.instance.measurement(self.TODAY)
+        self.assertTrue(view.single_pillar)
+        self.assertFalse(view.single_format)
+
+
+class TestTheSeventhDay(InstanceCase):
+    """references/measure.md says at J+7, so the seventh day is the first day
+    a line is due, and the sixth is not."""
+
+    def test_due_on_the_seventh_day_and_not_on_the_sixth(self):
+        from datetime import date
+        due = lambda today: [p.filename for p in
+                             self.instance.measurement(today).due]
+        self.assertIn("2026-08-25-agency-segment.md", due(date(2026, 9, 1)))
+        self.assertNotIn("2026-08-25-agency-segment.md", due(date(2026, 8, 31)))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
