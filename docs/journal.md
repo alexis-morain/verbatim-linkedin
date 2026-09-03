@@ -7,7 +7,7 @@ l'interdit explicite d'émettre une couture que la machine ne lit pas. Cette
 session pose la machine, dans l'ordre que le backlog Alchie proposait : les
 deux tests de pinning d'abord, la couture ensuite, les six marches en un seul
 changement. Base `41e21c2`, 929 tests app. Fin de session : **959 tests app,
-55 JS**, `check.sh` vert, app 2.2.0, [[hashes]].
+55 JS**, `check.sh` vert, app 2.2.0, commit `5886018` et tag `v2.2.0` poussés.
 
 ### Les pins avant le code
 
@@ -79,7 +79,15 @@ depuis cette instance, par le Chrome headless du cache Playwright à 1600 px,
 recadrée avec Pillow sur les offsets lus dans le navigateur ; l'ancienne
 capture reste dans l'historique git. Aucun appel à un fournisseur pendant la
 session, ni test de fumée. Revue à contexte frais par un agent checker avant
-le commit : [[checker]].
+le commit : **CONFIRMED**, chaque marche relue dans le code, `check.sh` et la
+suite relancés par l'agent, sondes hors dépôt sur un `conversation.json`
+ancien, sur une paire `sheet` sous fiche non approuvée (fabriquée, sans
+plantage), sur les paires à deux clés ou à zéro clé (refusées entières), sur
+le repli prose mêlant les deux étiquettes, et sur le wheel. Deux doutes non
+réfutants : un brouillon mal formé refuse la conversation entière au
+chargement, cohérent avec la fiche et les révisions ; et le rendu `dangling`
+n'était pas exercé en réel, ce qui a été fait ensuite à la main sur
+l'instance de test, classe `anchor-of-sheet` et indice fixe, comme prévu.
 
 ### Ce qui reste
 
