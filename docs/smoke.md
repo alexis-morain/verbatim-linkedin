@@ -185,6 +185,7 @@ measurement, not a current promise.
 | 2026-08-29 | openai | qwen2.5:14b | Ollama, 127.0.0.1:11434 | pass / degraded (2 of 6 runs) / pass | `c77ea20` |
 | 2026-08-29 | openai | deepseek-r1:14b | Ollama, 127.0.0.1:11434 | pass / fail / pass | `c77ea20` |
 | 2026-09-02 | openai | qwen2.5:14b | Ollama, 127.0.0.1:11434 | pass / pass (1 of 1 run; advisory, see the 2 of 6 above) / pass | `b290998` |
+| 2026-09-02 | openai | gpt-4.1-mini | api.openai.com | pass / pass / pass | `308e6ef` |
 
 ## What the first release ships untested, and on purpose
 
@@ -206,8 +207,13 @@ What that costs, stated so nobody has to work it out later:
 Anyone with a key closes this in about a minute, and the row belongs in the
 table below like any other.
 
-**The `openai` wire is proved.** Both rows are the same endpoint speaking the
-OpenAI chat format, which is what that wire had to demonstrate.
+**The `openai` wire is proved, hosted and local.** The 2026-09-02 row
+against `api.openai.com` is the provider itself, with `tool_choice` enforced
+server side: one run, three passes, and the first row on this wire where the
+required tool is not an advisory. The Ollama rows are the same wire on a
+local runtime. What is still missing on that row is a price: `providers.py`
+carries no OpenAI rate, so the meter counts tokens and invents nothing,
+which is the documented behaviour and not a failure.
 
 What the two rows say about the models rather than about the wire:
 `deepseek-r1:14b` declares no tool support, so this engine cannot drive it at

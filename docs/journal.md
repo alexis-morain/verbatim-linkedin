@@ -97,9 +97,18 @@ l'horloge ; `examples/voice.md` dit que sept posts sont sortis depuis sa
 rédaction et que le bandeau attend la réécriture ; l'angle des agences,
 consommé par le post du 25/08, rejoint enfin le côté utilisé.
 
+Puis Alexis a fourni une clé OpenAI dans un fichier : chargée dans
+l'environnement de la commande, jamais affichée. Trois `pass` contre
+`api.openai.com` sur `gpt-4.1-mini`, première ligne de ce fil où
+`tool_choice` est imposé côté serveur. `providers.py` n'a aucun tarif
+OpenAI, donc le compteur compte et n'invente rien.
+
 ### Ce qui reste
 
-PyPI et la page de release, jeton d'Alexis, avec `v2.1.0` à poser d'abord. Le fil `anthropic`, toujours non
+PyPI et la page de release, jeton d'Alexis, avec `v2.1.0` à poser d'abord.
+Le fil `anthropic`, pas de clé pour l'instant. Des tarifs OpenAI dans
+`providers.py`, à prendre sur la page de prix du fournisseur et pas de
+mémoire. Le fil `anthropic`, toujours non
 testé. `linkedin-measure`, gaté sur des relevés réels. Les tests d'écran de
 Mesure lisent l'horloge pour la liste « à remplir », ce qui passe et passera,
 mais la couture `today` s'arrête à la route. Le faux positif « non validée »
