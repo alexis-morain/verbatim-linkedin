@@ -145,7 +145,7 @@
      marked in it. The marking is decided server side, in anchors.lines, so a
      reload and a live frame paint the same verdict. #}
   <article class="post their-words">
-    {% for row in trace.lines %}{% if row %}<p>{% for piece in row %}{% if piece.status == 'anchored' %}{{ piece.text }}{% else %}<mark class="claim-{{ piece.status }}" title="{{ t('interview.anchor_' ~ piece.status ~ '_hint') }}">{{ piece.text }}</mark>{% endif %} {% endfor %}</p>{% endif %}{% endfor %}
+    {% for row in trace.lines %}{% if row %}<p>{% for piece in row %}{% if piece.status == 'anchored' %}{{ piece.text }}{% else %}<mark class="claim-{{ piece.status }}" title="{{ t('interview.claim_' ~ piece.status ~ '_hint') }}">{{ piece.text }}</mark>{% endif %} {% endfor %}</p>{% endif %}{% endfor %}
   </article>
 
   <form method="post" action="/interview/{{ conversation.id }}/draft/lint">
@@ -178,14 +178,18 @@
   {% endif %}
   <ul class="anchors">
     {% for verdict in trace.verdicts %}
-    <li class="anchor anchor-{{ verdict.status }}">
+    {# The words over a backing are computed from its provenance and never
+       written here: "you said" is true over a transcript quote and false
+       over a line of the sheet, which the person approved and did not utter.
+       The hint key comes from the route for the same reason. #}
+    <li class="anchor anchor-{{ verdict.status }} anchor-of-{{ verdict.provenance }}">
       <p class="badge mono">{{ t('interview.anchor_' ~ verdict.status) }}</p>
-      <p class="hint">{{ t('interview.anchor_' ~ verdict.status ~ '_hint') }}</p>
+      <p class="hint">{{ t('interview.' ~ verdict.hint) }}</p>
       <dl>
         <dt class="mono">{{ t('interview.trace_post') }}</dt>
         <dd class="their-words">{{ verdict.post }}</dd>
-        <dt class="mono">{{ t('interview.trace_said') }}</dt>
-        <dd class="their-words">{{ verdict.said }}</dd>
+        <dt class="mono">{{ t('interview.trace_' ~ verdict.provenance) }}</dt>
+        <dd class="their-words">{{ verdict.quote }}</dd>
       </dl>
     </li>
     {% endfor %}

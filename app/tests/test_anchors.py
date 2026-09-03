@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
 from verbatim_app.anchors import (  # noqa: E402
+    SHEET as FROM_SHEET, TRANSCRIPT as FROM_TRANSCRIPT,
     Anchor, contains, lines, split_output, uncovered, verify,
 )
 
@@ -28,6 +29,14 @@ TRANSCRIPT = ("Alors en fait j'ai vendu l'audit avant même d'écrire le "
 BLOCK = (DRAFT + "\n\nANCHORS\n"
          "POST: The client signed for the result, not for the tool.\n"
          "SAID: il voulait le résultat\n")
+
+#: What the approved sheet said, the engine's rewording of the transcript.
+SHEET_TEXT = ("Selling the audit before the script existed\n"
+              "the client wanted the result, not the tool\n"
+              "vendre avant d'écrire")
+
+#: The text each provenance is checked against, the shape `verify` takes.
+SOURCES = {FROM_TRANSCRIPT: TRANSCRIPT, FROM_SHEET: SHEET_TEXT}
 
 
 class TestSplitOutput(unittest.TestCase):
@@ -221,29 +230,29 @@ class TestContains(unittest.TestCase):
 
 class TestVerify(unittest.TestCase):
     def test_a_backed_claim_is_anchored(self):
-        verdicts = verify(DRAFT, split_output(BLOCK).anchors, TRANSCRIPT)
+        verdicts = verify(DRAFT, split_output(BLOCK).anchors, SOURCES)
         self.assertEqual([v.status for v in verdicts], ["anchored"])
         self.assertTrue(verdicts[0].in_draft)
-        self.assertTrue(verdicts[0].in_transcript)
+        self.assertTrue(verdicts[0].in_source)
 
     def test_an_invented_quote_is_fabricated(self):
         anchors = (Anchor(fragment="The client signed for the result",
                           quote="j'ai automatisé toute la chaîne"),)
-        verdicts = verify(DRAFT, anchors, TRANSCRIPT)
+        verdicts = verify(DRAFT, anchors, SOURCES)
         self.assertEqual(verdicts[0].status, "fabricated")
 
     def test_a_fragment_absent_from_the_draft_is_dangling(self):
         anchors = (Anchor(fragment="A sentence the draft never says",
                           quote="il voulait le résultat"),)
-        verdicts = verify(DRAFT, anchors, TRANSCRIPT)
+        verdicts = verify(DRAFT, anchors, SOURCES)
         self.assertEqual(verdicts[0].status, "dangling")
 
     def test_dangling_wins_when_both_sides_fail(self):
         anchors = (Anchor(fragment="A sentence the draft never says",
                           quote="une phrase jamais dite"),)
-        verdicts = verify(DRAFT, anchors, TRANSCRIPT)
+        verdicts = verify(DRAFT, anchors, SOURCES)
         self.assertEqual(verdicts[0].status, "dangling")
-        self.assertFalse(verdicts[0].in_transcript)
+        self.assertFalse(verdicts[0].in_source)
 
 
 class TestUncovered(unittest.TestCase):
@@ -288,9 +297,97 @@ class TestUncovered(unittest.TestCase):
     def test_a_degenerate_fragment_covers_and_anchors_nothing(self):
         anchors = (Anchor(fragment="e", quote="a"),)
         self.assertEqual(len(uncovered(DRAFT, anchors)), 2)
-        verdicts = verify(DRAFT, anchors, TRANSCRIPT)
+        verdicts = verify(DRAFT, anchors, SOURCES)
         self.assertEqual(verdicts[0].status, "dangling")
-        self.assertFalse(verdicts[0].in_transcript)
+        self.assertFalse(verdicts[0].in_source)
+
+
+class TestTheSheetSeam(unittest.TestCase):
+    """The second provenance, `references/anchoring.md` under Provenance. A
+    quote names where it lives, and it is looked for there and nowhere else;
+    a pair written the old way, with no label, still means the transcript."""
+
+    def test_a_pair_without_a_label_is_the_transcript(self):
+        self.assertEqual(Anchor(fragment="a", quote="b").provenance,
+                         FROM_TRANSCRIPT)
+
+    def test_said_and_sheet_entries_carry_their_provenance(self):
+        out = split_output(
+            DRAFT + "\n\nANCHORS\n"
+            "POST: The client signed for the result, not for the tool.\n"
+            "SHEET: the client wanted the result, not the tool\n"
+            "POST: I sold my first audit before writing a single line of code.\n"
+            "SAID: j'ai vendu l'audit avant même d'écrire le script\n")
+        self.assertEqual([anchor.provenance for anchor in out.anchors],
+                         [FROM_SHEET, FROM_TRANSCRIPT])
+        self.assertEqual(out.problems, ())
+
+    def test_a_sheet_entry_is_read_as_tolerantly_as_a_said_one(self):
+        out = split_output(
+            DRAFT + "\n\nANCHORS\n"
+            "- post: The client signed for the result, not for the tool.\n"
+            "  Sheet: « the client wanted the result, not the tool »\n")
+        self.assertEqual(out.anchors[0].provenance, FROM_SHEET)
+        self.assertEqual(out.anchors[0].quote,
+                         "the client wanted the result, not the tool")
+
+    def test_a_sheet_quote_is_looked_for_in_the_sheet(self):
+        anchors = (Anchor(fragment="not for the tool",
+                          quote="the client wanted the result",
+                          provenance=FROM_SHEET),)
+        self.assertEqual(verify(DRAFT, anchors, SOURCES)[0].status, "anchored")
+
+    def test_a_sheet_quote_found_only_in_the_transcript_is_fabricated(self):
+        # The words are real and the person said them. The pair claims they
+        # are in the sheet, and they are not: a quote is checked against the
+        # source it names, whichever other source happens to hold it.
+        anchors = (Anchor(fragment="not for the tool",
+                          quote="il voulait le résultat",
+                          provenance=FROM_SHEET),)
+        self.assertEqual(verify(DRAFT, anchors, SOURCES)[0].status,
+                         "fabricated")
+
+    def test_a_said_quote_found_only_in_the_sheet_is_fabricated(self):
+        # The other direction, and the one that matters most: the sheet is
+        # the engine's rewording, and offering a line of it as something
+        # said is the laundering the contract forbids. A backing never
+        # converts.
+        anchors = (Anchor(fragment="not for the tool",
+                          quote="the client wanted the result"),)
+        self.assertEqual(verify(DRAFT, anchors, SOURCES)[0].status,
+                         "fabricated")
+
+    def test_a_provenance_with_no_text_backs_nothing(self):
+        anchors = (Anchor(fragment="not for the tool",
+                          quote="the client wanted the result",
+                          provenance=FROM_SHEET),)
+        verdicts = verify(DRAFT, anchors, {FROM_TRANSCRIPT: TRANSCRIPT})
+        self.assertEqual(verdicts[0].status, "fabricated")
+        self.assertFalse(verdicts[0].in_source)
+
+    def test_a_sheet_entry_stranded_outside_the_block_is_reported(self):
+        out = split_output("A draft.\n\nSHEET: a line that never got its marker\n")
+        self.assertEqual(len(out.problems), 1)
+        self.assertIn("outside the anchors block", out.problems[0])
+
+    def test_a_decorated_marker_followed_by_sheet_entries_opens_the_block(self):
+        out = split_output(DRAFT + "\n\n## Anchors\nPOST: not for the tool.\n"
+                           "SHEET: the client wanted the result\n")
+        self.assertEqual(len(out.anchors), 1)
+        self.assertEqual(out.anchors[0].provenance, FROM_SHEET)
+        self.assertEqual(out.draft, DRAFT)
+
+    def test_an_unpaired_post_names_both_seams(self):
+        out = split_output(DRAFT + "\n\nANCHORS\n"
+                           "POST: The client signed for the result, not for the tool.\n")
+        self.assertIn("no SAID or SHEET quote", out.problems[0])
+
+    def test_an_orphan_sheet_entry_names_itself(self):
+        out = split_output(DRAFT + "\n\nANCHORS\n"
+                           "SHEET: the client wanted the result, not the tool\n")
+        self.assertEqual(out.problems, (
+            "SHEET entry has no POST claim: the client wanted the result, "
+            "not the tool",))
 
 
 class TestLines(unittest.TestCase):

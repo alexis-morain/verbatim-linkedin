@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.2.1
+version: 0.2.2
 ---
 
 # Write a post
@@ -124,10 +124,14 @@ Then produce, in this order:
    The angles that were not taken are sleeping in it, and they go back into
    `ideas.md` at the end of the session.
 8. **The anchors block**, format in `references/anchoring.md`: each claim of
-   the body paired with the interview sentence that backs it, quoted word for
-   word in the language of the interview. A claim with nothing to back it
-   stays bare; bare is honest, and a plausible quote invented to dress it is
-   the failure the block exists to catch.
+   the body paired with what backs it, and the label says where that lives.
+   `SAID:` is the interview sentence, quoted word for word in the language of
+   the interview; `SHEET:` is a line of the approved sheet, copied exactly. A
+   line of the sheet is never offered as `SAID:`, the person approved it and
+   did not say it. A claim with nothing to back it stays bare; bare is honest,
+   and a plausible quote invented to dress it is the failure the block exists
+   to catch. The profile backs nothing: it is input to a question, never
+   evidence.
 
 **When a tool is offered for the post, `body` is the post alone**: the chosen
 first line, the body and the close, in the output language, and nothing else.
@@ -135,7 +139,8 @@ The other hooks, the character count and the transcript stay out of it. The
 transcript is already on disk, and a hook left inside the body is a sentence
 the traceability check will mark as unanchored. The photo ideas and the tips
 go in their own fields; the anchors block becomes the `anchors` field, one
-pair per entry, under the same rules.
+pair per entry, the backing under `said` or `sheet` exactly as the block would
+label it, under the same rules.
 
 **The signature block is not generated, it is concatenated.** It is appended
 after a blank line, without passing through the model. A generated signature

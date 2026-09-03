@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from . import interview
+from .anchors import KEY_OF
 #: `STATES` is the three states of `references/measure.md`, imported rather
 #: than repeated: archiving starts a post at `draft` and the publishing step
 #: moves it, so the vocabulary belongs to the module that owns the front
@@ -318,11 +319,13 @@ def _notes(conversation) -> str:
         if sheet.elements:
             lines.append("- Concrete elements:")
             lines += [f"  - {element}" for element in sheet.elements]
-    lines.append("- Anchors offered, the claim then the interview sentence "
-                 "backing it. No verdict is filed here: it is recomputed from "
-                 "the transcript next to this file.")
+    lines.append("- Anchors offered, the claim then the line backing it, "
+                 "marked with where that line lives: said, the interview; "
+                 "sheet, the approved sheet. No verdict is filed here: it is "
+                 "recomputed from the interview next to this file.")
     if draft.anchors:
-        lines += [f"  - {anchor.fragment!r} <- {anchor.quote!r}"
+        lines += [f"  - {anchor.fragment!r} <- {KEY_OF[anchor.provenance]}: "
+                  f"{anchor.quote!r}"
                   for anchor in draft.anchors]
     else:
         lines.append(f"  - {NOT_RETURNED}")

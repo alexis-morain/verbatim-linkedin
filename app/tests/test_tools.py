@@ -361,7 +361,7 @@ class TestTheDraftTool(unittest.TestCase):
         schema = self.tool.input_schema
         self.assertEqual(schema["required"], ["body"])
         pair = schema["properties"]["anchors"]["items"]
-        self.assertEqual(sorted(pair["properties"]), ["post", "said"])
+        self.assertEqual(sorted(pair["properties"]), ["post", "said", "sheet"])
 
     def test_an_offer_reaches_the_conversation(self):
         answer = self.tool.run({"body": "Quatre mois pour rien.",

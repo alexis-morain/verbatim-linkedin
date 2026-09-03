@@ -1242,6 +1242,129 @@ class TestWhatTheDraftIsCheckedAgainst(InterviewCase):
     def test_no_draft_means_nothing_to_check(self):
         self.assertEqual(interview.checked(approved(self.root)), [])
 
+    def test_a_quote_lifted_from_the_profile_is_fabricated(self):
+        # A2 of the Alchie backlog, pinned before the sheet seam lands. The
+        # profile reaches the model on a tool result, which `said()` never
+        # credits, so a draft that quotes the profile back is anchored on
+        # nothing: the person recognises their own words and nothing was
+        # verified. Fabricated is the right verdict today, and it has to stay
+        # the right verdict once a second provenance exists.
+        conversation = started(self.root)
+        conversation.messages.append(assistant(
+            calls=[("toolu_01", "read_instance", {"path": "profile.md"})]))
+        conversation.messages.append(results(
+            ("toolu_01", "Fractional CFO work for seed and Series A B2B "
+                         "SaaS, three to five days a month.")))
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.propose(conversation, proposal(), now=WHEN)
+        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        interview.write(conversation, offer(
+            body="Fractional CFO work for seed and Series A B2B SaaS.\n\n"
+                 "Le canal direct est le seul qui paie.",
+            anchors=[{"post": "Fractional CFO work for seed and Series A",
+                      "said": "Fractional CFO work for seed and Series A "
+                              "B2B SaaS"},
+                     {"post": "Le canal direct est le seul qui paie.",
+                      "said": "le canal direct est le seul qui paie"}]),
+            now=LATER)
+        self.assertNotIn("Fractional", conversation.said())
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["fabricated", "anchored"])
+
+    def test_a_sheet_line_quoted_as_something_said_is_fabricated(self):
+        # The sheet is the engine's rewording of what was said, approved by
+        # a click. A quote that names the transcript is looked for in the
+        # transcript and nowhere else, so the sheet's own words offered as
+        # something said come back fabricated. This is the verdict a sheet
+        # seam must leave exactly where it is: a backing never converts.
+        conversation = approved(self.root)
+        line = conversation.sheet.angle
+        self.assertNotIn(line, conversation.said())
+        interview.write(conversation, offer(
+            body=line + ".\n\nLe canal direct est le seul qui paie.",
+            anchors=[{"post": line, "said": line}]), now=LATER)
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["fabricated"])
+
+
+
+class TestASheetBacking(InterviewCase):
+    """The second provenance, `references/anchoring.md` under Provenance. A
+    claim that descends from the sheet the person approved is backed under
+    the `sheet` key, checked against the sheet's own words, and never
+    converted into something they said: an approval is consent, not
+    utterance."""
+
+    def backed(self, conversation, quote, key="sheet"):
+        line = conversation.sheet.elements[1]
+        interview.write(conversation, offer(
+            body=line + ".\n\nLe canal direct est le seul qui paie.",
+            anchors=[{"post": line, key: quote}]), now=LATER)
+        return line
+
+    def test_a_sheet_pair_lands_with_its_provenance(self):
+        conversation = approved(self.root)
+        line = self.backed(conversation, conversation.sheet.elements[1])
+        self.assertEqual(conversation.draft.anchors,
+                         (Anchor(fragment=line, quote=line, provenance="sheet"),))
+
+    def test_it_round_trips_through_the_disk_under_its_own_key(self):
+        conversation = approved(self.root)
+        self.backed(conversation, conversation.sheet.elements[1])
+        interview.save(self.root, conversation, now=LATER)
+        raw = json.loads((self.directory(conversation) / interview.CONVERSATION)
+                         .read_text(encoding="utf-8"))
+        self.assertEqual(sorted(raw["draft"]["anchors"][0]), ["post", "sheet"])
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.draft.anchors, conversation.draft.anchors)
+
+    def test_a_pair_naming_both_backings_is_refused(self):
+        conversation = approved(self.root)
+        with self.assertRaisesRegex(interview.InterviewError, "never both"):
+            interview.write(conversation, offer(anchors=[
+                {"post": "Le canal direct est le seul qui paie.",
+                 "said": "le canal direct est le seul qui paie",
+                 "sheet": "le canal direct est le seul qui paie"}]))
+
+    def test_a_pair_naming_no_backing_is_refused(self):
+        conversation = approved(self.root)
+        with self.assertRaisesRegex(interview.InterviewError, "never neither"):
+            interview.write(conversation, offer(anchors=[
+                {"post": "Le canal direct est le seul qui paie."}]))
+
+    def test_a_sheet_quote_is_checked_against_the_sheet(self):
+        conversation = approved(self.root)
+        line = self.backed(conversation, conversation.sheet.elements[1])
+        self.assertNotIn(line, conversation.said())
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["anchored"])
+
+    def test_a_sheet_quote_absent_from_the_sheet_is_fabricated(self):
+        conversation = approved(self.root)
+        self.backed(conversation, "une phrase que la fiche ne dit pas")
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["fabricated"])
+
+    def test_the_sources_hold_the_sheet_only_once_approved(self):
+        conversation = started(self.root)
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.propose(conversation, proposal(), now=WHEN)
+        self.assertEqual(sorted(interview.sources(conversation)),
+                         ["transcript"])
+        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        found = interview.sources(conversation)
+        self.assertEqual(sorted(found), ["sheet", "transcript"])
+        self.assertEqual(found["transcript"], conversation.said())
+        self.assertEqual(found["sheet"], conversation.sheet.text())
+
+    def test_the_sheet_text_is_the_five_fields_whole(self):
+        sheet = interview.Sheet(angle="a", elements=("b", "c"), moment="d",
+                                conviction="e", first_lines=("f", "g"))
+        self.assertEqual(sheet.text(), "a\nb\nc\nd\ne\nf\ng")
 
 
 REVISION = "L'accroche est trop commerciale, ouvre sur le chiffre."

@@ -2011,9 +2011,31 @@ class TestARuntimeThatIgnoresTheRequiredTool(DraftCase):
         self.assertTrue(problems)
         # Anywhere in the list, not first: the road this arrived by leads it,
         # and the parse failures follow.
-        self.assertIn("no SAID quote", " ".join(problems))
+        self.assertIn("no SAID or SHEET quote", " ".join(problems))
         self.assertIn("propose_draft was required and was not called",
                       problems[0])
+
+
+class TestAProseBlockWithASheetEntry(DraftCase):
+    """The prose road carries the provenance too, or a local runtime, which
+    is the one that takes this road, would land every sheet backing as
+    something said."""
+
+    scripts = (says("Quatre mois pour rien.\n\nJ'ai écrit pour des agences, "
+                    "et le canal direct est le seul qui paie.\n\n"
+                    "ANCHORS\n"
+                    "POST: Quatre mois pour rien.\n"
+                    "SHEET: Quatre mois pour rien.\n"),)
+
+    def test_the_provenance_survives_the_prose_road(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual([anchor.provenance
+                          for anchor in conversation.draft.anchors], ["sheet"])
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["anchored"])
 
 
 class TestProseWithNoBlockIsNotADraft(DraftCase):
@@ -2100,6 +2122,126 @@ class TestTheTraceabilityPanel(DraftCase):
         self.assertEqual(
             [verdict.status for verdict in interview.checked(conversation)],
             ["anchored", "fabricated", "dangling"])
+
+
+class TestTheProfileBacksNothing(DraftCase):
+    """A2 of the Alchie backlog, pinned before the sheet seam lands.
+
+    The profile is legitimate input to a question and to an angle, and it is
+    not evidence: a post that quotes it back proves only that the profile
+    exists, and the person recognises their own words without noticing that
+    nothing was verified. Here the quote is lifted from `examples/profile.md`
+    word for word, and it comes back fabricated, because the transcript is
+    the only thing a quote offered as something said is checked against.
+    """
+
+    LINE = "Fractional CFO work for seed and Series A B2B SaaS"
+
+    scripts = (asks(("c1", "propose_draft", dict(
+        DRAFT_ARGS,
+        body=LINE + ".\n\n" + DRAFT_ARGS["body"],
+        anchors=DRAFT_ARGS["anchors"] + [{"post": LINE, "said": LINE}]))),
+               says("Written."))
+
+    def test_the_quote_really_is_in_the_profile(self):
+        # Or the test below would be passing on a typo.
+        self.assertIn(self.LINE, (self.root / "profile.md")
+                      .read_text(encoding="utf-8"))
+
+    def test_it_comes_back_fabricated_on_the_screen(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        self.assertNotIn("Fractional", conversation.said())
+        self.assertEqual(
+            [verdict.status for verdict in interview.checked(conversation)],
+            ["anchored", "fabricated"])
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn("anchor-fabricated", page.text)
+        self.assertIn("claim-fabricated", page.text)
+
+
+class TestTheWordingFollowsTheProvenance(DraftCase):
+    """A3 of the Alchie backlog: the words shown over a backing are computed
+    from where it lives, never a fixed string in a template.
+
+    "You said" is true over a transcript quote and false over every other
+    one, and a template printing it regardless would one day print it over a
+    sentence nobody uttered, looking exactly like a quotation. Written red,
+    before the sheet seam existed, so that the seam could not land half way:
+    a parse that accepted `sheet` while the screen still said "you said"
+    would be precisely the mislabelling `references/anchoring.md` exists to
+    prevent.
+    """
+
+    scripts = (asks(("c1", "propose_draft", dict(
+        DRAFT_ARGS,
+        # The second backing is a first line of the approved sheet, which
+        # the person never typed: a quote of it offered as something said
+        # would be fabricated, and offered as a line of the sheet it holds.
+        anchors=DRAFT_ARGS["anchors"] + [
+            {"post": "Quatre mois pour rien.",
+             "sheet": "Quatre mois pour rien."}]))),
+               says("Written."))
+
+    def entries(self, interview_id):
+        """The panel's entries, keyed by the provenance each one wears."""
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertEqual(page.status_code, 200)
+        found = {}
+        for chunk in page.text.split('<li class="anchor ')[1:]:
+            body = chunk.split("</li>", 1)[0]
+            worn = re.search(r"anchor-of-([a-z]+)", body)
+            self.assertIsNotNone(worn, "an entry that names no provenance")
+            found[worn.group(1)] = body
+        return found
+
+    def test_both_backings_land_and_both_are_anchored(self):
+        interview_id = self.signed()
+        self.draft(interview_id)
+        verdicts = interview.checked(interview.load(self.root, interview_id))
+        self.assertEqual([verdict.status for verdict in verdicts],
+                         ["anchored", "anchored"])
+        self.assertEqual([verdict.anchor.provenance for verdict in verdicts],
+                         ["transcript", "sheet"])
+
+    def test_a_transcript_backing_is_worded_as_something_said(self):
+        from verbatim_app.i18n import load_strings
+        strings = load_strings("en")
+        interview_id = self.signed()
+        self.draft(interview_id)
+        entry = self.entries(interview_id)["transcript"]
+        self.assertIn(shown(strings("interview.trace_transcript")), entry)
+        self.assertIn(shown(strings("interview.anchor_anchored_transcript_hint")),
+                      entry)
+
+    def test_a_sheet_backing_is_never_worded_as_something_said(self):
+        from verbatim_app.i18n import load_strings
+        strings = load_strings("en")
+        interview_id = self.signed()
+        self.draft(interview_id)
+        entry = self.entries(interview_id)["sheet"]
+        self.assertIn(shown(strings("interview.trace_sheet")), entry)
+        self.assertIn(shown(strings("interview.anchor_anchored_sheet_hint")),
+                      entry)
+        self.assertNotIn(shown(strings("interview.trace_transcript")), entry)
+        self.assertNotIn(
+            shown(strings("interview.anchor_anchored_transcript_hint")), entry)
+
+    def test_the_two_wordings_are_different_sentences_in_every_pack(self):
+        # A pack translating the two keys to the same words would put the
+        # transcript's sentence back over the sheet, in that language only.
+        from verbatim_app.i18n import load_strings
+        for lang in ("en", "fr"):
+            strings = load_strings(lang)
+            for transcript, sheet in (
+                    ("trace_transcript", "trace_sheet"),
+                    ("anchor_anchored_transcript_hint",
+                     "anchor_anchored_sheet_hint"),
+                    ("anchor_fabricated_transcript_hint",
+                     "anchor_fabricated_sheet_hint")):
+                self.assertNotEqual(strings("interview." + transcript),
+                                    strings("interview." + sheet), lang)
 
 
 class TestTheInlineLintPass(DraftCase):

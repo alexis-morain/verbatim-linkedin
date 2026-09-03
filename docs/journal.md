@@ -1,5 +1,93 @@
 # Journal
 
+## 2026-09-03. La couture de la fiche : `SHEET:`, et chaque ancre dit d'où vient sa citation
+
+Le matin, `anchoring.md` avait reçu sa section `## Provenance`, doc seul, avec
+l'interdit explicite d'émettre une couture que la machine ne lit pas. Cette
+session pose la machine, dans l'ordre que le backlog Alchie proposait : les
+deux tests de pinning d'abord, la couture ensuite, les six marches en un seul
+changement. Base `41e21c2`, 929 tests app. Fin de session : **959 tests app,
+55 JS**, `check.sh` vert, app 2.2.0, [[hashes]].
+
+### Les pins avant le code
+
+**A2, le profil n'adosse rien**, vert du premier coup, deux fois. Un test
+unitaire fait lire `profile.md` par un tool result puis cite ce texte en
+`said` : fabriquée, parce que `said()` ne crédite jamais un résultat d'outil.
+Un test écran cite mot pour mot une phrase d'`examples/profile.md` : fabriquée
+sur la page, `claim-fabricated` dans le corps. Et un second pin unitaire qui
+compte plus que le premier : une ligne de la fiche offerte comme quelque chose
+de dit ressort fabriquée, et doit le rester une fois la couture posée. Un
+adossement ne se convertit jamais.
+
+**A3, le libellé se déduit de la provenance**, écrit rouge exprès. Quatre
+tests écran qui découpent le panneau par entrée et vérifient que « You said »
+n'apparaît que sur l'entrée transcript, que l'entrée fiche porte sa propre
+phrase, et que les deux phrases diffèrent dans chaque pack. Rouge pour une
+raison structurelle d'abord, la paire `{post, sheet}` étant refusée par
+`_anchor_pairs`, ce qui est exactement la garde que la doc promettait.
+
+### La couture, six marches d'un bloc
+
+- `anchors.py` : `TRANSCRIPT` et `SHEET` comme provenances, `SEAMS` qui lie
+  l'étiquette du bloc à la provenance, `KEYS` et `KEY_OF` qui en dérivent la
+  clé JSON, les trois regex construites sur la même liste. `Anchor.provenance`
+  vaut transcript par défaut, donc toute paire ancienne garde son sens.
+  `Verdict.in_transcript` devient `in_source`. `verify(draft, anchors, sources)`
+  prend un dictionnaire provenance vers texte et ne cherche une citation que
+  dans la source qu'elle nomme ; une provenance absente du dictionnaire est
+  une source qui n'a rien dit.
+- `interview.py` : `Sheet.text()`, les cinq champs entiers ; `sources()`, le
+  transcript toujours, la fiche seulement approuvée ; `_anchor_pairs` accepte
+  exactement une clé parmi `said` et `sheet`, refuse les deux et aucune. Le
+  disque écrit la clé de la provenance, donc un `conversation.json` ancien se
+  relit tel quel et `VERSION` ne bouge pas : un lecteur ancien devant une clé
+  `sheet` refuse le brouillon entier, il ne le lit pas de travers, et c'est le
+  cas où une version sert.
+- `routes/interview.py` : le panneau émet `quote`, `provenance` et `hint`, la
+  clé de pack calculée par `_hint(status, provenance)` ; le gabarit ne porte
+  plus une phrase, il compose `trace_<provenance>` et la clé reçue. Une
+  provenance inconnue s'affiche comme sa clé nue, visible, jamais comme la
+  phrase du transcript.
+- `locales/` : deux clés par phrase qui parle d'une source, une par
+  provenance, dans les deux packs ; les marques dans le corps du post passent
+  sur des `claim_*_hint` neutres, parce qu'une phrase peut être couverte par
+  plusieurs ancres de provenances différentes.
+- `archive.py` : les notes préfixent chaque adossement de `said:` ou
+  `sheet:`, pour qu'un post relu dans un an dise encore d'où vient chaque
+  ligne.
+- `tools.py`, `skills/linkedin-post` 0.2.2, `anchoring.md`, `instance.md`,
+  README : le rédacteur sait qu'une ligne de fiche ne s'offre jamais en
+  `SAID:` et que le profil n'adosse rien.
+
+### Ce que les tests ont attrapé
+
+Le premier passage rendait fabriquée toute ancre transcript, trois tests
+rouges. `interview.py` nomme `TRANSCRIPT` le fichier `transcript.md`, et la
+provenance importée sous le même nom depuis `anchors.py` était écrasée en
+silence : `sources()` rangeait la parole sous la clé `transcript.md`. Importée
+`FROM_TRANSCRIPT`, avec le commentaire qui dit pourquoi. Sans les pins d'A2,
+ce bug aurait pu passer pour une régression du seul cas neuf.
+
+### Vérifications
+
+Écran vérifié sur une instance Nadia copiée dans le scratchpad, jamais
+`examples/` en direct : quatre entrées, ancrée et fabriquée pour chaque
+provenance, les classes `anchor-of-transcript` et `anchor-of-sheet` et les
+quatre phrases lues dans le DOM. `docs/screenshots/traceability.png` refaite
+depuis cette instance, par le Chrome headless du cache Playwright à 1600 px,
+recadrée avec Pillow sur les offsets lus dans le navigateur ; l'ancienne
+capture reste dans l'historique git. Aucun appel à un fournisseur pendant la
+session, ni test de fumée. Revue à contexte frais par un agent checker avant
+le commit : [[checker]].
+
+### Ce qui reste
+
+B1 et B2 (la carte des rungs, l'intent de témoignage), C1 et C2 (le refus à la
+révision, le tour gratuit), puis C3. Les captures `overview.png` et Mesure.
+`anchoring.md` garde les six marches comme liste pour une provenance de plus,
+s'il y en a jamais une.
+
 ## 2026-09-02. Session autonome : 7.2, 7.3, les prompts, l'estimation, le découpage
 
 Consigne d'Alexis, en une ligne : « continue le projet verbatim en autonomie,

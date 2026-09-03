@@ -1,6 +1,6 @@
 [project]
 name = "verbatim-linkedin"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local web app over a Verbatim instance: LinkedIn posts built from an interview, never from thin air."
 requires-python = ">=3.11"
 license = { text = "MIT" }

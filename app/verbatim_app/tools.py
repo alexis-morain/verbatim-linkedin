@@ -361,10 +361,13 @@ def draft_tool(write) -> Tool:
             "it. 'body' is the post as it would be published, without the "
             "signature block, which is concatenated from the profile and "
             "never written here. Each anchor pairs 'post', a fragment of "
-            "the body copied exactly, with 'said', the interview sentence "
-            "backing it, quoted word for word in the language of the "
-            "interview. A claim nothing backs stays bare: bare is honest, "
-            "an invented quote is not. 'photos' and 'tips' are what the "
+            "the body copied exactly, with the line backing it, under the "
+            "key that says where that line lives: 'said', the interview "
+            "sentence quoted word for word in the language of the "
+            "interview, or 'sheet', a line of the approved sheet copied "
+            "exactly. One of the two per anchor. A claim nothing backs "
+            "stays bare: bare is honest, an invented quote is not, and the "
+            "profile is never a source. 'photos' and 'tips' are what the "
             "session leaves behind rather than part of the post: they are "
             "filed under its session notes and never concatenated into it. "
             "One entry per kind at most, and what is left out is shown as "
@@ -378,8 +381,9 @@ def draft_tool(write) -> Tool:
                     "items": {
                         "type": "object",
                         "properties": {"post": {"type": "string"},
-                                       "said": {"type": "string"}},
-                        "required": ["post", "said"],
+                                       "said": {"type": "string"},
+                                       "sheet": {"type": "string"}},
+                        "required": ["post"],
                     },
                 },
                 "photos": _notes_schema(interview.PHOTO_KINDS),

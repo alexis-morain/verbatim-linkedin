@@ -217,6 +217,18 @@ class TestTheFileItWrites(ArchiveCase):
         for verdict in ("anchored", "fabricated", "dangling", "unanchored"):
             self.assertNotIn(verdict, notes)
 
+    def test_the_notes_say_where_each_backing_lives(self):
+        # The archive carries the provenance, so a post read in a year still
+        # says whether a line was said or approved.
+        notes = self.composed().split("Session notes, not published:")[1]
+        self.assertIn("<- said: 'quatre mois a vendre'", notes)
+        conversation = self.drafted(anchors=[
+            {"post": "Onze conversations",
+             "sheet": "le canal direct est le seul qui paie"}])
+        notes = self.composed(conversation).split(
+            "Session notes, not published:")[1]
+        self.assertIn("<- sheet: 'le canal direct est le seul qui paie'", notes)
+
     def test_the_photo_ideas_and_tips_land_in_the_notes_not_in_the_post(self):
         conversation = self.drafted(
             photos=[{"kind": "portrait", "text": "Devant le tableau."}],

@@ -6,6 +6,13 @@ post byte to byte: the model quotes its source in the interview language,
 and this code checks that the quote exists in the transcript. It checks
 presence, never truth, and it forgives typography, never words.
 
+Since the sheet seam, a quote also names where it lives: `SAID:` is the
+transcript, `SHEET:` is the sheet the person approved, and each one is looked
+for in the source it names and nowhere else. The label a screen shows over a
+backing is derived from that provenance, never written into a template; the
+`Provenance` section of the contract says why, and the two provenances that
+have no seam here, the profile and the engine's own speech, are the reason.
+
 The parse is deliberately tolerant of list markers and letter case, because
 a weaker model decorates, and a decorated block that still parses is worth
 more than a strict one thrown away. What it does not tolerate is silence:
@@ -23,18 +30,38 @@ from dataclasses import dataclass, replace
 
 MARKER = "ANCHORS"
 
-ITEM = re.compile(r"^(?:[-*]|\d+[.)])?\s*(POST|SAID)\s*:\s*(.*)$",
+#: Where a backing lives: the provenances of `references/anchoring.md` that
+#: have a seam. The transcript is every word the person typed; the sheet is
+#: the one they approved. The profile and the engine's own speech have no
+#: seam here, on purpose and for good: a quote of either wears one of these
+#: two labels and comes back fabricated, because it is looked for in the
+#: source the label names and nowhere else.
+TRANSCRIPT = "transcript"
+SHEET = "sheet"
+
+#: The seam label of each provenance, as the block spells it. One table, and
+#: the key the same pair travels under in a tool call and on disk is the
+#: label in lower case, so the three spellings of one provenance cannot
+#: drift apart.
+SEAMS = {"SAID": TRANSCRIPT, "SHEET": SHEET}
+LABEL_OF = {provenance: label for label, provenance in SEAMS.items()}
+KEYS = {label.lower(): provenance for label, provenance in SEAMS.items()}
+KEY_OF = {provenance: key for key, provenance in KEYS.items()}
+
+_ENTRY = "|".join(["POST", *SEAMS])
+
+ITEM = re.compile(rf"^(?:[-*]|\d+[.)])?\s*({_ENTRY})\s*:\s*(.*)$",
                   re.IGNORECASE)
 
 #: Outside a block the seam is read strictly, capitals and all, because a
 #: draft has every right to open a line with "Said:" in its own prose. The
 #: tolerance of ITEM is for entries already inside a block, nowhere else.
-STRAY = re.compile(r"^(?:[-*]|\d+[.)])?\s*(?:POST|SAID):")
+STRAY = re.compile(rf"^(?:[-*]|\d+[.)])?\s*(?:{_ENTRY}):")
 
 #: Looser still, colon not required: the shape of an entry a model mangled.
 #: Only ever used to say that a decorated marker left residue behind, never
 #: to split anything.
-RESIDUE = re.compile(r"^(?:[-*]|\d+[.)])?\s*(?:POST|SAID)\b")
+RESIDUE = re.compile(rf"^(?:[-*]|\d+[.)])?\s*(?:{_ENTRY})\b")
 
 #: An entry shorter than this, typography folded, identifies nothing: one
 #: letter is found in any draft and any transcript, and an anchor that
@@ -76,7 +103,12 @@ class Piece:
 @dataclass(frozen=True)
 class Anchor:
     fragment: str  # POST: a piece of the draft, copied exactly
-    quote: str     # SAID: the interview sentence backing it, word for word
+    quote: str     # the line backing it, word for word: SAID: or SHEET:
+    #: Which source the quote is claimed from, one of the provenances above.
+    #: The transcript by default: it was the only provenance the block knew
+    #: before the sheet seam landed, so every pair written that way still
+    #: means what it meant.
+    provenance: str = TRANSCRIPT
 
 
 @dataclass(frozen=True)
@@ -98,13 +130,16 @@ class Output:
 class Verdict:
     anchor: Anchor
     in_draft: bool
-    in_transcript: bool
+    #: Whether the quote is in the source its provenance names. That one and
+    #: no other: a sheet line found in the transcript is not a sheet backing,
+    #: and an interview sentence found only in the sheet was never said.
+    in_source: bool
 
     @property
     def status(self) -> str:
         if not self.in_draft:
             return "dangling"
-        if not self.in_transcript:
+        if not self.in_source:
             return "fabricated"
         return "anchored"
 
@@ -150,7 +185,8 @@ def split_output(text: str) -> Output:
     swallowed = False  # the last POST was already reported, eat its SAID
 
     def unpaired(fragment):
-        problems.append(f"POST entry has no SAID quote: {fragment[:80]}")
+        problems.append(
+            f"POST entry has no SAID or SHEET quote: {fragment[:80]}")
 
     for line in raw[start + 1:]:
         line = line.strip()
@@ -159,8 +195,8 @@ def split_output(text: str) -> Output:
         match = ITEM.match(line)
         if match is None:
             problems.append(
-                f"line in the anchors block is not a POST or SAID entry: "
-                f"{line[:80]}")
+                f"line in the anchors block is not a POST, SAID or SHEET "
+                f"entry: {line[:80]}")
             continue
         kind, value = match.group(1).upper(), _unquote(match.group(2).strip())
         if kind == "POST":
@@ -178,21 +214,22 @@ def split_output(text: str) -> Output:
                 pending = value
         else:
             if pending is None:
-                # One fault, one complaint: a SAID whose POST was already
+                # One fault, one complaint: a quote whose POST was already
                 # reported is part of that finding, not a second one.
                 if not swallowed:
                     problems.append(
-                        f"SAID entry has no POST claim: {value[:80]}")
+                        f"{kind} entry has no POST claim: {value[:80]}")
                 swallowed = False
             elif not value:
                 unpaired(pending)
                 pending = None
             elif not anchorable(value):
                 problems.append(
-                    f"SAID entry too short to identify a quote: {value[:80]}")
+                    f"{kind} entry too short to identify a quote: {value[:80]}")
                 pending = None
             else:
-                anchors.append(Anchor(fragment=pending, quote=value))
+                anchors.append(Anchor(fragment=pending, quote=value,
+                                      provenance=SEAMS[kind]))
                 pending = None
     if pending is not None:
         unpaired(pending)
@@ -253,15 +290,25 @@ def anchorable(text: str) -> bool:
     return len(normalize(text)) >= MIN_ANCHOR
 
 
-def verify(draft: str, anchors, transcript: str) -> list:
+def verify(draft: str, anchors, sources) -> list:
     """One verdict per anchor. Two of the three alarm states live here,
     dangling and fabricated; the third, unanchored, belongs to the draft
-    rather than to any anchor and is read off it by `uncovered`."""
+    rather than to any anchor and is read off it by `uncovered`.
+
+    `sources` maps a provenance to the text a quote of that provenance is
+    looked for in, and it is looked for there and nowhere else. A sheet line
+    found in the transcript, or an interview sentence found only in the
+    sheet, is a quote claimed from a source that does not hold it, which is
+    what fabricated means. A provenance the mapping does not name is a
+    source that said nothing, so every quote claimed from it is fabricated
+    too; `interview.sources` leaves the sheet out until it is approved.
+    """
     return [Verdict(anchor=anchor,
                     in_draft=anchorable(anchor.fragment)
                     and contains(draft, anchor.fragment),
-                    in_transcript=anchorable(anchor.quote)
-                    and contains(transcript, anchor.quote))
+                    in_source=anchorable(anchor.quote)
+                    and contains(sources.get(anchor.provenance, ""),
+                                 anchor.quote))
             for anchor in anchors]
 
 

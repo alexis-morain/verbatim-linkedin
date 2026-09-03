@@ -6,7 +6,8 @@ can check: it verifies that a quoted sentence exists in the interview
 transcript. It never verifies that a claim is true. Truth stays with the
 human; presence in the transcript is what a program can decide. Which
 transcript, and what else may stand in for one, is a second question, and
-`Provenance` at the end of this file answers it.
+`Provenance` at the end of this file answers it: a quote names where it
+lives, and it is checked there and nowhere else.
 
 A post is often written in another language than the interview. A French
 interview feeding an English post shares no literal text with it, so nothing
@@ -23,21 +24,29 @@ ANCHORS
 POST: one claim of the draft, copied exactly, on one line
 SAID: the interview sentence that backs it, word for word, on one line
 POST: the next claim
-SAID: its source
+SHEET: the line of the approved sheet it descends from, copied exactly
 ```
 
 Rules, each one load bearing:
 
 - `ANCHORS` stands on a line of its own and everything after it belongs to
-  the block. `POST:` and `SAID:` are the machine seam, English like file
-  names and front matter keys, whatever languages the interview and the post
-  use.
+  the block. `POST:`, `SAID:` and `SHEET:` are the machine seam, English like
+  file names and front matter keys, whatever languages the interview and the
+  post use.
+- Every claim is paired with one backing, and its label says where that
+  backing lives: `SAID:` for the transcript, `SHEET:` for the sheet the
+  person approved. Which label is not a matter of taste. A line of the sheet
+  offered as `SAID:` is checked against the transcript, fails there, and
+  comes back fabricated; `Provenance` below says why that is the right
+  verdict.
 - One line per entry. A claim or a quote that spans several sentences becomes
   several pairs.
 - `POST:` copies a fragment of the draft exactly. A paraphrase of the draft
   cannot be found in it, so an anchor written that way points at nothing.
 - `SAID:` quotes the transcript word for word, in the language of the
   interview. Trimming a sentence is fine; rewording it is fabrication.
+- `SHEET:` copies a line of the approved sheet exactly, in the language the
+  sheet is written in. Same rule: trim, never reword.
 - A claim with nothing to back it stays bare. Bare is the honest output:
   the reader sees an unanchored claim and asks about it. Decorating it with
   a plausible quote is precisely the failure this block exists to catch.
@@ -57,12 +66,15 @@ Three alarm states, equal in weight:
 - **unanchored**: a claim of the draft that no pair covers. The machine
   reads claims as rough sentences, cut on line breaks and sentence
   punctuation.
-- **fabricated**: a `SAID:` quote that is not in the transcript. The model
-  invented a source, which is worse than naming none.
+- **fabricated**: a quote that is not in the source its label names, a
+  `SAID:` absent from the transcript or a `SHEET:` absent from the approved
+  sheet. The model invented a source, which is worse than naming none. A
+  real sentence filed under the wrong label counts here too: a quote is
+  checked where it claims to be, whichever other source happens to hold it.
 - **dangling**: a `POST:` fragment that is not in the draft.
 
 A claim is anchored when its fragment is found in the draft and its quote is
-found in the transcript. That is the only state that passes.
+found in the source its label names. That is the only state that passes.
 
 
 ## Provenance
@@ -74,11 +86,11 @@ A draft is written from more than the transcript. The drafting turn is handed
 the interview sides, the sheet the person signed, and the current revision
 request. Only the first of those is the transcript. So a claim can be well
 founded and still have no quote in `said()`, because it descends from a sheet
-the person approved rather than from a sentence they typed. Today such a claim
-can only come back `unanchored`, and that under reports it: it is not
-baseless, it is backed somewhere this block cannot name.
+the person approved rather than from a sentence they typed. Before the sheet
+seam, such a claim could only come back `unanchored`, and that under reported
+it: it was not baseless, it was backed somewhere this block could not name.
 
-Naming it is what this section is for.
+Naming it is what this section is for, and `SHEET:` is how it is named.
 
 ### The label is derived, never written
 
@@ -94,12 +106,18 @@ fabricated anchor still covers its claim, and a mislabelled one still
 convinces its reader. The second is the worse of the two, because the machine
 reports the first and cannot see the second at all.
 
+In the app that rule is two keys per sentence in every language pack, one per
+provenance, and the route picks the key from the anchor's provenance. The
+template holds no sentence of its own, and a provenance the pack does not
+know shows as a bare key, which is visible, rather than as the transcript's
+sentence, which would be a lie that reads well.
+
 ### The provenances this engine has
 
 | Provenance | Where it lives | May back a claim | Seam |
 |---|---|---|---|
 | **Transcript** | `said()`, every word the person typed, revision requests included | yes | `SAID:` |
-| **Sheet** | `conversation.sheet`, once approved | yes, when its seam is read | reserved, not emitted |
+| **Sheet** | `conversation.sheet`, once approved, its five fields whole | yes | `SHEET:` |
 | **Profile** | the instance on disk | no | none, and never |
 | **Engine speech** | `engine_turns()`, tool results | no | none, and never |
 
@@ -152,18 +170,20 @@ rules follow from the ones above instead of being new:
 
 ### Adding a provenance
 
-A seam the machine does not read is not a seam. `anchors.py` reads `POST:` and
-`SAID:`, and reports every other line inside the block as a problem. A writer
-told today to emit a third label would produce a block full of problems and
-claims anchored to nothing.
+A seam the machine does not read is not a seam. `anchors.py` reads the three
+labels above and reports every other line inside the block as a problem. A
+writer told to emit a fourth label before the parser knew it would produce a
+block full of problems and claims anchored to nothing.
 
 So until its machine side lands, **a backing whose provenance has no seam is
 not emitted, and its claim stays bare**. That is already what this contract
 asks for when nothing backs a claim, and it stays honest: the reader sees an
 unanchored claim and asks about it.
 
-Landing a provenance means landing all of it at once, because a half landed
-seam is the mislabelling this section exists to prevent:
+The sheet seam landed on 3 September 2026, all six steps in one change, and
+the six steps stay here as the checklist for the next provenance, if there is
+ever one. Landing a provenance means landing all of it at once, because a
+half landed seam is the mislabelling this section exists to prevent:
 
 1. the parse accepts the label, and the two guards that catch entry shaped
    lines outside the block know it too

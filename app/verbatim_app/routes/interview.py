@@ -254,7 +254,7 @@ def panel(conversation) -> dict:
     if draft is None:
         return {}
     verdicts = interview.checked(conversation)
-    #: The anchors whose quote is nowhere in the transcript, by identity.
+    #: The anchors whose quote is nowhere in the source it names, by identity.
     invented = {verdict.anchor for verdict in verdicts
                 if verdict.status == "fabricated"}
     painted = anchors.lines(draft.body, draft.anchors)
@@ -282,7 +282,13 @@ def panel(conversation) -> dict:
                     "status": _claim(piece, invented)}
                    for piece in row] for row in painted],
         "verdicts": [{"post": verdict.anchor.fragment,
-                      "said": verdict.anchor.quote,
+                      "quote": verdict.anchor.quote,
+                      "provenance": verdict.anchor.provenance,
+                      # The pack key of the sentence under this entry,
+                      # derived here rather than in the template so that
+                      # the one place deciding the wording is a function.
+                      "hint": _hint(verdict.status,
+                                    verdict.anchor.provenance),
                       "status": verdict.status} for verdict in verdicts],
         "counts": counts,
     }
@@ -297,6 +303,23 @@ def _absent(notes, kinds) -> list:
     """
     arrived = {note.kind for note in notes}
     return [kind for kind in kinds if kind not in arrived]
+
+
+def _hint(status: str, provenance: str) -> str:
+    """The pack key of the sentence shown under a verdict.
+
+    Derived from the provenance for the two states that talk about a source,
+    fixed for the one that talks about the draft alone. The rule is the
+    contract's: the words shown over a backing are computed from where it
+    lives and are never a fixed string, because "you said" over a sheet line
+    is a quotation of something nobody uttered, and it reads exactly like
+    one. A provenance the pack does not know renders as its own key, which
+    is visible, rather than as the transcript's sentence, which would be a
+    lie that reads well.
+    """
+    if status in ("anchored", "fabricated"):
+        return f"anchor_{status}_{provenance}_hint"
+    return f"anchor_{status}_hint"
 
 
 def _claim(piece, invented) -> str:
@@ -906,7 +929,8 @@ def _prose_draft(conversation, said: str, road=()) -> bool:
         interview.write(
             conversation,
             {"body": out.draft,
-             "anchors": [{"post": anchor.fragment, "said": anchor.quote}
+             "anchors": [{"post": anchor.fragment,
+                          anchors.KEY_OF[anchor.provenance]: anchor.quote}
                          for anchor in out.anchors]},
             problems=tuple(road) + tuple(out.problems))
     except interview.InterviewError:

@@ -34,7 +34,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from .anchors import Anchor, verify
+#: The two provenances travel under other names here: `TRANSCRIPT` is a
+#: file name in this module, and the file is a rendering, never a source.
+from .anchors import (
+    Anchor, KEYS, KEY_OF, SHEET as FROM_SHEET, TRANSCRIPT as FROM_TRANSCRIPT,
+    verify,
+)
 from .instance import atomic_write
 from .providers import Usage
 from .shown import shown
@@ -153,6 +158,15 @@ class Sheet:
             [self.angle, list(self.elements), self.moment, self.conviction,
              list(self.first_lines)], ensure_ascii=False)
         return shown(payload)
+
+    def text(self) -> str:
+        """The sheet as words a quote can be looked for in: the five fields,
+        one line each, the two lists one line per entry. What the person
+        approved, whole, and nothing that was not on that screen. This is the
+        source a `SHEET:` quote is checked against, and only once the sheet
+        is approved: `sources` decides that, not this method."""
+        return "\n".join([self.angle, *self.elements, self.moment,
+                          self.conviction, *self.first_lines])
 
 
 @dataclass(frozen=True)
@@ -478,22 +492,38 @@ def _anchor_pairs(arguments: dict) -> tuple:
     An empty list is fine and is not a slip: `references/anchoring.md` says a
     claim with nothing to back it stays bare, and an engine that demanded a
     pair per claim would be asking a weak model to decorate.
+
+    Each pair names where its quote lives by the key it travels under, `said`
+    for the interview sentence or `sheet` for a line of the approved sheet.
+    One of the two, never both and never neither: a pair naming no source
+    could only be checked against a guess, and a pair naming two would be
+    checked against whichever one flattered it.
     """
     entries = arguments.get("anchors", [])
     if not isinstance(entries, list):
         raise InterviewError(
-            "'anchors' is a list of {post, said} pairs, or absent")
+            "'anchors' is a list of {post, said} or {post, sheet} pairs, "
+            "or absent")
     found = []
     for entry in entries:
         if not isinstance(entry, dict):
-            raise InterviewError("each anchor is a {post, said} pair")
-        fragment, quote = entry.get("post"), entry.get("said")
+            raise InterviewError(
+                "each anchor is a {post, said} or {post, sheet} pair")
+        named = [key for key in KEYS if key in entry]
+        if len(named) != 1:
+            raise InterviewError(
+                "each anchor names one backing beside 'post': 'said', the "
+                "interview sentence, or 'sheet', a line of the approved "
+                "sheet; never both and never neither")
+        fragment, quote = entry.get("post"), entry.get(named[0])
         if not isinstance(fragment, str) or not fragment.strip() \
                 or not isinstance(quote, str) or not quote.strip():
             raise InterviewError(
                 "each anchor needs 'post', a fragment of the draft, and "
-                "'said', the interview sentence backing it, both non-empty")
-        found.append(Anchor(fragment=fragment.strip(), quote=quote.strip()))
+                f"'{named[0]}', the line backing it quoted word for word, "
+                "both non-empty")
+        found.append(Anchor(fragment=fragment.strip(), quote=quote.strip(),
+                            provenance=KEYS[named[0]]))
     return tuple(found)
 
 
@@ -647,17 +677,31 @@ def material(conversation: Conversation) -> str:
     return "\n\n".join(parts)
 
 
-def checked(conversation: Conversation) -> list:
-    """The verdict on every anchor of the current draft, computed now.
+def sources(conversation: Conversation) -> dict:
+    """The text each provenance is checked against, by provenance.
 
     The transcript side is `said()` and nothing else: the engine's own
     questions and every tool result stay out of it, or a model could satisfy
-    anchoring by quoting the question it just asked.
+    anchoring by quoting the question it just asked. The sheet side is the
+    approved sheet's own words, and only once approved: a proposed sheet is
+    replaceable and signed by nobody, so nothing is backed by it, and a draft
+    cannot exist before the approval anyway. What is not in this mapping
+    backs nothing, the profile first of all.
     """
+    found = {FROM_TRANSCRIPT: conversation.said()}
+    if sheet_approved(conversation):
+        found[FROM_SHEET] = conversation.sheet.text()
+    return found
+
+
+def checked(conversation: Conversation) -> list:
+    """The verdict on every anchor of the current draft, computed now, each
+    quote against the one source its provenance names: `sources` says
+    which, and a quote is never looked for anywhere else."""
     if conversation.draft is None:
         return []
     return verify(conversation.draft.body, conversation.draft.anchors,
-                  conversation.said())
+                  sources(conversation))
 
 
 def start(instance_root, *, skill: str, sections, interface_language: str,
@@ -837,7 +881,10 @@ def _as_json(conversation: Conversation) -> str:
         draft = conversation.draft
         data["draft"] = {
             "body": draft.body,
-            "anchors": [{"post": anchor.fragment, "said": anchor.quote}
+            # The key of the quote is its provenance, `said` or `sheet`,
+            # the same spelling the tool call travels under.
+            "anchors": [{"post": anchor.fragment,
+                         KEY_OF[anchor.provenance]: anchor.quote}
                         for anchor in draft.anchors],
             "photos": [{"kind": note.kind, "text": note.text}
                        for note in draft.photos],

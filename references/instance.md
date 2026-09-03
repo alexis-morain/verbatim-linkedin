@@ -113,8 +113,8 @@ that are not part of the post.
 **The seam between the two is the line `Session notes, not published:`**, and
 it is machine readable on purpose. What a consumer hands to a publishing tier
 is the body cut at that marker, never the body whole: below it sit the
-validation sheet, every anchor the engine claimed and the interview sentence
-behind each one, which is the rawest material an instance holds. A post is
+validation sheet, every anchor the engine claimed and the line behind each
+one, said or approved, which is the rawest material an instance holds. A post is
 allowed to contain a line of dashes, so the marker is the seam and the
 horizontal rule above it is decoration.
 
@@ -215,7 +215,7 @@ Six fields:
 | Field | What it says |
 |---|---|
 | `body` | the post as it would be published, signature block excluded: that one is concatenated from `profile.md`, never generated |
-| `anchors` | the pairs of `references/anchoring.md`, `post` for the claim and `said` for the interview sentence backing it, in the order the engine offered them |
+| `anchors` | the pairs of `references/anchoring.md`: `post` for the claim, then the line backing it under the key that says where it lives, `said` for the interview sentence or `sheet` for a line of the approved sheet. One of the two per pair, in the order the engine offered them |
 | `photos` | the two photo ideas the skill asks the writing step for, the staged portrait and the visual. Empty when they did not arrive |
 | `tips` | the three tips the same step is asked for, each a `kind` (`strong`, `weak`, `lesson`) and a `text`. Empty when they did not arrive |
 | `problems` | what was unreadable in the way this draft arrived, empty when it arrived structured |
@@ -232,10 +232,11 @@ prose fallback below makes.
 Three rules, and the first is the one the screen is built on:
 
 - **No verdict is ever stored.** Anchored, unanchored, fabricated and dangling
-  are computed from `body`, `anchors` and the transcript every time somebody
-  looks. A stored verdict is a second source of truth that stops being true
-  the moment any of the three changes, and it would go stale in the direction
-  that flatters the engine.
+  are computed from `body`, `anchors`, the transcript and the approved sheet
+  every time somebody looks, each quote against the one source its key names.
+  A stored verdict is a second source of truth that stops being true the
+  moment any of those changes, and it would go stale in the direction that
+  flatters the engine.
 - **A new draft replaces the one before it.** Revisions are a free loop in the
   skill, and a draft is not a decision anybody signed: the sheet is. What the
   person keeps is kept by archiving it, which names a file under `posts/` and
@@ -287,13 +288,16 @@ dates, both languages, the model and the token total. Its body is a run of
 strictly alternating: a turn where the engine speaks, reads a file and speaks
 again leaves two `## Asked` in a row, because the reading is not transcript.
 
-**The anchoring source is the `Said` side, and a consumer reads it from
-`conversation.json`, never off the rendered file.** A quote is checked
-against what the person said, never against what the engine asked or what a
-tool returned: a model allowed to quote its own question can satisfy
-`references/anchoring.md` without the person ever having said anything.
-Reading roles out of structure rather than off markdown headings is what
-makes that hold, since text that looks like a heading is still text.
+**The anchoring sources are the `Said` side and the approved sheet, and a
+consumer reads both from `conversation.json`, never off the rendered file.**
+A quote is checked against the one source its key names, what the person said
+under `said` or what they approved under `sheet`, never against what the
+engine asked or what a tool returned: a model allowed to quote its own
+question can satisfy `references/anchoring.md` without the person ever having
+said anything. Reading roles out of structure rather than off markdown
+headings is what makes that hold, since text that looks like a heading is
+still text. The sheet counts only once approved: a proposed one is signed by
+nobody and backs nothing.
 
 Tool calls and their results stay in `conversation.json`. They are on screen
 while the interview runs, and they are not transcript: a tool result is a

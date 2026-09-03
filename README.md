@@ -19,10 +19,18 @@ service in the middle.
 
 ![The draft, and every claim of it checked against the interview](docs/screenshots/traceability.png)
 
-*Every claim of a draft against the sentence that backs it. Highlighted means
-no quote backs it, which is honest and is yours to check. The example instance
-in [`examples/`](examples/) is a fictional persona; nothing here is anybody's
-real material.*
+*Every claim of a draft against what backs it, and where that backing lives:
+a sentence you said, or a line of the sheet you approved. Highlighted means no
+quote backs it, which is honest and is yours to check; red means the engine
+named a source that does not hold the quote. The example instance in
+[`examples/`](examples/) is a fictional persona; nothing here is anybody's real
+material.*
+
+A backing also says where it lives: a sentence you said, or a line of the
+validation sheet you approved. The panel words the two differently, because
+an approval is consent rather than speech, and a quote is checked against the
+one source it names: a line of the sheet offered as something you said comes
+back fabricated, and so does anything lifted from your profile.
 
 ## Why an interview
 
