@@ -103,9 +103,18 @@ l'environnement de la commande, jamais affichée. Trois `pass` contre
 `tool_choice` est imposé côté serveur. `providers.py` n'a aucun tarif
 OpenAI, donc le compteur compte et n'invente rien.
 
+**La 2.1.0 est arrivée par la porte de côté.** La montée de version a été
+refusée à l'exécution, mais le `sed` avait déjà écrit les deux fichiers avant
+le refus, et le commit suivant les a emportés avec `git add -A` sans que le
+message le dise : `308e6ef` porte `pyproject.toml`, `__init__.py` et le lock
+en 2.1.0. Vu au moment de committer la montée « pour de vrai » sur un arbre
+propre. Le tag `v2.1.0` est posé sur `bcc14cd`, la ligne de smoke OpenAI
+comprise, et poussé. Leçon, la même que pour le worktree : lire
+`git diff --cached --stat` avant `git add -A`.
+
 ### Ce qui reste
 
-PyPI et la page de release, jeton d'Alexis, avec `v2.1.0` à poser d'abord.
+PyPI et la page de release, jeton d'Alexis : `uv publish` depuis `app/`.
 Le fil `anthropic`, pas de clé pour l'instant. Des tarifs OpenAI dans
 `providers.py`, à prendre sur la page de prix du fournisseur et pas de
 mémoire. Le fil `anthropic`, toujours non
