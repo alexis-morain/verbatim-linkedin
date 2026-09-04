@@ -1465,10 +1465,54 @@ class TestTheVersionsOfADraft(InterviewCase):
         again = interview.load(self.root, conversation.id)
         self.assertEqual(again.drafted, LATER.strftime(interview.STAMP))
 
-    def test_a_conversation_from_before_falls_back_to_its_draft(self):
-        # No key on disk, and the older rule applies rather than a guess:
-        # the body in front was written by the last turn that ran, which is
-        # true of every conversation written before a revert was possible.
+    def test_versions_on_disk_always_come_with_the_stamp_beside_them(self):
+        # The two facts are written by one function so that no third writer
+        # can set one and forget the other. A file carrying `earlier` and no
+        # `drafted` is the shape where a revert moves the comparison stamp
+        # backwards, and every request the discarded version answered comes
+        # back as a live instruction.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        interview.save(self.root, conversation, now=EVEN_LATER)
+        raw = json.loads((self.directory(conversation)
+                          / interview.CONVERSATION).read_text(encoding="utf-8"))
+        self.assertIn("earlier", raw)
+        self.assertIn("drafted", raw)
+
+    def test_a_file_with_versions_and_no_stamp_is_given_one_on_the_way_in(self):
+        # A hand edited file, or one written by anything that ever fills
+        # `earlier` without stamping. The current draft is the newest by
+        # construction, so its own stamp is the high water mark and reading
+        # it back is a migration rather than a guess.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=WHEN)
+        interview.write(conversation, offer(body="Autre chose."), now=LATER)
+        interview.revise(conversation, "R1", now=EVEN_LATER)
+        interview.write(conversation, offer(body="Encore autre."),
+                        now=datetime(2026, 8, 28, 15, 12, 0))
+        interview.revise(conversation, "R2",
+                         now=datetime(2026, 8, 28, 15, 15, 0))
+        interview.save(self.root, conversation, now=LATEST)
+        path = self.directory(conversation) / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        del raw["drafted"]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.drafted, again.draft.written)
+        self.assertEqual([r.text for r in interview._pending(again)], ["R2"])
+        interview.revert(again, shown(again.draft.body), now=LATEST)
+        # R1 was answered by the version just thrown away, and it stays
+        # answered. This is the whole of what the stamp is for.
+        self.assertEqual([r.text for r in interview._pending(again)], ["R2"])
+
+    def test_a_conversation_from_before_is_given_the_stamp_on_the_way_in(self):
+        # No key on disk, so the draft in front supplies it: the body there
+        # was written by the last turn that ran, which is true of every
+        # conversation written before this stamp existed. A migration, not a
+        # guess, and it is what makes the shape safe to go back from.
         conversation = approved(self.root)
         interview.write(conversation, offer(), now=LATER)
         interview.save(self.root, conversation, now=LATER)
@@ -1477,9 +1521,27 @@ class TestTheVersionsOfADraft(InterviewCase):
         del raw["drafted"]
         path.write_text(json.dumps(raw), encoding="utf-8")
         again = interview.load(self.root, conversation.id)
-        self.assertEqual(again.drafted, "")
+        self.assertEqual(again.drafted, LATER.strftime(interview.STAMP))
         interview.revise(again, "plus court", now=EVEN_LATER)
         self.assertIn("plus court", interview.material(again))
+
+    def test_a_conversation_that_stamps_nothing_keeps_the_older_rule(self):
+        # Neither key, and no draft stamp either. Nothing can be said about
+        # what came after what, so the last request is the request.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        path = self.directory(conversation) / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        del raw["drafted"]
+        raw["draft"]["written"] = ""
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.drafted, "")
+        interview.revise(again, "premiere", now=EVEN_LATER)
+        interview.revise(again, "seconde", now=LATEST)
+        self.assertEqual([r.text for r in interview._pending(again)],
+                         ["seconde"])
 
     def test_the_versions_round_trip_through_the_disk(self):
         conversation = approved(self.root)

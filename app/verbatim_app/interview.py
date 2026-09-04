@@ -694,10 +694,7 @@ def write(conversation: Conversation, arguments: dict, *, problems=(),
                   tips=_notes(arguments, "tips", TIP_KINDS),
                   problems=tuple(problems),
                   written=(now or datetime.now()).strftime(STAMP))
-    _keep_version(conversation)
-    conversation.draft = draft
-    conversation.drafted = draft.written
-    return draft
+    return _install(conversation, draft)
 
 
 def write_passage(conversation: Conversation, arguments: dict, *, scope=None,
@@ -761,26 +758,31 @@ def write_passage(conversation: Conversation, arguments: dict, *, scope=None,
     # otherwise put two identical rows in the panel and count one claim
     # twice. Order is kept: `dict.fromkeys` is the cheapest way to say it.
     merged = tuple(dict.fromkeys(kept + _anchor_pairs(arguments)))
-    _keep_version(conversation)
-    conversation.draft = Draft(
+    return _install(conversation, Draft(
         body=body, anchors=merged,
         photos=conversation.draft.photos, tips=conversation.draft.tips,
         problems=tuple(problems),
-        written=(now or datetime.now()).strftime(STAMP))
-    conversation.drafted = conversation.draft.written
-    return conversation.draft
+        written=(now or datetime.now()).strftime(STAMP)))
 
 
-def _keep_version(conversation: Conversation) -> None:
-    """Put the draft about to be replaced on the pile of earlier ones.
+def _install(conversation: Conversation, draft: Draft) -> Draft:
+    """Retire the draft in front, put this one there, stamp the turn.
 
-    Called by both writers, because a rewrite is a rewrite whether it aimed
-    at the whole post or at one block. A first draft replaces nothing and
-    pushes nothing: the pile holds versions, not a slot for the absence of
-    one.
+    Three facts that have to move together, in one function so that no
+    writer can do part of it. They were three statements repeated in both
+    writers, and `earlier` filled while `drafted` stayed empty is exactly
+    the state where going back moves the comparison stamp backwards and
+    every request the discarded version answered comes back as a live
+    instruction.
+
+    A first draft retires nothing: the pile holds versions, not a slot for
+    the absence of one.
     """
     if conversation.draft is not None:
         conversation.earlier.append(conversation.draft)
+    conversation.draft = draft
+    conversation.drafted = draft.written
+    return draft
 
 
 def version(conversation: Conversation) -> int:
@@ -1363,7 +1365,13 @@ def _build(data: dict, interview_id: str) -> Conversation:
         updated=str(data.get("updated", "")),
         state=str(data.get("state") or OPEN),
         post=str(data.get("post") or ""),
-        drafted=str(data.get("drafted", "")),
+        # Seeded from the draft when the key is absent, which is a
+        # migration rather than a guess: the draft in front is the newest
+        # by construction, so its own stamp is the high water mark. Without
+        # it, a file carrying versions and no stamp lets a revert move the
+        # comparison backwards and hands the writer requests an earlier
+        # turn already answered.
+        drafted=str(data.get("drafted", "")) or _drafted(data),
         usage=Usage(int(usage.get("input_tokens") or 0),
                     int(usage.get("output_tokens") or 0)),
         spent=spent,
@@ -1372,6 +1380,18 @@ def _build(data: dict, interview_id: str) -> Conversation:
         earlier=_check_earlier(data.get("earlier")),
         revisions=_check_revisions(data.get("revisions")),
         messages=data["messages"])
+
+
+def _drafted(data: dict) -> str:
+    """When a drafting turn last ran, read off the draft on disk.
+
+    Only for a file that does not say. The current draft is newer than
+    everything in `earlier`, so its stamp is the answer whenever there is
+    one at all, and an empty string keeps the older rule for a file that
+    stamps nothing.
+    """
+    draft = data.get("draft")
+    return str(draft.get("written", "")) if isinstance(draft, dict) else ""
 
 
 def _check_sheet(data) -> Sheet | None:

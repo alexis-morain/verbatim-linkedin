@@ -1859,18 +1859,29 @@ class TestTheFirstLineIsChosenOnTheScreen(SheetCase):
         # to be silent, so anything that is not one of the shapes the form
         # sends lands on undecided and is refused.
         interview_id = self.with_sheet()
-        # The superscript is not decoration. `str.isdigit` says yes to it and
-        # `int` says no, which is a 500 out of a form field rather than the
-        # refusal this route documents. Its sibling `draft` has always
-        # caught that; this one was written without the guard.
-        for wrong in ("nope", "-1", "1.0", "nothing", "0x0", "none of them",
-                      "\u00b2", "\u0662", "9" * 5000):
+        # Three shapes worth naming. The superscript, because `str.isdigit`
+        # says yes to it and `int` says no, which was a 500 out of a form
+        # field rather than a refusal. `-2`, because it is the integer
+        # `NEITHER`, and a bare `int()` would let a decision nobody made be
+        # recorded as "I read both and took neither": the sentinel is a word
+        # precisely so that no number in this field can mean it. And `1_0`,
+        # which `int` reads as ten, because a form does not send that.
+        for wrong in ("nope", "-1", "-2", "1_0", "1.0", "nothing", "0x0",
+                      "none of them", "\u00b2", "9" * 5000):
             reply = self.approve(interview_id, first_line=wrong)
             self.assertIn("notice=first-line-missing",
                           reply.headers["location"], wrong)
             self.assertEqual(
                 interview.load(self.root, interview_id).sheet.state,
                 "proposed", wrong)
+
+    def test_a_digit_in_another_script_is_read_as_the_number_it_is(self):
+        # Not a parse failure: `int` converts it. It is refused because two
+        # is not an index into a two line sheet, and this is here so nobody
+        # later reads the list above as proof that it is caught earlier.
+        interview_id = self.with_sheet()
+        reply = self.approve(interview_id, first_line="\u0662")
+        self.assertIn("notice=first-line-missing", reply.headers["location"])
 
     def test_whitespace_around_a_decision_is_not_a_different_decision(self):
         # Form handling, not leniency about the step: a padded value is the

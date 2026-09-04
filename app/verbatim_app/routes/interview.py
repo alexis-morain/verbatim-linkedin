@@ -482,14 +482,25 @@ def approve_sheet(request: Request, interview_id: str, sheet: str = Form(""),
     point of this step is that skipping it used to be silent.
     """
     root = request.app.state.instance.root
+    picked = first_line.strip()
     try:
-        # `int` rather than `isdigit`, which says yes to a superscript and to
-        # other Unicode digits `int` then refuses, and yes to a digit string
-        # past the interpreter's own conversion limit. That gap is a 500 out
-        # of a form field rather than the refusal below. Its sibling `draft`
-        # has always parsed this way.
-        taken = (interview.NEITHER if first_line.strip() == NONE_OF_THEM
-                 else int(first_line))
+        # `isdecimal` and then `int`, and both are load bearing.
+        #
+        # `isdigit` was the first shape and it says yes to a superscript
+        # that `int` then refuses, which is a 500 out of a form field
+        # rather than the refusal below. A bare `int` was the second and it
+        # is wider than the form: it reads `-2`, which is `NEITHER`, so a
+        # click that decided nothing would be recorded as "I read both and
+        # took neither". The sentinel is a word exactly so that no number
+        # in this field can mean it. It also reads `1_0` as ten.
+        #
+        # `isdecimal` is the predicate that matches what a form sends: no
+        # sign, no separator, no superscript. The `try` stays for the digit
+        # string past the interpreter's own conversion limit, which is
+        # decimal and still raises.
+        taken = (interview.NEITHER if picked == NONE_OF_THEM
+                 else int(picked) if picked.isdecimal()
+                 else interview.UNDECIDED)
     except ValueError:
         taken = interview.UNDECIDED
     try:
