@@ -84,6 +84,15 @@ profile yet, and tells you to run `linkedin-setup` first.
 The two are the same engine over the same files. Use whichever you are in
 front of; a directory written by one is read by the other.
 
+**On macOS there is also a window**, `Verbatim.dmg` on the
+[releases page](https://github.com/alexis-morain/verbatim-linkedin/releases):
+the same app, Apple Silicon, needing neither Python nor `uv` on your machine
+because it carries [uv](https://github.com/astral-sh/uv) (Apache-2.0 OR MIT)
+and installs the engine from PyPI the first time you open it. It is not
+signed, so macOS will call it damaged and the release notes carry the one line
+that clears it. If that trade is not for you, the command above is the same
+app with no warning, and it is the one this page recommends.
+
 ![The overview: status, next session, posts per pillar, latest posts](docs/screenshots/overview.png)
 
 ## Engine and profile

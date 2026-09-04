@@ -54,3 +54,7 @@ __pycache__/
 # app virtualenv and build leftovers
 app/.venv/
 app/dist/
+
+# the macOS build: a 21 MB disk image is a release asset, not a source file
+dist/
+*.dmg

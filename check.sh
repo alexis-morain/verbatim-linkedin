@@ -284,6 +284,74 @@ else
   printf '   skip node not installed, the screen script was not tested\n'
 fi
 
+step "the launcher's provider list matches the engine's"
+# The settings sheet offers a menu of providers, and providers.py rejects any
+# name absent from its own table. Swift cannot import Python, so the list is
+# written twice; what stops it diverging in silence is this check rather than
+# somebody remembering. Same shape as the bundle list held by test_bundle.py.
+if python3 - <<'PROVIDERS'
+import ast, re, sys
+
+py = ast.parse(open("app/verbatim_app/providers.py", encoding="utf-8").read())
+engine = {}
+for node in py.body:
+    if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+        name = node.targets[0].id
+        if name in ("DEFAULT_BASE_URL", "DEFAULT_MODEL"):
+            engine[name] = ast.literal_eval(node.value)
+
+swift = open("scripts/VerbatimConfig.swift", encoding="utf-8").read()
+
+def table(name):
+    match = re.search(r"let %s = \[(.*?)\]" % name, swift, re.S)
+    if match is None:
+        return None
+    return dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]*)"', match.group(1)))
+
+def names(name):
+    match = re.search(r"let %s = \[(.*?)\]" % name, swift, re.S)
+    return re.findall(r'"([^"]+)"', match.group(1)) if match else None
+
+bad = []
+if names("PROVIDERS") != sorted(engine["DEFAULT_BASE_URL"]):
+    bad.append("PROVIDERS %s vs providers.py %s"
+               % (names("PROVIDERS"), sorted(engine["DEFAULT_BASE_URL"])))
+for name in ("DEFAULT_BASE_URL", "DEFAULT_MODEL"):
+    if table(name) != engine[name]:
+        bad.append("%s %s vs providers.py %s" % (name, table(name), engine[name]))
+
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+PROVIDERS
+then
+  ok "scripts/VerbatimConfig.swift agrees with providers.py"
+else
+  bad "the launcher offers providers the engine does not know, or the reverse"
+fi
+
+step "the macOS launcher's config file"
+# The only part of the app shell that is logic rather than lifecycle, and it
+# edits a file holding somebody's API key: it must change the four lines it
+# owns and no others. Compiled against the very source the app ships.
+if command -v swiftc >/dev/null 2>&1; then
+  probe="$(mktemp -d)"
+  if swiftc -o "$probe/config-test" \
+       scripts/VerbatimConfig.swift scripts/config-test.swift >/dev/null 2>&1 \
+     && "$probe/config-test" >/dev/null 2>&1; then
+    ok "scripts/VerbatimConfig.swift"
+  else
+    bad "scripts/VerbatimConfig.swift"
+    swiftc -o "$probe/config-test" \
+      scripts/VerbatimConfig.swift scripts/config-test.swift 2>&1 | tail -20 | sed 's/^/     /'
+    "$probe/config-test" 2>&1 | tail -20 | sed 's/^/     /'
+  fi
+  rm -rf "$probe"
+else
+  # announced degradation, not a silent pass
+  printf '   skip swiftc not installed, the macOS launcher was not tested\n'
+fi
+
 step "language packs"
 for dir in locales/*/; do
   code="$(basename "$dir")"

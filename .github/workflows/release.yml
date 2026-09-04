@@ -1,0 +1,119 @@
+# The DMG, built and attached to a release when a version tag is pushed.
+#
+# Order matters and this workflow cannot enforce all of it: the wheel must
+# already be on PyPI when the tag is pushed, because the app pins a version
+# and installs it from the index at first launch. Publish, then tag. The
+# "engine resolves" step below is what catches the mistake, before anybody
+# downloads anything.
+#
+# Tags: v2.4.0 builds a DMG pinning engine 2.4.0. A shell only fix that
+# changes no engine takes a suffix, v2.4.0-app2, and advances CFBundleVersion
+# through VERBATIM_BUILD_NUMBER.
+#
+# The DMG is unsigned. Signing needs a paid Developer ID, and a certificate
+# on its own buys nothing: unnotarised, macOS blocks the app either way. So
+# the cost is the certificate plus notarisation together, deferred until the
+# download counter on the releases page justifies it. When it does, it is two
+# commands, on the app before hdiutil and on the dmg after; scripts/dmg.sh
+# carries them in its header.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    # Apple Silicon. uv ships one binary per architecture and the app carries
+    # it, so this build is arm64 only, deliberately.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # A repository that demands the validation block before every commit
+      # does not publish a binary that has not passed it.
+      - name: check.sh
+        run: ./check.sh
+
+      - name: Build the DMG
+        env:
+          VERBATIM_BUILD_NUMBER: ${{ github.run_number }}
+        run: ./scripts/dmg.sh --out dist
+
+      # The pin points at PyPI, so prove the pin resolves before the release
+      # exists. A cold cache and a throwaway tool directory: this is the
+      # first launch of the person who downloads it, minus the window.
+      - name: The pinned engine resolves from PyPI
+        run: |
+          VERSION="$(awk -F'"' '/^version = "/ { print $2; exit }' app/pyproject.toml)"
+          echo "pinned engine: $VERSION"
+          export UV_TOOL_DIR="$RUNNER_TEMP/tools"
+          export UV_TOOL_BIN_DIR="$RUNNER_TEMP/bin"
+          export UV_PYTHON_INSTALL_DIR="$RUNNER_TEMP/python"
+          export UV_CACHE_DIR="$RUNNER_TEMP/cache"
+          uv tool install --force "verbatim-linkedin==$VERSION"
+          "$RUNNER_TEMP/bin/verbatim" --help > /dev/null
+          echo "the wheel is on the index and the command runs"
+
+      - name: The app carries what it promises
+        run: |
+          APP="$(mktemp -d)/Verbatim.app"
+          hdiutil attach -nobrowse -quiet -mountpoint "$RUNNER_TEMP/mnt" dist/*.dmg
+          cp -R "$RUNNER_TEMP/mnt/Verbatim.app" "$APP"
+          hdiutil detach -quiet "$RUNNER_TEMP/mnt"
+          test -x "$APP/Contents/Resources/uv"
+          test -x "$APP/Contents/Resources/start.sh"
+          test -f "$APP/Contents/Resources/LICENSES/README.txt"
+          test -f "$APP/Contents/MacOS/Verbatim"
+          # The clone is gone and stays gone: no git, no origin/main.
+          ! grep -q "git " "$APP/Contents/Resources/start.sh"
+          echo "the bundle holds uv, the launcher, the licences and the shell"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Verbatim-dmg
+          path: dist/*.dmg
+
+      - name: Attach it to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/*.dmg \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --notes-file - <<'NOTES'
+          ## macOS app
+
+          `Verbatim-*.dmg` is the local app in a window: Apple Silicon, no
+          Python and no `uv` needed on your machine, the engine installs
+          itself from PyPI the first time you open it.
+
+          **It is not signed**, so macOS will call it damaged when you first
+          open it. It is not damaged; it is unsigned, which is not the same
+          thing. One line clears it:
+
+          ```
+          xattr -dr com.apple.quarantine /Applications/Verbatim.app
+          ```
+
+          If you would rather not run that, `uvx verbatim-linkedin ~/my-profile`
+          is the same app with no download and no warning.
+
+          It writes to `~/Library/Application Support/Verbatim` (the engine and
+          its Python runtime), `~/Library/Logs/verbatim.log`, and
+          `~/.config/verbatim/env` (your model and key, mode 600). If you use
+          "Install Skills for Claude Code" it also writes
+          `~/.claude/skills/verbatim`, and it will refuse rather than overwrite
+          anything it did not put there itself. Removing the app leaves all of
+          those; delete them by hand.
+          NOTES
