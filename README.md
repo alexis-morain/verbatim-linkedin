@@ -161,6 +161,11 @@ skill would say what it means, and it waits for real measured posts to be
 built against, because advice written from imagined data measures the
 imagination.
 
+![The Measure screen: what is due, then sums per pillar, format and objective, with a status per threshold](docs/screenshots/measure.png)
+
+Under two measured posts, that screen concludes nothing and says so on the
+line. Nothing on it is an average.
+
 ## Languages
 
 Three axes, and they are independent:
