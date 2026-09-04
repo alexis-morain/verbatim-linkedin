@@ -25,6 +25,7 @@ const {load, page, streamed, refused, settled} = require("./dom.js");
    the contract, and they are FRAME_KEYS in routes/interview.py. */
 const STRINGS = {
   said: "you-said", asked: "verbatim-asked",
+  sheet_first_line_none: "neither-of-these",
   sufficiency: "material {ratio}%",
   sufficiency_counts: "{facts}/{enough} facts, {figures} num, {named} named",
   tool_call: "reads", tool_result: "answered", tool_failed: "refused",
@@ -63,6 +64,20 @@ function opened(options) {
   return load(page(STRINGS, options));
 }
 
+/* The proposed first lines as a reader sees them: the label text, with the
+   radio that carries the choice left out. */
+function lines(screen) {
+  return screen.at("sheet-first-lines").children
+    .map((li) => li.read().trim())
+    .filter((text) => text !== STRINGS.sheet_first_line_none);
+}
+
+/* Every choice the panel offers, as the values that would be submitted. */
+function choices(screen) {
+  return screen.at("sheet-first-lines").querySelectorAll("input")
+    .map((node) => node.getAttribute("value"));
+}
+
 const A_SHEET = {
   kind: "sheet", state: "proposed",
   angle: "The migration nobody asked for",
@@ -89,10 +104,47 @@ test("a sheet frame fills the panel and moves the digest into the form",
   assert.deepStrictEqual(
     screen.at("sheet-elements").children.map((li) => li.textContent),
     A_SHEET.elements);
-  assert.deepStrictEqual(
-    screen.at("sheet-first-lines").children.map((li) => li.textContent),
-    A_SHEET.first_lines);
+  assert.deepStrictEqual(lines(screen), A_SHEET.first_lines);
 });
+
+
+/* ------------------------------------------ the first line, on the live path */
+
+test("a sheet arriving mid stream offers the choice, refusal included",
+     async () => {
+  /* F1 on the wire. The panel is filled by the client when a sheet lands
+     without a reload, so a choice that only existed in the template would
+     be a step that vanishes on exactly the path everybody takes. */
+  const screen = opened();
+  await turn(screen, "go on", [frame(A_SHEET)]);
+
+  assert.deepStrictEqual(choices(screen), ["0", "1", "none"]);
+  assert.deepStrictEqual(lines(screen), A_SHEET.first_lines);
+});
+
+test("the choice travels with the approval form and is required",
+     async () => {
+  const screen = opened();
+  await turn(screen, "go on", [frame(A_SHEET)]);
+
+  const radio = screen.at("sheet-first-lines").querySelectorAll("input")[0];
+  assert.strictEqual(radio.getAttribute("type"), "radio");
+  assert.strictEqual(radio.getAttribute("name"), "first_line");
+  assert.strictEqual(radio.getAttribute("form"), "sheet-approve");
+  assert.strictEqual(radio.getAttribute("required"), "required");
+});
+
+test("a second sheet replaces the choice instead of adding to it",
+     async () => {
+  const screen = opened();
+  await turn(screen, "go on", [frame(A_SHEET)]);
+  await turn(screen, "not that", [frame(Object.assign({}, A_SHEET, {
+    first_lines: ["Try this."], digest: "0000deadbeef"
+  }))]);
+
+  assert.deepStrictEqual(choices(screen), ["0", "none"]);
+});
+
 
 test("a sheet with no digest empties the form rather than leaving the old one",
      async () => {
@@ -118,9 +170,7 @@ test("a second sheet replaces the lists instead of growing them", async () => {
   assert.deepStrictEqual(
     screen.at("sheet-elements").children.map((li) => li.textContent),
     ["one line"]);
-  assert.deepStrictEqual(
-    screen.at("sheet-first-lines").children.map((li) => li.textContent),
-    ["Try this."]);
+  assert.deepStrictEqual(lines(screen), ["Try this."]);
   assert.strictEqual(screen.at("sheet-digest").value, "0000deadbeef");
 });
 

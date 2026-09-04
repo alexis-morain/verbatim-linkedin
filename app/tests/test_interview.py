@@ -845,7 +845,7 @@ class TestTheSheet(InterviewCase):
         conversation = started(self.root)
         interview.propose(conversation, proposal(), now=WHEN)
         interview.approve(conversation, conversation.sheet.digest(),
-                          now=LATER)
+                          first_line=0, now=LATER)
         with self.assertRaisesRegex(interview.InterviewError, "frozen"):
             interview.propose(conversation, proposal(angle="Another one"))
         self.assertEqual(conversation.sheet.angle, SHEET["angle"])
@@ -934,7 +934,7 @@ class TestTheSheet(InterviewCase):
         interview.propose(conversation, proposal(), now=WHEN)
         self.assertTrue(interview.approve(conversation,
                                           conversation.sheet.digest(),
-                                          now=LATER))
+                                          first_line=0, now=LATER))
         self.assertEqual(conversation.sheet.state, "approved")
         self.assertEqual(conversation.sheet.approved, "2026-08-28T14:41:02")
         self.assertTrue(interview.sheet_approved(conversation))
@@ -943,9 +943,10 @@ class TestTheSheet(InterviewCase):
         conversation = started(self.root)
         interview.propose(conversation, proposal(), now=WHEN)
         interview.approve(conversation, conversation.sheet.digest(),
-                          now=LATER)
+                          first_line=0, now=LATER)
         self.assertFalse(interview.approve(conversation,
                                            conversation.sheet.digest(),
+                                           first_line=0,
                                            now=datetime(2026, 8, 28, 15, 0)))
         self.assertEqual(conversation.sheet.approved, "2026-08-28T14:41:02")
 
@@ -991,6 +992,164 @@ class TestTheSheet(InterviewCase):
         conversation = started(self.root)
         interview.propose(conversation, proposal())
         self.assertFalse(interview.sheet_approved(conversation))
+
+
+
+class TestTheFirstLineIsDecided(InterviewCase):
+    """F1. The sheet proposes one or two first lines and nothing recorded
+    which one was taken.
+
+    The skill already says the post is written for the chosen proposal, to
+    the character. Nobody was ever asked, so nothing was ever chosen, and
+    what the model does with no decision is write a lukewarm self
+    description over two proposals that were better. The step existed and
+    was invisible; this makes it a decision that has to be made.
+    """
+
+    def sheet(self, **kwargs):
+        conversation = started(self.root)
+        interview.propose(conversation, proposal(**kwargs), now=WHEN)
+        return conversation
+
+    def test_approving_records_which_line_was_taken(self):
+        conversation = self.sheet()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=1, now=LATER)
+        self.assertEqual(conversation.sheet.first_line, 1)
+        self.assertEqual(conversation.sheet.chosen,
+                         conversation.sheet.first_lines[1])
+
+    def test_neither_is_a_decision_and_is_recorded_as_one(self):
+        conversation = self.sheet()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=interview.NEITHER, now=LATER)
+        self.assertEqual(conversation.sheet.first_line, interview.NEITHER)
+        self.assertEqual(conversation.sheet.chosen, "")
+        self.assertTrue(conversation.sheet.decided)
+
+    def test_an_approval_that_decided_nothing_is_refused(self):
+        # The whole of F1. Silence used to be the common case and it was
+        # indistinguishable from a choice.
+        conversation = self.sheet()
+        with self.assertRaises(interview.FirstLineMissing):
+            interview.approve(conversation, conversation.sheet.digest(),
+                              now=LATER)
+        self.assertEqual(conversation.sheet.state, interview.PROPOSED)
+
+    def test_a_line_that_is_not_on_the_sheet_is_refused(self):
+        conversation = self.sheet()
+        for wrong in (2, 7, -3):
+            with self.assertRaises(interview.FirstLineMissing):
+                interview.approve(conversation, conversation.sheet.digest(),
+                                  first_line=wrong, now=LATER)
+
+    def lineless(self):
+        """A sheet offering no first line, built by hand because `propose`
+        refuses one: `_sheet_lines` has always required a non-empty list.
+        So this shape reaches the engine from disk alone, which is a
+        conversation written before this step existed, and it is the shape
+        the refusal below must not fire on."""
+        conversation = started(self.root)
+        conversation.sheet = interview.Sheet(
+            angle="Four months lost", elements=("four months",),
+            moment="j'ai arrete", conviction="le direct paie",
+            first_lines=(), proposed=WHEN.strftime(interview.STAMP))
+        return conversation
+
+    def test_a_sheet_offering_no_line_asks_nothing(self):
+        # Nothing to choose between, so no step to skip. A refusal here
+        # would be an unanswerable question.
+        conversation = self.lineless()
+        self.assertTrue(interview.approve(conversation,
+                                          conversation.sheet.digest(),
+                                          now=LATER))
+        self.assertFalse(conversation.sheet.decided)
+
+    def test_a_second_click_is_the_same_decision_not_an_error(self):
+        conversation = self.sheet()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
+        self.assertFalse(interview.approve(conversation,
+                                           conversation.sheet.digest(),
+                                           first_line=1, now=LATER))
+        # And it does not move the decision either: the sheet is frozen.
+        self.assertEqual(conversation.sheet.first_line, 0)
+
+    def test_the_choice_is_not_in_the_digest(self):
+        # The digest identifies the sheet somebody read. The choice is part
+        # of the signature, not part of what is signed, and a digest moving
+        # with it could never be matched by the form that carries the click.
+        conversation = self.sheet()
+        before = conversation.sheet.digest()
+        interview.approve(conversation, before, first_line=1, now=LATER)
+        self.assertEqual(conversation.sheet.digest(), before)
+
+    def test_the_writer_is_told_which_line_was_taken(self):
+        conversation = self.sheet()
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=1, now=LATER)
+        material = interview.material(conversation)
+        self.assertIn(f'"first_line": "{conversation.sheet.first_lines[1]}"',
+                      material)
+
+    def test_the_writer_is_told_when_neither_was_taken(self):
+        # Not silence. A writer that cannot tell "nobody decided" from "both
+        # were refused" writes the lukewarm line in both cases.
+        conversation = self.sheet()
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=interview.NEITHER, now=LATER)
+        self.assertIn('"first_line": null', interview.material(conversation))
+
+    def test_a_sheet_nobody_was_asked_about_says_nothing_to_the_writer(self):
+        conversation = self.lineless()
+        interview.say(conversation, "le canal direct est le seul qui paie")
+        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        material = interview.material(conversation)
+        self.assertNotIn('"first_line":', material)
+
+    def test_the_choice_credits_nothing_to_the_person(self):
+        # An approval is a consent, not an utterance, and picking a line the
+        # engine wrote is not saying it. `anchoring.md` again.
+        conversation = self.sheet()
+        before = interview.sufficiency(conversation)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
+        self.assertEqual(interview.sufficiency(conversation), before)
+        self.assertNotIn(conversation.sheet.chosen, conversation.said())
+
+    def test_the_choice_round_trips_through_the_disk(self):
+        conversation = self.sheet()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=1, now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.sheet, conversation.sheet)
+
+    def test_a_sheet_nobody_decided_on_means_no_key_on_disk(self):
+        # A conversation written before this step existed reads back byte
+        # for byte, and reads back undecided rather than as a choice.
+        conversation = self.sheet()
+        interview.save(self.root, conversation, now=WHEN)
+        raw = json.loads((self.directory(conversation)
+                          / interview.CONVERSATION).read_text(encoding="utf-8"))
+        self.assertNotIn("first_line", raw["sheet"])
+        self.assertEqual(interview.load(self.root, conversation.id)
+                         .sheet.first_line, interview.UNDECIDED)
+
+    def test_a_choice_of_the_wrong_shape_on_disk_is_refused(self):
+        conversation = self.sheet()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        path = self.directory(conversation) / interview.CONVERSATION
+        for wrong in ("0", True, 1.5, None):
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw["sheet"]["first_line"] = wrong
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            with self.assertRaises(interview.InterviewError):
+                interview.load(self.root, conversation.id)
 
 
 class TestAMangledSheetOnDisk(InterviewCase):
@@ -1049,7 +1208,8 @@ def approved(root):
     conversation = started(root)
     interview.say(conversation, "le canal direct est le seul qui paie")
     interview.propose(conversation, proposal(), now=WHEN)
-    interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+    interview.approve(conversation, conversation.sheet.digest(),
+                      first_line=0, now=LATER)
     return conversation
 
 
@@ -1346,7 +1506,8 @@ class TestOnlyWhatTheAuthorSaidCredits(InterviewCase):
             moment="on a signe 6800 euros",
             conviction="le direct paie",
             first_lines=["Quatre mois.", "2024 fut long."]), now=WHEN)
-        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
         self.assertEqual(interview.sufficiency(conversation), before)
 
     def test_a_tool_result_credits_nothing(self):
@@ -1478,7 +1639,8 @@ class TestWhatTheDraftIsCheckedAgainst(InterviewCase):
                          "SaaS, three to five days a month.")))
         interview.say(conversation, "le canal direct est le seul qui paie")
         interview.propose(conversation, proposal(), now=WHEN)
-        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
         interview.write(conversation, offer(
             body="Fractional CFO work for seed and Series A B2B SaaS.\n\n"
                  "Le canal direct est le seul qui paie.",
@@ -1576,7 +1738,8 @@ class TestASheetBacking(InterviewCase):
         interview.propose(conversation, proposal(), now=WHEN)
         self.assertEqual(sorted(interview.sources(conversation)),
                          ["transcript"])
-        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=LATER)
         found = interview.sources(conversation)
         self.assertEqual(sorted(found), ["sheet", "transcript"])
         self.assertEqual(found["transcript"], conversation.said())

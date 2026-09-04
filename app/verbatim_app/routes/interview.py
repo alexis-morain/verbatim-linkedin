@@ -233,7 +233,12 @@ def begin(request: Request, seed: str = Form("")):
 #: query string is anybody's to write and an unknown value must render as
 #: nothing rather than reach the string table.
 NOTICES = ("sheet-changed", "draft-changed", "turn-running",
-           "idea-not-moved")
+           "first-line-missing", "idea-not-moved")
+
+#: What the form sends for "I read both and took neither". A word rather
+#: than a number, because every number in that field is an index into the
+#: lines and a sentinel index is one off-by-one away from being one of them.
+NONE_OF_THEM = "none"
 
 
 def panel(conversation) -> dict:
@@ -448,7 +453,8 @@ def discard(request: Request, interview_id: str):
 
 
 @router.post("/interview/{interview_id}/sheet/approve")
-def approve_sheet(request: Request, interview_id: str, sheet: str = Form("")):
+def approve_sheet(request: Request, interview_id: str, sheet: str = Form(""),
+                  first_line: str = Form("")):
     """The person's click, the only writer of `approved`.
 
     Taken under the turn lock: a running turn is saving this conversation,
@@ -462,8 +468,21 @@ def approve_sheet(request: Request, interview_id: str, sheet: str = Form("")):
     replacement the person never read would put their signature under the
     model's unreviewed text. A mismatch approves nothing and the screen says
     why, showing what is actually there now.
+
+    `first_line` is which of the proposed openings they took, as its index,
+    or `none` for both refused. It arrives as text because a form field
+    does, and anything that is not one of those two shapes is not a
+    decision: it is read here rather than trusted, and what it falls back to
+    is `UNDECIDED`, which `approve` refuses. Fail closed, because the whole
+    point of this step is that skipping it used to be silent.
     """
     root = request.app.state.instance.root
+    if first_line.strip() == NONE_OF_THEM:
+        taken = interview.NEITHER
+    elif first_line.strip().isdigit():
+        taken = int(first_line)
+    else:
+        taken = interview.UNDECIDED
     try:
         interview.load(root, interview_id)
     except interview.InterviewError:
@@ -474,8 +493,15 @@ def approve_sheet(request: Request, interview_id: str, sheet: str = Form("")):
         try:
             try:
                 conversation = interview.load(root, interview_id)
-                if interview.approve(conversation, sheet):
+                if interview.approve(conversation, sheet, taken):
                     interview.save(root, conversation)
+            except interview.FirstLineMissing:
+                # The step, made unskippable. The form marks the choice
+                # required and a browser enforces that; this is the same
+                # rule where it is a rule rather than a courtesy.
+                return RedirectResponse(
+                    f"/interview/{interview_id}?notice=first-line-missing",
+                    status_code=303)
             except interview.SheetChanged:
                 # The code travels in the URL, the sentence lives in the pack.
                 return RedirectResponse(
@@ -1111,6 +1137,7 @@ FRAME_KEYS = (
     "interview.error_sheet_not_read", "interview.error_draft_not_read",
     "interview.error_unknown", "interview.tokens", "interview.spent",
     "interview.sufficiency", "interview.sufficiency_counts",
+    "interview.sheet_first_line_none",
 )
 
 

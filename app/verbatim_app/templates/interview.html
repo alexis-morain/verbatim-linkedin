@@ -49,6 +49,8 @@
   <h2>{{ t('interview.sheet') }}</h2>
   {% if notice == 'sheet-changed' %}
   <p class="callout">{{ t('interview.sheet_changed') }}</p>
+  {% elif notice == 'first-line-missing' %}
+  <p class="callout" id="first-line-missing">{{ t('interview.sheet_first_line_missing') }}</p>
   {% elif notice == 'turn-running' %}
   <p class="callout">{{ t('interview.error_turn_running') }}</p>
   {% endif %}
@@ -63,7 +65,20 @@
     <dt class="mono">{{ t('interview.sheet_conviction') }}</dt>
     <dd id="sheet-conviction" class="their-words">{{ sheet.conviction if sheet }}</dd>
     <dt class="mono">{{ t('interview.sheet_first_lines') }}</dt>
-    <dd><ul id="sheet-first-lines" class="their-words">{% if sheet %}{% for line in sheet.first_lines %}<li>{{ line }}</li>{% endfor %}{% endif %}</ul></dd>
+    {# The step F1 exists for. The skill already says the post is written for
+       the chosen proposal, to the character; nothing recorded a choice, so
+       nothing was ever written for one, and a model with no decision opens
+       on a lukewarm self description. The radios carry `form`, so the
+       choice lives beside the line it is about and still travels with the
+       approval below. Taking neither is on the list: it is a decision, and
+       the only thing refused here is deciding nothing. #}
+    <dd><ul id="sheet-first-lines" class="their-words">{% if sheet %}{% for line in sheet.first_lines %}
+      <li>{% if sheet.state == 'proposed' and conversation.state == 'open' %}<label><input type="radio" name="first_line" value="{{ loop.index0 }}" form="sheet-approve" required> {{ line }}</label>{% else %}{% if sheet.first_line == loop.index0 %}<span class="badge mono">{{ t('interview.sheet_first_line_taken') }}</span> {% endif %}{{ line }}{% endif %}</li>
+      {% endfor %}{% if sheet.state == 'proposed' and conversation.state == 'open' %}
+      <li class="hint"><label><input type="radio" name="first_line" value="none" form="sheet-approve" required> {{ t('interview.sheet_first_line_none') }}</label></li>
+      {% elif sheet.first_line == -2 %}
+      <li class="hint">{{ t('interview.sheet_first_line_none_taken') }}</li>
+      {% endif %}{% endif %}</ul></dd>
   </dl>
   {# How it arrived. Hidden until there is something to say, and filled by the
      script from the same frame that fills the fields above: a sheet parsed out

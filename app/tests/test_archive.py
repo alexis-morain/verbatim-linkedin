@@ -69,7 +69,8 @@ class ArchiveCase(unittest.TestCase):
             "moment": "rien de signe",
             "conviction": "le canal direct est le seul qui paie",
             "first_lines": ["Quatre mois a vendre aux agences."]}, now=WHEN)
-        interview.approve(conversation, conversation.sheet.digest(), now=WHEN)
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0, now=WHEN)
         fields = dict(body=BODY, anchors=[
             {"post": "Onze conversations", "said": "quatre mois a vendre"}])
         fields.update(draft)

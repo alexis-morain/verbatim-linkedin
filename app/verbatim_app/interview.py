@@ -63,6 +63,15 @@ CLOSED = "closed"
 PROPOSED = "proposed"
 APPROVED = "approved"
 
+#: Which first line the person took, when the sheet offered any. An index
+#: into `first_lines`, or one of these two. `UNDECIDED` is a sheet nobody was
+#: ever asked about: one approved before this step existed, or one that
+#: proposed no line to choose between. `NEITHER` is a decision, and the
+#: difference is the whole of F1: a writer that cannot tell "nobody chose"
+#: from "both were refused" writes the same lukewarm opening for both.
+UNDECIDED = -1
+NEITHER = -2
+
 #: What one moment of a conversation is, once the wire shape is read for what
 #: it means. `said` and `asked` are people talking; `call` and `result` are the
 #: engine reaching for a file. The screen shows all four, the transcript keeps
@@ -126,6 +135,13 @@ class InterviewError(Exception):
     pass
 
 
+class FirstLineMissing(InterviewError):
+    """An approval that decided nothing about the first line, on a sheet
+    that offered one. Its own class rather than a message, like
+    `SheetChanged`: the screen answering it has a sentence to say and a form
+    to redraw with the choice still open."""
+
+
 class DraftChanged(InterviewError):
     """The draft on disk is not the draft the screen was showing. Its own
     class rather than a message, for the same reason `SheetChanged` is one:
@@ -161,6 +177,26 @@ class Sheet:
     #: person signing this is entitled to know which of the two is in front
     #: of them, since a sheet parsed out of free text is the weaker object.
     problems: tuple = ()
+    #: Which of the proposed first lines they took, as an index, or
+    #: `NEITHER`. Written by the click that approves and by nothing else:
+    #: the skill says the post is written for the chosen proposal, to the
+    #: character, and until this existed nothing ever recorded one.
+    first_line: int = UNDECIDED
+
+    @property
+    def decided(self) -> bool:
+        """Whether anybody was ever asked. False on a sheet that offered no
+        line, and on one approved before this step existed."""
+        return self.first_line != UNDECIDED
+
+    @property
+    def chosen(self) -> str:
+        """The line they took, empty when they took neither. Empty is not a
+        missing answer: `decided` is the field that says whether there is
+        one."""
+        if 0 <= self.first_line < len(self.first_lines):
+            return self.first_lines[self.first_line]
+        return ""
 
     def digest(self) -> str:
         """What identifies this sheet: its content, nothing else.
@@ -506,6 +542,7 @@ def propose(conversation: Conversation, arguments: dict, *, problems=(),
 
 
 def approve(conversation: Conversation, digest: str,
+            first_line: int = UNDECIDED,
             now: datetime | None = None) -> bool:
     """The person's half: freeze the sheet. Returns whether anything changed,
     so a double click is a repeat of the same decision, not an error. The
@@ -528,8 +565,22 @@ def approve(conversation: Conversation, digest: str,
             f"the sheet of {conversation.id} is not the one this approval "
             "was read from")
     if conversation.sheet.state == APPROVED:
+        # A second click is a repeat of the same decision, and the sheet is
+        # frozen, so a different choice arriving with it changes nothing
+        # either. What was signed stays signed.
         return False
+    lines = conversation.sheet.first_lines
+    if lines and not (first_line == NEITHER or 0 <= first_line < len(lines)):
+        # The step made unskippable. The skill says the post is written for
+        # the chosen proposal, to the character; nothing recorded a choice,
+        # so nothing was ever written for one, and what a model does with no
+        # decision is open on a lukewarm self description. Taking neither is
+        # a decision and passes here. Deciding nothing does not.
+        raise FirstLineMissing(
+            f"the sheet of {conversation.id} offers a first line and this "
+            "approval takes none of them and refuses none of them")
     conversation.sheet.state = APPROVED
+    conversation.sheet.first_line = first_line if lines else UNDECIDED
     conversation.sheet.approved = (now or datetime.now()).strftime(STAMP)
     return True
 
@@ -913,7 +964,13 @@ def material(conversation: Conversation, *, scope=None) -> str:
     parts.append("## Sheet\n\n" + json.dumps(
         {"angle": sheet.angle, "elements": list(sheet.elements),
          "moment": sheet.moment, "conviction": sheet.conviction,
-         "first_lines": list(sheet.first_lines), "state": sheet.state},
+         "first_lines": list(sheet.first_lines), "state": sheet.state,
+         # Three states, and the absent key is one of them. A string is the
+         # line they took, `null` is both refused, and no key at all is a
+         # sheet nobody was ever asked about. Structure rather than a
+         # sentence, like everything else in this block: a sentence here
+         # would be one language on every screen.
+         **({"first_line": sheet.chosen or None} if sheet.decided else {})},
         ensure_ascii=False, indent=2))
     pending = _pending(conversation)
     if pending:
@@ -1208,6 +1265,10 @@ def _as_json(conversation: Conversation) -> str:
             "conviction": sheet.conviction,
             "first_lines": list(sheet.first_lines),
             "problems": list(sheet.problems),
+            # Written only once somebody decided, so a conversation from
+            # before this step reads back byte for byte, and reads back
+            # undecided rather than as a choice nobody made.
+            **({"first_line": sheet.first_line} if sheet.decided else {}),
             "proposed": sheet.proposed,
             "approved": sheet.approved,
         }
@@ -1333,7 +1394,14 @@ def _check_sheet(data) -> Sheet | None:
     if not isinstance(problems, list) or not all(
             isinstance(entry, str) for entry in problems):
         raise ValueError("sheet")
+    first_line = data.get("first_line", UNDECIDED)
+    if isinstance(first_line, bool) or not isinstance(first_line, int):
+        # A bool is an int in Python and `True` would read as index 1, a
+        # choice nobody made, on the one field that says what the post was
+        # written for.
+        raise ValueError("sheet")
     return Sheet(
+        first_line=first_line,
         angle=str(data.get("angle", "")),
         elements=tuple(data["elements"]),
         moment=str(data.get("moment", "")),

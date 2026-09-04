@@ -22,6 +22,10 @@
   if (!turns || !strings) { return; }
 
   var T = JSON.parse(strings.textContent);
+  /* What the form sends for "I read both and took neither". The same word
+     the route reads, and a word rather than a number because every number
+     in that field is an index into the lines. */
+  var NONE_OF_THEM = "none";
   var box = form ? document.getElementById("text") : null;
   var button = form ? form.querySelector("button") : null;
   var ask = document.getElementById("ask-sheet");
@@ -189,6 +193,55 @@
     });
   }
 
+  function firstLines(entries) {
+    /* The proposed openings, each one a choice rather than a line to read.
+       The skill writes the post for the chosen proposal, to the character,
+       and until somebody was asked nothing was ever chosen: a model with no
+       decision opens on a lukewarm self description. So the step is on the
+       screen, and the last option is refusing both, which is a decision and
+       not the absence of one.
+
+       Built here as well as in the template, because a sheet that lands
+       mid stream fills this panel with no reload: a choice that only
+       existed server side would be a step that disappears on the path
+       everybody takes. The radios carry `form`, so they sit beside the line
+       they are about and still travel with the approval below.
+
+       Replaced whole, like every other list here. Radios left behind from
+       an earlier proposal would offer lines this sheet does not have and
+       carry indexes into it. */
+    var list = document.getElementById("sheet-first-lines");
+    if (!list) { return; }
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+    (entries || []).forEach(function (entry, index) {
+      list.appendChild(choice(String(index), entry));
+    });
+    if ((entries || []).length) {
+      var neither = choice(NONE_OF_THEM, T.sheet_first_line_none);
+      neither.className = "hint";
+      list.appendChild(neither);
+    }
+  }
+
+  function choice(value, label) {
+    /* One radio and its words. `textContent` for the words, like every
+       other thing on this page that came off a model. */
+    var item = document.createElement("li");
+    var wrap = document.createElement("label");
+    var radio = document.createElement("input");
+    radio.setAttribute("type", "radio");
+    radio.setAttribute("name", "first_line");
+    radio.setAttribute("value", value);
+    radio.setAttribute("form", "sheet-approve");
+    radio.setAttribute("required", "required");
+    var words = document.createElement("span");
+    words.textContent = label;
+    wrap.appendChild(radio);
+    wrap.appendChild(words);
+    item.appendChild(wrap);
+    return item;
+  }
+
   function sheet(frame) {
     /* Values into slots, nothing else: the panel and its labels are on the
        page already, rendered from the language pack. The approve form is the
@@ -202,7 +255,7 @@
       if (node) { node.textContent = slots[id]; }
     });
     refill(document.getElementById("sheet-elements"), frame.elements);
-    refill(document.getElementById("sheet-first-lines"), frame.first_lines);
+    firstLines(frame.first_lines);
     /* How this sheet arrived, and it is not decoration. A sheet parsed out of
        an answer that ignored its tool is a weaker object than one a model
        committed to, and the person about to sign it decides with that in

@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.3.0
+version: 0.4.0
 ---
 
 # Write a post
@@ -101,7 +101,11 @@ Three hard rules on this sheet:
   "plausible", no inference. A model that knows how an infrastructure usually
   works will write the usual one as a fact. That is the failure this prevents.
 - The first line is the only thing most readers will see. If a proposal is
-  chosen, **the post is written for it**, to the character.
+  chosen, **the post is written for it**, to the character. The person is
+  asked which one, and taking neither is one of the answers: a sheet whose
+  `first_line` is `null` was read and both proposals were refused, so the
+  post opens on a line written for this angle and never on either of them.
+  A sheet with no `first_line` at all is one nobody was asked about.
 - Once the sheet is approved, the interview is closed. No more questions.
 
 ## Writing

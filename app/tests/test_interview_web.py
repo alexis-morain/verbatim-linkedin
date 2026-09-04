@@ -1559,18 +1559,25 @@ class SheetCase(WebCase):
         conversation = interview.load(self.root, interview_id)
         interview.propose(conversation, dict(SHEET_ARGS))
         if approved:
-            interview.approve(conversation, conversation.sheet.digest())
+            interview.approve(conversation, conversation.sheet.digest(),
+                              first_line=0)
         interview.save(self.root, conversation)
         return interview_id
 
-    def approve(self, interview_id, digest=None):
+    def approve(self, interview_id, digest=None, first_line="0"):
         """POST the click. The digest defaults to the disk's, which is what
-        a fresh page would carry; a test about staleness passes its own."""
+        a fresh page would carry; a test about staleness passes its own.
+
+        `first_line` is which proposed opening was taken, and it defaults to
+        the first one because a form that carries no choice is refused: the
+        tests about that refusal pass their own.
+        """
         if digest is None:
             sheet = interview.load(self.root, interview_id).sheet
             digest = sheet.digest() if sheet else ""
         return self.client.post(f"/interview/{interview_id}/sheet/approve",
-                                data={"sheet": digest},
+                                data={"sheet": digest,
+                                      "first_line": first_line},
                                 follow_redirects=False)
 
 
@@ -1810,6 +1817,94 @@ class TestAnApprovedSheetEndsTheQuestions(SheetCase):
 
 
 
+
+class TestTheFirstLineIsChosenOnTheScreen(SheetCase):
+    """F1. The sheet proposes one or two openings and the click that
+    approves it now says which one was taken.
+
+    The skill already says the post is written for the chosen proposal, to
+    the character. Nobody was ever asked, so nothing was ever chosen, and
+    what the model does with no decision is open on a lukewarm self
+    description over two proposals that were better.
+    """
+
+    def test_a_proposed_sheet_offers_the_choice_beside_the_lines(self):
+        interview_id = self.with_sheet()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('name="first_line" value="0"', page.text)
+        self.assertIn('name="first_line" value="1"', page.text)
+        self.assertIn('name="first_line" value="none"', page.text)
+        # Beside the line and still part of the approval: the radios are
+        # inside the sheet display and carry the form they belong to.
+        self.assertIn('form="sheet-approve" required', page.text)
+
+    def test_an_approval_that_decided_nothing_writes_nothing(self):
+        interview_id = self.with_sheet()
+        reply = self.approve(interview_id, first_line="")
+        self.assertEqual(reply.status_code, 303)
+        self.assertIn("notice=first-line-missing", reply.headers["location"])
+        self.assertEqual(interview.load(self.root, interview_id).sheet.state,
+                         "proposed")
+
+    def test_the_screen_says_why_nothing_was_approved(self):
+        interview_id = self.with_sheet()
+        page = self.client.get(
+            f"/interview/{interview_id}?notice=first-line-missing")
+        self.assertIn(
+            shown(self.app.state.t("interview.sheet_first_line_missing")),
+            page.text)
+
+    def test_a_value_that_is_not_a_decision_is_not_read_as_one(self):
+        # Fail closed. The whole point of the step is that skipping it used
+        # to be silent, so anything that is not one of the shapes the form
+        # sends lands on undecided and is refused.
+        interview_id = self.with_sheet()
+        for wrong in ("nope", "-1", "1.0", "nothing", "0x0", "none of them"):
+            reply = self.approve(interview_id, first_line=wrong)
+            self.assertIn("notice=first-line-missing",
+                          reply.headers["location"], wrong)
+            self.assertEqual(
+                interview.load(self.root, interview_id).sheet.state,
+                "proposed", wrong)
+
+    def test_whitespace_around_a_decision_is_not_a_different_decision(self):
+        # Form handling, not leniency about the step: a padded value is the
+        # same click.
+        interview_id = self.with_sheet()
+        self.approve(interview_id, first_line=" none ")
+        self.assertEqual(interview.load(self.root, interview_id)
+                         .sheet.first_line, interview.NEITHER)
+
+    def test_taking_one_records_it_and_the_screen_says_which(self):
+        interview_id = self.with_sheet()
+        self.approve(interview_id, first_line="1")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.sheet.first_line, 1)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(shown(self.app.state.t(
+            "interview.sheet_first_line_taken")), page.text)
+        # And the choice is gone from the screen as a choice: an approved
+        # sheet is frozen, and a radio that changes nothing is a lie.
+        self.assertNotIn('name="first_line"', page.text)
+
+    def test_refusing_both_is_recorded_and_said(self):
+        interview_id = self.with_sheet()
+        self.approve(interview_id, first_line="none")
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.sheet.first_line, interview.NEITHER)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(shown(self.app.state.t(
+            "interview.sheet_first_line_none_taken")), page.text)
+
+    def test_the_writer_is_handed_the_line_that_was_taken(self):
+        interview_id = self.with_sheet()
+        self.approve(interview_id, first_line="1")
+        conversation = interview.load(self.root, interview_id)
+        material = interview.material(conversation)
+        self.assertIn(f'"first_line": "{SHEET_ARGS["first_lines"][1]}"',
+                      material)
+
+
 class TestNothingIsOfferedWithNoHistoryBehindIt(SheetCase):
     """E2. Alchie's back arrow does not exist until the third question, and
     the rule under it is the one worth taking: a control with nothing behind
@@ -1913,7 +2008,8 @@ class DraftCase(SheetCase):
                       "le canal direct est le seul qui paie, j'ai arrêté "
                       "les agences")
         interview.propose(conversation, dict(SHEET_ARGS))
-        interview.approve(conversation, conversation.sheet.digest())
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0)
         interview.save(self.root, conversation)
         return interview_id
 
@@ -2968,7 +3064,8 @@ class TestATurnWhoseToolDidFire(SheetCase):
         conversation = interview.load(self.root, interview_id)
         interview.say(conversation, "le canal direct est le seul qui paie")
         interview.propose(conversation, dict(SHEET_ARGS))
-        interview.approve(conversation, conversation.sheet.digest())
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=0)
         interview.save(self.root, conversation)
         self.transport.scripts = self.transport.scripts[2:]
         reply = self.client.post(f"/interview/{interview_id}/draft",
