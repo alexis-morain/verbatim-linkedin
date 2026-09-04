@@ -807,6 +807,18 @@ def _sheet_fields(sheet) -> dict:
                 digest=sheet.digest())
 
 
+#: What a turn is doing, by the tool it just reached for. The screen shows a
+#: line saying so while it waits, and the names stay here: a browser holding
+#: them would be a second place deciding which tool writes a post. Anything
+#: not on this map has no phase, which the screen renders as no line rather
+#: than as a bare token.
+PHASE_OF = {SHEET_TOOL: "sheet", DRAFT_TOOL: "post", PASSAGE_TOOL: "post"}
+
+
+def _phase(name: str) -> str:
+    return PHASE_OF.get(name, "")
+
+
 def _frame(kind: str, **fields) -> str:
     return "data: " + json.dumps(dict(kind=kind, **fields),
                                  ensure_ascii=False) + "\n\n"
@@ -980,7 +992,8 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
             keep()
             if step.kind == "tool_call":
                 yield _frame("tool_call", id=step.call.id, name=step.call.name,
-                             arguments=step.call.arguments)
+                             arguments=step.call.arguments,
+                             phase=_phase(step.call.name))
             elif step.kind == "tool_result":
                 yield _frame("tool_result", id=step.call.id,
                              name=step.call.name, result=step.result,
@@ -1138,6 +1151,8 @@ FRAME_KEYS = (
     "interview.error_unknown", "interview.tokens", "interview.spent",
     "interview.sufficiency", "interview.sufficiency_counts",
     "interview.sheet_first_line_none",
+    "interview.waiting_sheet", "interview.waiting_post",
+    "interview.waiting_finishing",
 )
 
 

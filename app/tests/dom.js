@@ -176,7 +176,12 @@ Document.prototype.place = function (parent, tag, id, fields) {
 
 /* A reply the client can drain. `chunks` are raw network reads, so a caller
    can cut one SSE frame in half and hand over the halves separately. */
-function streamed(chunks) {
+function streamed(chunks, options) {
+  /* `hold` leaves the stream open once the chunks are read, which is a turn
+     still in flight: the model has said what it has said so far and the
+     provider has not closed. It is the only way to look at a screen mid
+     turn, and what a status line is about is exactly that moment. */
+  const held = Boolean(options && options.hold);
   const queue = chunks.map(function (chunk) { return encoder.encode(chunk); });
   let at = 0;
   return {
@@ -186,9 +191,11 @@ function streamed(chunks) {
       getReader: function () {
         return {
           read: function () {
-            return Promise.resolve(at < queue.length
-              ? {done: false, value: queue[at++]}
-              : {done: true});
+            if (at < queue.length) {
+              return Promise.resolve({done: false, value: queue[at++]});
+            }
+            return held ? new Promise(function () {})
+              : Promise.resolve({done: true});
           }
         };
       }

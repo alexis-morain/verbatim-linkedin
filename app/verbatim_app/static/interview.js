@@ -33,6 +33,7 @@
   var revision = document.getElementById("revision");
   var current = null;
   var channel = null;   /* where this turn's words go: see `into` below */
+  var waiting = null;   /* the status line, for as long as the turn runs */
   var pending = null;   /* what was typed, until the turn is known to be real */
   var origin = null;    /* the box it was typed in, so the right one clears */
   var committed = false;  /* whether this turn's words reached disk */
@@ -43,6 +44,19 @@
       return Object.prototype.hasOwnProperty.call(values, key)
         ? values[key] : whole;
     });
+  }
+
+  function trailing() {
+    /* The status line says what is happening next, so it belongs after
+       everything that has already happened. It is put up before the request
+       leaves and the person's own words land later, on the frame that says
+       they reached disk, so without this the screen reads as though the
+       engine started working before they finished typing. */
+    if (waiting && waiting.parentNode) {
+      var host = waiting.parentNode;
+      host.removeChild(waiting);
+      host.appendChild(waiting);
+    }
   }
 
   function into() {
@@ -66,6 +80,7 @@
     wrap.appendChild(who);
     wrap.appendChild(words);
     into().appendChild(wrap);
+    trailing();
     return words;
   }
 
@@ -74,6 +89,7 @@
     line.className = "turn tool mono" + (failed ? " tool-failed" : "");
     line.textContent = text;
     into().appendChild(line);
+    trailing();
     return line;
   }
 
@@ -93,6 +109,29 @@
     turns.appendChild(fold);
   }
 
+  function phase(key) {
+    /* What the turn is doing, on one line that lives as long as the turn.
+
+       It used to be a single note removed the moment the response headers
+       arrived, which is before the model has said anything: the gap it
+       existed to cover was the one it was taken away for. Now it stays, and
+       it says which phase, off what the server reports rather than off tool
+       names read here: a client that knew the names would be a second place
+       deciding which tool writes a post.
+
+       A key the pack has no sentence for takes the line away rather than
+       printing itself. That is the rule the stop reasons already follow: a
+       bare token on a French screen is worse than no line at all.
+
+       Removed and appended rather than left where it was, so it is the last
+       thing in the channel. A status line above the words it is about reads
+       as something that already happened. */
+    var words = key ? T[key] : "";
+    if (waiting) { waiting.remove(); waiting = null; }
+    if (!words) { return; }
+    waiting = note(words);
+  }
+
   function handle(frame) {
     /* One frame says the words reached disk, and nothing else is guessed from.
        A refusal that arrives before it wrote nothing, so what was typed stays
@@ -110,6 +149,9 @@
       return;
     }
     if (frame.kind === "text") {
+      /* Words are arriving, so the words are the signal. A line under them
+         saying the model is thinking says something that is not true. */
+      phase("");
       if (!current) { current = spoken("turn-asked", T.asked); }
       current.textContent += frame.text;
       return;
@@ -123,9 +165,13 @@
          implementation of the thing this product is named after. The stream
          is left to finish, then the page is asked again. */
       landed = true;
+      /* And that wait is real: the stream has to end before the page is
+         asked again, and nothing else on the screen says why. */
+      phase("waiting_finishing");
     } else if (frame.kind === "tool_call") {
       note(T.tool_call + " " + frame.name + " "
            + JSON.stringify(frame.arguments));
+      if (frame.phase) { phase("waiting_" + frame.phase); }
     } else if (frame.kind === "tool_result") {
       answered(frame);
     } else if (frame.kind === "usage") {
@@ -366,24 +412,26 @@
     committed = false;
     landed = false;
     current = null;   /* a cut answer must not swallow the next one */
-    var waiting = note(T.thinking);
+    phase("thinking");
     return fetch(url, {
       method: "POST",
       headers: {"content-type": "application/x-www-form-urlencoded"},
       body: new URLSearchParams(
         Object.assign({text: text}, extra || {})).toString()
     }).then(function (reply) {
-      waiting.remove();
-      if (!reply.ok) { return refused(reply); }
+      if (!reply.ok) { phase(""); return refused(reply); }
       return drain(reply.body.getReader());
     }).catch(function (failure) {
-      waiting.remove();
+      phase("");
       note(T.error + " " + failure, true);
       /* The stream died without saying why. If the words were written, the
          model still owes a reply and the screen has to keep saying so. */
       if (committed) { owing(true); }
     }).then(function () {
       pending = null;
+      /* The turn is over, whatever it did. Nothing is waiting any more, and
+         a line saying otherwise outlives the thing it describes. */
+      if (!(reload && landed)) { phase(""); }
       if (reload && landed) {
         /* Asked again rather than patched: what came back is a whole panel,
            and the server is the one that decides what backs what. The reload

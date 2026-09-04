@@ -2457,6 +2457,45 @@ class TestWhereADraftingTurnTalks(DraftCase):
         self.assertNotIn('id="revision-reply"', page.text)
 
 
+
+class TestTheTurnSaysWhichPhaseItIsIn(DraftCase):
+    """F4. The waiting line follows the turn instead of saying one thing.
+
+    Which phase is the server's to say, off the tool that was reached for.
+    A browser holding the tool names would be a second place deciding which
+    tool writes a post, and the two would disagree the day one is renamed.
+    """
+
+    scripts = (asks(("c1", "propose_draft", DRAFT_ARGS)), says("Done."))
+
+    def test_the_draft_tool_is_the_post_phase(self):
+        interview_id = self.signed()
+        reply = self.draft(interview_id)
+        calls = [f for f in frames(reply.text) if f["kind"] == "tool_call"]
+        self.assertEqual([call["phase"] for call in calls], ["post"])
+
+    def test_the_sheet_tool_is_the_sheet_phase(self):
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "j'ai arrete les agences")
+        interview.save(self.root, conversation)
+        self.transport.scripts = list(
+            (asks(("c1", "propose_sheet", SHEET_ARGS)), says("Here.")))
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        calls = [f for f in frames(reply.text) if f["kind"] == "tool_call"]
+        self.assertEqual([call["phase"] for call in calls], ["sheet"])
+
+    def test_every_phase_the_server_sends_has_a_sentence(self):
+        # The language leak, caught where it starts. A phase the pack has no
+        # words for renders as nothing on the screen, which is silent, so
+        # the guard belongs here rather than in the browser.
+        from verbatim_app.routes.interview import PHASE_OF
+        strings = self.app.state.t
+        for phase in set(PHASE_OF.values()):
+            key = f"interview.waiting_{phase}"
+            self.assertNotEqual(strings(key), key, phase)
+
+
 PROSE = ("Quatre mois pour rien.\n\n"
          "J'ai écrit pour des agences, et le canal direct est le seul "
          "qui paie.\n\n"

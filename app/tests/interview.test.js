@@ -30,6 +30,9 @@ const STRINGS = {
   sufficiency_counts: "{facts}/{enough} facts, {figures} num, {named} named",
   tool_call: "reads", tool_result: "answered", tool_failed: "refused",
   thinking: "waiting",
+  waiting_sheet: "putting-the-sheet-together",
+  waiting_post: "writing-your-post",
+  waiting_finishing: "finishing",
   stop_truncated: "cut", stop_max_tokens: "ceiling-of-tokens",
   stop_other: "other", stop_tool_use: "tool-use", stop_refusal: "refusal",
   stop_unknown: "stopped-saying {code}",
@@ -531,6 +534,111 @@ test("a turn refused before it was written leaves the button hidden",
   await settled();
 
   assert.strictEqual(screen.at("ask-sheet").hidden, true);
+});
+
+
+
+/* ----------------------------------------- the waiting line follows the turn */
+
+test("the waiting line survives the first byte and waits for the answer",
+     async () => {
+  /* It used to go the moment the response headers arrived, which is before
+     the model has said anything: the gap it exists to cover was the one it
+     was removed for. */
+  const screen = opened();
+  screen.reply = streamed([frame({kind: "accepted"})], {hold: true});
+  screen.at("text").value = "j'ai arrete les agences";
+  screen.at("say").dispatch("submit");
+  await settled();
+
+  assert.deepStrictEqual(screen.thread(), ["you-said j'ai arrete les agences",
+                                           "waiting"]);
+});
+
+test("the line says which phase the turn is in, and says it last",
+     async () => {
+  const screen = opened({ask: true, asked: false});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "tool_call", name: "propose_sheet", phase: "sheet",
+           arguments: {}})
+  ], {hold: true});
+  screen.at("ask-sheet").dispatch("click");
+  await settled();
+
+  const thread = screen.thread();
+  assert.strictEqual(thread[thread.length - 1], "putting-the-sheet-together");
+});
+
+test("a post being written says so, and finishing says that", async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "tool_call", name: "propose_draft", phase: "post",
+           arguments: {}})
+  ], {hold: true});
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  let shown = screen.panel();
+  assert.strictEqual(shown[shown.length - 1], "writing-your-post");
+
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "tool_call", name: "propose_draft", phase: "post",
+           arguments: {}}),
+    frame({kind: "draft", body: "Quatre mois.", verdicts: []})
+  ], {hold: true});
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  shown = screen.panel();
+  assert.strictEqual(shown[shown.length - 1], "finishing");
+});
+
+test("a phase the pack has no words for shows nothing rather than a token",
+     async () => {
+  /* The language leak in miniature, and the rule the stop reasons already
+     follow: a bare `compiling` on a French screen is worse than no line. */
+  const screen = opened({ask: true, asked: false});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "tool_call", name: "read_file", phase: "", arguments: {}})
+  ], {hold: true});
+  screen.at("ask-sheet").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.thread().indexOf("waiting_"), -1);
+  assert.strictEqual(screen.thread().indexOf("undefined"), -1);
+});
+
+test("the line is gone once the turn is over", async () => {
+  const screen = opened();
+  await turn(screen, "j'ai arrete", [
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "When?"}),
+    frame({kind: "stop", stop: "end_turn", owing: false})
+  ]);
+
+  assert.deepStrictEqual(screen.thread(),
+                         ["you-said j'ai arrete", "verbatim-asked When?"]);
+});
+
+test("an answer arriving takes the line away rather than pushing it down",
+     async () => {
+  /* While words are streaming the words are the signal, and a status line
+     under them saying the model is thinking says something untrue. */
+  const screen = opened();
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "When?"})
+  ], {hold: true});
+  screen.at("text").value = "j'ai arrete";
+  screen.at("say").dispatch("submit");
+  await settled();
+
+  assert.deepStrictEqual(screen.thread(),
+                         ["you-said j'ai arrete", "verbatim-asked When?"]);
 });
 
 
