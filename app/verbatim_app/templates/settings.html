@@ -63,7 +63,7 @@
   <pre class="copy-source mono" id="key-lines">
 export VERBATIM_PROVIDER={{ engine.settings.provider if engine.settings and engine.settings.provider else defaults.provider }}
 export VERBATIM_MODEL={{ engine.settings.model if engine.settings and engine.settings.model else defaults.model }}
-export ANTHROPIC_API_KEY=...</pre>
+export {{ defaults.key }}=...</pre>
   <p class="hint">{{ t('settings.key_none') }}</p>
 </section>
 

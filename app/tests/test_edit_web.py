@@ -492,6 +492,21 @@ class TestTheSettingsScreen(WebCase):
         self.assertEqual(pack_dirs(self.tmp), ())
         self.assertTrue(pack_dirs())
 
+    def test_the_copy_block_names_the_key_this_provider_would_be_read_from(self):
+        """Found by running it, not by testing it: the block said
+        ANTHROPIC_API_KEY on an instance configured for openai, which is a
+        line that does nothing when pasted. The tests all ran on the default
+        provider, so none of them could see it."""
+        (self.root / ".env").write_text("VERBATIM_PROVIDER=openai\n",
+                                        encoding="utf-8")
+        page = self.client.get("/settings").text
+        self.assertIn("export OPENAI_API_KEY=...", page)
+        self.assertNotIn("ANTHROPIC_API_KEY=...", page)
+
+    def test_the_default_provider_still_names_its_own_key(self):
+        page = self.client.get("/settings").text
+        self.assertIn("export ANTHROPIC_API_KEY=...", page)
+
     def test_the_licence_and_the_place_to_report_are_on_it(self):
         page = self.client.get("/settings").text
         self.assertIn("MIT", page)

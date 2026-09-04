@@ -24,7 +24,7 @@ from . import render as _render
 from .interview import engine_for
 from ..archive import notes_only, post_only, shape as post_shape
 from ..i18n import packs
-from ..providers import DEFAULT_MODEL, DEFAULT_PROVIDER
+from ..providers import DEFAULT_MODEL, DEFAULT_PROVIDER, key_names
 from ..instance import (
     LABELS, PILLARS, STATES, InstanceError, SectionChanged, UnreadableError,
 )
@@ -204,12 +204,13 @@ def settings(request: Request, saved: int = 0, problem: str = ""):
     known = {pack.code for pack in languages}
     chosen = {status.interface_language if status else "",
               status.output_language_default if status else ""}
+    engine = engine_for(request, sized=True)
     return _render(request, "settings.html",
                    # Handed over, not read twice: what the selects were built
                    # from is what the screen shows.
                    status=status,
                    saved=saved, problem=problem,
-                   engine=engine_for(request, sized=True),
+                   engine=engine,
                    languages=languages,
                    # A pack that is set and not installed. Offered rather than
                    # quietly swapped: this screen does not get to change what
@@ -223,7 +224,15 @@ def settings(request: Request, saved: int = 0, problem: str = ""):
                    # somebody is told to trust, so it never carries a second
                    # spelling of a default.
                    defaults={"provider": DEFAULT_PROVIDER,
-                             "model": DEFAULT_MODEL.get(DEFAULT_PROVIDER, "")},
+                             "model": DEFAULT_MODEL.get(DEFAULT_PROVIDER, ""),
+                             # The variable this configuration would actually
+                             # be read from. A block naming the other
+                             # provider's is a block that does not work, and
+                             # it is the one thing on the screen somebody is
+                             # told to paste.
+                             "key": key_names(
+                                 engine.settings.provider if engine.settings
+                                 else DEFAULT_PROVIDER)[-1]},
                    version=__version__,
                    launcher=request.app.state.environ.get(
                        "VERBATIM_LAUNCHER", ""))

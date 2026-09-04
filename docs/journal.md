@@ -120,9 +120,31 @@ bloc Status. Un reste, exactement la classe que je venais de nettoyer : mon
 
 **1208 tests app, 97 JS, `check.sh` vert.**
 
-**Reste à faire** : la version du paquet est toujours 2.4.1 au moment d'écrire,
-donc le CSS servi porte `?v=2.4.1` et un navigateur qui a déjà vu cette version
-garde l'ancienne feuille jusqu'à un rechargement dur. Le bump 2.5.0 le règle.
+**2.5.0 committée, pas publiée : décision d'Alexis en fin de session.** PyPI
+est « long, chiant et inutile » pour ce tour, donc pas d'envoi et pas de tag,
+puisque tagger sans envoyer fait un DMG qui ne s'installe chez personne. Sa
+`Verbatim.app` a quand même été mise à jour, par l'autre chemin : le wheel
+local installé dans le dossier d'outils que l'app possède
+(`~/Library/Application Support/Verbatim/tools`, l'environnement exact que son
+`start.sh` pose), `engine.version` écrit à 2.5.0, et le bundle de `dist/`
+mis en place. L'ancienne est gardée sous `dist/Verbatim-2.4.1.app`.
+
+**Ce que ça laisse comme état** : une app épinglée sur une version que l'index
+n'a pas. Elle tourne parce que `HAVE == WANT` et que le binaire existe ; si le
+dossier d'outils est vidé, elle essaiera PyPI pour 2.5.0 et échouera avec sa
+phrase habituelle. La réparation est de relancer l'install locale, ou de
+publier. Et tant que 2.5.0 n'est pas sur l'index, **ne pas tagger** : le
+workflow construirait un DMG que personne ne peut installer.
+
+**Un défaut que seul le lancement réel a montré.** L'app d'Alexis tourne sur
+`openai` et `gpt-5`, et le bloc à copier de l'écran Réglages disait
+`export ANTHROPIC_API_KEY=...`. C'est-à-dire la seule ligne de l'écran qu'on
+dit à quelqu'un de coller, nommant une variable que sa configuration ne lit
+pas. Aucun test ne pouvait le voir : ils tournaient tous sur le fournisseur
+par défaut. `providers.KEY_NAME` et `key_names()` donnent maintenant le nom
+que `_api_key` lirait vraiment, l'écran le prend de là, et deux tests tiennent
+les deux fournisseurs. Trois rondes de revue à contexte frais ne l'avaient pas
+sorti ; le premier `open -a` si.
 
 ## 2026-09-04 (quatrième session). Le DMG, et le mur qui n'était pas celui qu'on croyait
 

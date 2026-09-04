@@ -301,13 +301,26 @@ def _refuse_untrusted_endpoint(base_url, provider, environ, path) -> None:
         code="endpoint-untrusted", detail=host)
 
 
+#: The provider specific name for a key, beside the two tables above for the
+#: same reason they are there: a screen that tells somebody which variable to
+#: export must name the one this file would then read, and there is exactly
+#: one place that decides which that is.
+KEY_NAME = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+
+
+def key_names(provider: str) -> list:
+    """The variables a key is read from, in the order they win.
+
+    `VERBATIM_API_KEY` first and always: it is the one that works whatever the
+    provider, which is why it is also the one an unrecognised provider is left
+    with rather than nothing at all.
+    """
+    specific = KEY_NAME.get(provider)
+    return ["VERBATIM_API_KEY"] + ([specific] if specific else [])
+
+
 def _api_key(provider: str, environ) -> str | None:
-    names = ["VERBATIM_API_KEY"]
-    if provider == "anthropic":
-        names.append("ANTHROPIC_API_KEY")
-    elif provider == "openai":
-        names.append("OPENAI_API_KEY")
-    for name in names:
+    for name in key_names(provider):
         value = environ.get(name)
         if value:
             return value
