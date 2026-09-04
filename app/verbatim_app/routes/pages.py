@@ -349,12 +349,22 @@ def post_screen(request: Request, name: str, **extra):
         post_text, notes, unreadable = "", "", str(broken)
     except InstanceError:
         raise HTTPException(status_code=404)
+    # A profile with no `## Signature block` is a section to restore, and
+    # `signature()` says so by raising. Every other screen survives that
+    # state and paints the conformance report; this one reads the profile
+    # only to measure a tail, so it degrades to not measuring it. The one
+    # other caller, archive.py, turns the same raise into a form error, and
+    # a read path with no guard at all was this screen going to 500 over a
+    # heading somebody renamed.
+    try:
+        signature = instance.signature()
+    except InstanceError:
+        signature = ""
     values = dict(post=matches[0], post_text=post_text, notes=notes,
                   # Read off the file on screen, not off the front matter:
                   # a post edited by hand after archiving has the shape it
                   # has now, and the stored count is what it was then.
-                  shape=post_shape("" if unreadable else raw,
-                                   instance.signature()),
+                  shape=post_shape("" if unreadable else raw, signature),
                   unreadable=unreadable, saved=0,
                   plan="", shown="", token="", publish_when="",
                   publish_problem="",

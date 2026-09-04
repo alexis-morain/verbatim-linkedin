@@ -52,8 +52,12 @@ class TestOneBadFileDoesNotTakeTheAppDown(WebCase):
     """Every screen renders the conformance report, so a file nobody can read
     decides whether one row is wrong or the whole app is gone."""
 
+    # The post detail is in here because it was not, and a screen that
+    # reads a second file to paint one row went out 500ing over a heading
+    # somebody had renamed. Every screen in this tuple survives a file it
+    # cannot read; a screen outside it has nobody saying so.
     SCREENS = ("/", "/profile", "/ideas", "/posts", "/measure", "/corpus",
-               "/interview")
+               "/interview", "/posts/2026-08-18-board-pack-hours.md")
 
     def all_screens_render(self):
         for path in self.SCREENS:
@@ -208,14 +212,32 @@ class TestScreens(WebCase):
     def test_post_detail_shows_both_axes(self):
         # A format is a shape, a label is an effect on the reader, and
         # references/formats.md keeps them apart. A screen showing one of
-        # them quietly makes them the same choice.
+        # them quietly makes them the same choice. Both are read through the
+        # pack, like the measure screen reads them: a raw TRUST beside a
+        # translated format is the language leak with one foot in the door.
         page = self.client.get("/posts/2026-08-18-board-pack-hours.md")
         self.assertIn("The breakdown", page.text)
-        self.assertIn("TRUST", page.text)
+        self.assertIn("Trust", page.text)
+        self.assertNotIn("TRUST", page.text)
 
-    def test_post_detail_counts_paragraphs(self):
+    def test_post_detail_describes_the_post_on_disk(self):
+        # One triple over one text. The signature share is a share of the
+        # count beside it, not of the count the front matter remembers.
         page = self.client.get("/posts/2026-08-18-board-pack-hours.md")
-        self.assertIn("Paragraphs", page.text)
+        self.assertIn("2 paragraphs, 138 characters", page.text)
+        self.assertNotIn("1487", page.text)
+
+    def test_a_profile_with_no_signature_block_still_paints_a_post(self):
+        # The one file this screen reads besides the post. `signature()`
+        # raises on a renamed heading by design, and every other screen
+        # survives that state.
+        path = self.root / "profile.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "## Signature block", "## Sign-off"), encoding="utf-8")
+        page = self.client.get("/posts/2026-08-18-board-pack-hours.md")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("2 paragraphs", page.text)
 
     def test_unknown_post_is_404(self):
         self.assertEqual(self.client.get("/posts/nope.md").status_code, 404)

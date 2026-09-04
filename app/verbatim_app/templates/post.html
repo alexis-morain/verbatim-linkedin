@@ -15,17 +15,15 @@
      showing only one of them quietly makes them the same choice. #}
   <dt>{{ t('posts.format') }}</dt>
   <dd class="mono">{% if post.format %}{{ t('interview.format_' + post.format.replace('-', '_')) }}{% endif %}</dd>
-  <dt>{{ t('posts.label') }}</dt><dd class="mono">{{ post.label }}</dd>
-  <dt>{{ t('posts.chars') }}</dt><dd class="mono">{{ post.chars }}</dd>
-  {# What a character count does not say: how many blocks a reader scrolls,
-     and how much of the length is the tail every post carries rather than
-     anything written for this one. Read off the file on screen, so a post
-     edited after archiving reports what it is now. #}
-  <dt>{{ t('posts.paragraphs') }}</dt><dd class="mono">{{ shape.paragraphs }}</dd>
-  {% if shape.signature %}
-  <dt>{{ t('posts.signature') }}</dt>
-  <dd class="mono">{{ t('posts.signature_value', signature=shape.signature) }}</dd>
-  {% endif %}
+  <dt>{{ t('posts.label') }}</dt>
+  <dd class="mono">{% if post.label %}{{ t('interview.label_' + post.label.lower()) }}{% endif %}</dd>
+  {# One triple over one text. The three numbers are read off the file on
+     screen, so a post edited after archiving reports what it is now, and
+     so the signature share is a share of the count beside it. The stored
+     `chars` is what was archived; showing both would put two character
+     counts on one screen and let a share be measured against the wrong one. #}
+  <dt>{{ t('posts.shape') }}</dt>
+  <dd class="mono">{% if shape.signature %}{{ t('posts.shape_signed', paragraphs=shape.paragraphs, characters=shape.characters, signature=shape.signature) }}{% else %}{{ t('posts.shape_value', paragraphs=shape.paragraphs, characters=shape.characters) }}{% endif %}</dd>
 </dl>
 
 <h2>{{ t('post.body') }}</h2>
