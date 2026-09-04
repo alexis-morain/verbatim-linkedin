@@ -588,6 +588,38 @@ class TestOpenAIWire(unittest.TestCase):
         self.assertEqual(body["messages"][1],
                          {"role": "user", "content": "hello"})
 
+    def test_openais_own_endpoint_gets_the_name_it_now_requires(self):
+        # api.openai.com rejects max_tokens outright on its current models:
+        # "Unsupported parameter: 'max_tokens' is not supported with this
+        # model. Use 'max_completion_tokens' instead." Found by running an
+        # interview against it, not by reading a changelog.
+        body = self.wire.payload(self.settings, system="s", messages=[],
+                                 tools=[], max_tokens=4096)
+        self.assertEqual(body["max_completion_tokens"], 4096)
+        self.assertNotIn("max_tokens", body)
+
+    def test_anything_else_speaking_the_format_keeps_the_old_name(self):
+        # The openai wire is also how a local runtime is driven, and those
+        # know max_tokens and not the newer name. The endpoint decides,
+        # because the only thing we actually know is what OpenAI's own API
+        # requires. A proxy in front of OpenAI on another host is the case
+        # this gets wrong, and it is the one the person can see and fix.
+        local = Settings("openai", "qwen2.5:14b",
+                         "http://127.0.0.1:11434/v1", "")
+        body = self.wire.payload(local, system="s", messages=[], tools=[],
+                                 max_tokens=4096)
+        self.assertEqual(body["max_tokens"], 4096)
+        self.assertNotIn("max_completion_tokens", body)
+
+    def test_the_port_makes_it_another_endpoint(self):
+        # Same rule as the endpoint guard: openai's name on another port is
+        # not openai's endpoint.
+        elsewhere = Settings("openai", "gpt-4o",
+                             "https://api.openai.com:8443/v1", "sk-oai")
+        body = self.wire.payload(elsewhere, system="s", messages=[], tools=[],
+                                 max_tokens=10)
+        self.assertIn("max_tokens", body)
+
     def test_usage_is_asked_for_explicitly(self):
         body = self.wire.payload(self.settings, system="s", messages=[], tools=[],
                                  max_tokens=10)

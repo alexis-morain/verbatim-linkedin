@@ -534,7 +534,16 @@ class OpenAIWire(Wire):
 
     def payload(self, settings, system, messages, tools, *, max_tokens,
                 require: str = ""):
-        body = {"model": settings.model, "max_tokens": max_tokens,
+        # OpenAI renamed this field on its own API and now rejects the old
+        # name outright, while every other runtime speaking this format still
+        # knows max_tokens and not the new one. The endpoint decides, because
+        # what OpenAI's API requires is the only half of this we can actually
+        # know; a proxy to OpenAI on another host is the case this gets wrong,
+        # and the 400 says exactly which word to expect.
+        own_endpoint = _authority(urlsplit(settings.base_url)) == _authority(
+            urlsplit(DEFAULT_BASE_URL["openai"]))
+        ceiling = "max_completion_tokens" if own_endpoint else "max_tokens"
+        body = {"model": settings.model, ceiling: max_tokens,
                 "stream": True,
                 "stream_options": {"include_usage": True},
                 "messages": self._messages(system, messages)}
