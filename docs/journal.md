@@ -1,5 +1,147 @@
 # Journal
 
+## 2026-09-04 (quatrième session). Le DMG, et le mur qui n'était pas celui qu'on croyait
+
+Base `edcb567`, 1163 tests app. Demande d'Alexis : rendre le projet
+téléchargeable depuis GitHub en DMG, pour faciliter la prise en main. Plan
+écrit, grillé, puis exécuté en autonomie. `check.sh` vert, rien de committé,
+rien de taggué, rien de publié.
+
+### Le certificat n'était pas la question
+
+Première réponse : un DMG non signé fait dire à macOS « Verbatim est
+endommagé », et le certificat Developer ID à 99 €/an ne sert qu'à une chose,
+donner le droit de notariser. Signé sans notarisation, le mur est le même avec
+un autre texte. Décision : reporter, avec un déclencheur écrit, le compteur de
+téléchargements de la page de release.
+
+Le grill a trouvé mieux. **Il n'existe aucun écran de configuration du
+modèle** : `templates/_engine.html` affiche fournisseur, modèle et endpoint en
+lecture seule, et `instance.py:65` tient `WRITABLE` à cinq fichiers markdown,
+`.env` non compris. Quelqu'un qui télécharge le DMG, même signé et notarisé,
+arrive donc sur une app qui lit ses fichiers et ne peut pas l'interviewer,
+avec pour seule issue deux fichiers cachés écrits à la main. Gatekeeper était
+le deuxième obstacle.
+
+### Le principe qui a tranché le reste
+
+**Le lanceur possède la machine, l'app possède l'instance.**
+
+Deux constats se sont croisés. L'app ne sort jamais du dossier qu'on lui
+donne : aucun `Path.home()` dans le code Python, le seul `expanduser()` porte
+sur l'argument fourni. Et la clé ne va jamais dans l'instance :
+`_refuse_secrets` arrête le démarrage quand elle en trouve une. Un écran de
+réglages dans l'app devait donc violer l'une des deux règles.
+
+La sortie : le mettre dans la coquille Swift, qui sait déjà des choses de la
+machine. La feuille écrit `~/.config/verbatim/env` en 600, quatre champs, et
+`start.sh` fait déjà `set -a` dessus. **Zéro ligne changée sous `app/`.** Le
+même principe a fait passer l'installation des skills du côté du lanceur : ce
+n'est plus du travail de `routes` et `templates`, c'est un élément de menu.
+
+### Ce que le clone est devenu
+
+`start.sh` perd tout son bloc git. L'app portait un clone sous Application
+Support et faisait `reset --hard origin/main` à chaque lancement ; « pousser
+sur GitHub est le processus de release » meurt ici, parce que ça n'est pas une
+release chez un inconnu, c'est une surprise. À la place, un `uv` de 47 Mo
+embarqué dans les ressources, vérifié au build contre la somme publiée par
+Astral, qui installe une version épinglée depuis PyPI. Le numéro est lu de
+`app/pyproject.toml` au build : le DMG et le wheel ne peuvent pas diverger en
+silence. `server.rev` portait une révision git, il porte maintenant version et
+instance.
+
+### Les trois défauts que le grill a sortis, et le quatrième que la machine a sorti
+
+- **Le compteur de 60 secondes tuait le premier lancement.** Calibré sur un
+  serveur qui démarre, pas sur une installation de runtime. Deux phases
+  maintenant : `start.sh` écrit des lignes `STATUS `, la coquille les lit sur
+  un tube et les affiche, et le compteur ne court qu'après l'installation.
+- **`uv` n'est pas universel**, un binaire par architecture. arm64 seulement,
+  dit sur la page de release, même argument que le certificat reporté.
+- **Le dépôt est MIT et redistribue un binaire tiers.**
+  `Contents/Resources/LICENSES/`, plus un paragraphe au README.
+- **`~/Library/Logs/` n'existe pas sur un compte neuf.** Trouvé en lançant
+  `start.sh` avec un `HOME` bidon : toutes les redirections échouaient et
+  l'installation du moteur échouait avec elles, sur le message le plus
+  trompeur possible. Le script d'origine avait le même défaut, masqué parce
+  que ce dossier existe sur tout compte qui a déjà servi. **C'est la preuve
+  que la machine d'Alexis ne prouve rien** : elle a git, `uv`, un cache chaud
+  et un `~/.config/verbatim/env` rempli.
+
+### La revue, et les neuf correctifs
+
+Deux axes en parallèle, standards et spec. Neuf corrigés, deux affirmations
+rejetées après test : la revue disait 60 secondes brûlées sur un endpoint
+refusé, c'est 1,35 s parce que la boucle teste `kill -0` à chaque tour ; et
+elle disait que `check.sh` dépend de `swiftc`, alors qu'il dégrade bruyamment
+comme le bloc node.
+
+Les deux vrais bugs. **Le témoin d'installation des skills était écrit après
+la copie** : une copie interrompue laissait un arbre sans témoin, et chaque
+reprise répondait « ce n'est pas nous », le seul message faux possible. Copie
+en zone d'attente puis déplacement. **Et le dernier fragment du tube pouvait
+arriver après le verdict**, dégradant le message d'échec en repli générique :
+le tube est vidé avant de décider.
+
+Le plus utile n'était ni l'un ni l'autre. `providers.py` refuse une mauvaise
+configuration avec une phrase écrite pour être lue, et la personne recevait
+« The engine did not start ». Elle lit maintenant *« the endpoint carries a
+user and password in the URL »*, mot pour mot.
+
+Deux écarts entre la spec et le code, tranchés du côté de la spec :
+**D6 disait « sans modèle configuré » et le code testait l'absence du
+fichier**, ce qui rate un `env` écrit à la main ne portant qu'une clé ; et la
+question ouverte 3 était répondue à l'envers, `installSkills` créant
+`~/.claude` chez quelqu'un sans Claude Code.
+
+**La liste des fournisseurs existe deux fois** et Swift ne peut pas importer
+Python. `check.sh` la tient maintenant, même forme que `test_bundle.py` sur la
+liste du bundle. Mise au rouge avant d'être crue : elle nomme l'écart.
+
+### Le premier usage réel a trouvé un bug du moteur
+
+Alexis a installé le DMG, choisi son instance, rempli la feuille avec une clé
+OpenAI, lancé un entretien, et reçu un 400 : *« Unsupported parameter:
+'max_tokens' is not supported with this model. Use 'max_completion_tokens'
+instead. »* Rien à voir avec l'empaquetage ; `OpenAIWire.payload` envoyait
+`max_tokens` et l'API d'OpenAI l'a remplacé sur ses modèles actuels. Le fil
+`openai` était marqué prouvé au 02/09, contre un endpoint local.
+
+Le piège est que ce fil sert deux choses : l'API d'OpenAI et n'importe quel
+runtime parlant son format, qui, lui, ne connaît que `max_tokens`. Basculer
+tout le monde aurait cassé Ollama. C'est donc l'endpoint qui décide, avec
+`_authority()` déjà écrit pour la garde d'endpoint : le nom propre d'OpenAI,
+port compris, reçoit `max_completion_tokens`, tout le reste garde l'ancien.
+Un proxy vers OpenAI sur un autre hôte est le cas que ça rate, et c'est celui
+que la personne voit dans le 400.
+
+**La leçon de distribution compte plus que le correctif.** L'app installée
+tourne sur le wheel de PyPI, pas sur le checkout : corriger ici ne répare rien
+chez elle tant que rien n'est publié. C'est exactement ce que D1 a acheté en
+tuant « pousser sur GitHub est le processus de release », et c'est le prix à
+payer, pas un défaut. La version reste à 2.4.0 : la monter sans publier ferait
+un DMG épinglant une version absente de l'index, le piège même que le plan
+nomme.
+
+### Ce qui est prouvé, et ce qui ne l'est pas
+
+Prouvé : démarrage à froid sur un `HOME` vide, moteur 2.4.0 installé depuis
+PyPI, HTTP 200, dossier vide arrivant sur le rapport de conformité,
+`key-missing` annoncé. DMG de 21 Mo qui monte, avec son lien vers
+`/Applications`. 14 tests Swift sur la fusion du fichier de config, qui édite
+un fichier portant une clé : ligne étrangère préservée, forme `export`
+reconnue, valeur vidée retirée, rien dupliqué. `scripts/config-test.swift`
+compile contre la source même que l'app embarque, pas contre une copie, et
+`check.sh` le fait tourner.
+
+Pas prouvé : tout ce qui demande une souris. Le sélecteur de dossier, la
+feuille de réglages, les trois éléments de menu et l'installation des skills
+compilent et ne sont pas exercés. Et le premier lancement mesuré ici a duré
+trois secondes parce que `uv` a trouvé un Python système en 3.14 ; sur un Mac
+neuf il téléchargera un runtime, ce qui est exactement le cas pour lequel les
+lignes de progression existent et le seul que la machine d'Alexis ne peut pas
+jouer.
 ## 2026-09-04 (nuit). B3, le plafond qui descend du format, et six revues pour six gardes posées à côté
 
 Sur la base `45684fc`, rebasé sur `ffbf5d5`, 1142 tests app au départ. Demande :
