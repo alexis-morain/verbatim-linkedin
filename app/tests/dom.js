@@ -287,6 +287,11 @@ function page(strings, options) {
   if (settings.draft) {
     const write = document.place(null, "button", "write-draft");
     write.setAttribute("data-url", "/interview/2026-08-28-01/draft");
+    /* Where a drafting turn's own words land: beside the button that starts
+       it, first draft and rewrite alike. Not in the thread at the top, which
+       is the interview, and the interview is over by the time this button
+       is on the page. */
+    document.place(null, "div", "revision-reply", {hidden: true});
   }
   /* The revision box exists only once a draft is on the page: a request that
      revises nothing is a stale form, and the server refuses it. Its own flag,
@@ -325,6 +330,11 @@ function page(strings, options) {
   screen.thread = function () {
     return document.getElementById("turns").children
       .map(function (turn) { return turn.read(); });
+  };
+  /* The same reading, of the panel's own channel. */
+  screen.panel = function () {
+    const node = document.getElementById("revision-reply");
+    return node ? node.children.map(function (turn) { return turn.read(); }) : [];
   };
   screen.script = "interview.js";
   screen.globals = {

@@ -162,6 +162,13 @@
   {# The scope, on the action line rather than in a paragraph above it. It
      is the sentence somebody reads with their hand already on the button. #}
   <p class="hint scope-line" id="revision-scope-line"{% if not scope %} hidden{% endif %}>{{ t('interview.revision_scope_line') }}</p>
+  {# Where a drafting turn talks: here, beside the scope, the echo of the
+     passage and the box, and not in the thread at the top of the page. The
+     refusal contract of `linkedin-post` means a turn can answer with a
+     question instead of a post, and an answer shown a screen away from its
+     own question is answered by picking the passage again by hand. Empty
+     until a turn speaks, and emptied by the next one. #}
+  <div class="revision-reply turns" id="revision-reply" hidden></div>
   {% endif %}
   {% if not trace %}
   <p class="empty">{{ t('interview.draft_none') }}</p>

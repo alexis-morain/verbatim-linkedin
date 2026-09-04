@@ -412,7 +412,10 @@ test("the draft screen has no answer form, and the client survives it",
   await settled();
 
   assert.strictEqual(screen.calls[0].url, "/interview/2026-08-28-01/draft");
-  assert.deepStrictEqual(screen.thread(), ["verbatim-asked writing"]);
+  /* In the draft panel, like every drafting turn. The thread above is the
+     interview, and an approved sheet has ended it. */
+  assert.deepStrictEqual(screen.panel(), ["verbatim-asked writing"]);
+  assert.deepStrictEqual(screen.thread(), []);
 });
 
 test("a draft that landed asks for the page again, once the stream is over",
@@ -441,9 +444,115 @@ test("a drafting turn that lands nothing leaves the page where it is",
   await settled();
 
   assert.deepStrictEqual(screen.reloads, []);
-  assert.deepStrictEqual(screen.thread(), ["sheet-missing"]);
+  assert.deepStrictEqual(screen.panel(), ["sheet-missing"]);
   assert.strictEqual(screen.at("write-draft").disabled, false);
 });
+
+
+/* ------------------------------------- a drafting turn answers in its panel */
+
+test("what the engine says about a revision lands in the revision panel",
+     async () => {
+  /* The defect this exists to refuse, seen in Alchie: the refusal shows up
+     in the general channel at the top of the page while the scope, the
+     echo of the passage and the box are all in the panel further down. The
+     answer belongs where the question was asked. */
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "Give me the name and the year."}),
+    frame({kind: "stop", stop: "end_turn", owing: false})
+  ]);
+  screen.at("revision").value = "Ces fourchettes viennent d'ou ?";
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.deepStrictEqual(
+    screen.panel(),
+    ["you-said Ces fourchettes viennent d'ou ?",
+     "verbatim-asked Give me the name and the year."]);
+  assert.deepStrictEqual(screen.thread(), []);
+  assert.strictEqual(screen.at("revision-reply").hidden, false);
+});
+
+test("a drafting turn that fails says so in the panel too", async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([frame({kind: "error", code: "passage-gone"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.deepStrictEqual(screen.thread(), []);
+  assert.strictEqual(screen.panel().length, 1);
+});
+
+test("the next request clears the last answer rather than stacking on it",
+     async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "Which source?"})
+  ]);
+  screen.at("revision").value = "premiere demande";
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "Thank you."})
+  ]);
+  screen.at("revision").value = "barometre Malt, 2025";
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.deepStrictEqual(
+    screen.panel(),
+    ["you-said barometre Malt, 2025", "verbatim-asked Thank you."]);
+});
+
+test("the scope of the refused request is still the scope of the answer",
+     async () => {
+  /* The other half of the Alchie defect: its refusal left the panel, and
+     answering it meant picking the passage again by hand. Nothing reloads
+     on a turn that landed nothing, so the picker is still on the block. */
+  const screen = opened({draft: true, revision: true,
+                         blocks: [{digest: "aaa1", text: "Un bloc."},
+                                  {digest: "bbb2", text: "Un autre."}]});
+  screen.at("revision-scope").value = "1";
+  screen.at("revision").value = "trop vague";
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "Which source?"})
+  ]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  screen.at("revision").value = "barometre Malt, 2025";
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.calls[1].init.body,
+                     "text=barometre+Malt%2C+2025&passage=bbb2&passage_index=1");
+  assert.deepStrictEqual(screen.reloads, []);
+});
+
+test("the interview thread is still where an interview turn goes",
+     async () => {
+  /* The panel is for the drafting loop and for nothing else. A screen that
+     routed every turn there would empty the thread the anchoring source is
+     read from. */
+  const screen = opened();
+  await turn(screen, "j'ai arrete les agences", [
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "When?"})
+  ]);
+
+  assert.deepStrictEqual(
+    screen.thread(),
+    ["you-said j'ai arrete les agences", "verbatim-asked When?"]);
+  assert.deepStrictEqual(screen.panel(), []);
+});
+
 
 test("a turn in flight disables every button that would start another",
      async () => {
@@ -497,17 +606,18 @@ test("the request leaves the box only once the server says it is on disk",
   await settled();
 
   /* Refused before `accepted`: nothing was written, so the words stay where
-     somebody can send them again. */
+     somebody can send them again. Read off the panel, which is where a
+     drafting turn talks: the request was typed there and the scope is there. */
   assert.strictEqual(screen.at("revision").value, "Plus court.");
-  assert.deepStrictEqual(screen.thread(), ["nothing-to-revise"]);
+  assert.deepStrictEqual(screen.panel(), ["nothing-to-revise"]);
 
   screen.reply = streamed([frame({kind: "accepted"})]);
   screen.at("write-draft").dispatch("click");
   await settled();
 
   assert.strictEqual(screen.at("revision").value, "");
-  assert.deepStrictEqual(screen.thread(),
-                         ["nothing-to-revise", "you-said Plus court."]);
+  assert.deepStrictEqual(screen.panel(), ["you-said Plus court."]);
+  assert.deepStrictEqual(screen.thread(), []);
 });
 
 test("clearing the box never reaches the answer box, which is not there",
@@ -526,7 +636,7 @@ test("clearing the box never reaches the answer box, which is not there",
   screen.at("write-draft").dispatch("click");
   await settled();
 
-  assert.deepStrictEqual(screen.thread(),
+  assert.deepStrictEqual(screen.panel(),
                          ["you-said Autre angle.", "verbatim-asked rewriting"]);
 });
 

@@ -2241,6 +2241,39 @@ class TestTheVersionOnScreen(DraftCase):
                          1)
 
 
+
+class TestWhereADraftingTurnTalks(DraftCase):
+    """The panel a revision is typed in is the panel its answer lands in.
+
+    The screen side of it: the container has to be on the page for the
+    client to have somewhere to write. Which of the two channels a turn
+    reaches for is the client's decision and is tested in
+    `interview.test.js`, against the same id.
+    """
+
+    def test_the_panel_has_a_channel_of_its_own(self):
+        interview_id = self.drafted()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="revision-reply"', page.text)
+        # Empty until a turn speaks. A container holding last session's
+        # exchange would be the screen answering a question nobody asked.
+        self.assertIn('id="revision-reply" hidden></div>', page.text)
+
+    def test_the_channel_is_there_for_a_first_draft_too(self):
+        # It follows the button that starts a drafting turn, not the draft.
+        # The thread above is the interview, and by the time this button is
+        # on the page an approved sheet has ended the interview.
+        interview_id = self.signed()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="write-draft"', page.text)
+        self.assertIn('id="revision-reply"', page.text)
+
+    def test_there_is_no_channel_before_the_sheet_is_signed(self):
+        interview_id = self.open_interview()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertNotIn('id="revision-reply"', page.text)
+
+
 PROSE = ("Quatre mois pour rien.\n\n"
          "J'ai écrit pour des agences, et le canal direct est le seul "
          "qui paie.\n\n"

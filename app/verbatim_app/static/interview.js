@@ -28,6 +28,7 @@
   var write = document.getElementById("write-draft");
   var revision = document.getElementById("revision");
   var current = null;
+  var channel = null;   /* where this turn's words go: see `into` below */
   var pending = null;   /* what was typed, until the turn is known to be real */
   var origin = null;    /* the box it was typed in, so the right one clears */
   var committed = false;  /* whether this turn's words reached disk */
@@ -40,6 +41,16 @@
     });
   }
 
+  function into() {
+    /* Where this turn's words belong. The interview thread for an interview
+       turn, and the revision panel for a drafting one, because that is
+       where the request was typed and where the scope, the echo of the
+       passage and the box all are. A refusal shown at the top of the page
+       while its own question sits further down is the defect this exists to
+       refuse: answering it there means picking the passage again by hand. */
+    return channel || turns;
+  }
+
   function spoken(kind, label) {
     var wrap = document.createElement("div");
     wrap.className = "turn " + kind;
@@ -50,7 +61,7 @@
     words.className = "words";
     wrap.appendChild(who);
     wrap.appendChild(words);
-    turns.appendChild(wrap);
+    into().appendChild(wrap);
     return words;
   }
 
@@ -58,7 +69,7 @@
     var line = document.createElement("div");
     line.className = "turn tool mono" + (failed ? " tool-failed" : "");
     line.textContent = text;
-    turns.appendChild(line);
+    into().appendChild(line);
     return line;
   }
 
@@ -252,11 +263,20 @@
     return stream(form.action, text, false, box);
   }
 
-  function stream(url, text, reload, source, extra) {
+  function stream(url, text, reload, source, extra, panel) {
     /* One turn, whichever button started it. The three of them differ by
        where they post and by what the server does with it; a screen that
        carried three copies of this would grow three ways of failing. */
     busy(true);
+    /* Emptied rather than appended to. What is in there is the last turn's
+       exchange, and the request about to go answers it: two of them stacked
+       reads as one conversation with itself, and the older half is the one
+       nothing is about any more. */
+    channel = panel || null;
+    if (channel) {
+      while (channel.firstChild) { channel.removeChild(channel.firstChild); }
+      channel.hidden = false;
+    }
     pending = text ? text : null;
     origin = source || null;
     committed = false;
@@ -344,7 +364,8 @@
        than being cleared here and forgotten. */
     write.addEventListener("click", function () {
       stream(write.getAttribute("data-url"),
-             revision ? revision.value : "", true, revision, aimedAt());
+             revision ? revision.value : "", true, revision, aimedAt(),
+             document.getElementById("revision-reply"));
     });
   }
 
