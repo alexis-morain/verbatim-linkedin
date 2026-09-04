@@ -4,6 +4,51 @@ One entry per published version, newest first. The dated working log is
 [`journal.md`](journal.md), in French, and it is a different file: it records
 sessions, not versions.
 
+## 2.4.1, 4 September 2026
+
+A fix and a new way to install, and the fix is the reason to take it.
+
+### The OpenAI thread was broken against OpenAI
+
+An interview against `api.openai.com` returned a 400: `max_tokens` is not
+supported on their current models, and `max_completion_tokens` is the name
+they want. 2.4.0 sent the old one, so the openai provider could not run an
+interview against OpenAI itself. A local runtime speaking the same format was
+never affected, which is why this shipped: that is what the thread had been
+tested against.
+
+The endpoint now decides which name is sent. OpenAI's own endpoint, port
+included, gets `max_completion_tokens`; everything else speaking the format
+keeps `max_tokens`, because those runtimes do not know the newer name. A
+proxy to OpenAI on a different host is the case this gets wrong, and the 400
+names the field to expect.
+
+### A macOS app, as a disk image
+
+`Verbatim-2.4.1-arm64.dmg` on the releases page: the same local app in a
+window. Apple Silicon, and it needs neither Python nor `uv` on your machine,
+because it carries [uv](https://github.com/astral-sh/uv) (Apache-2.0 OR MIT)
+and installs this release from PyPI the first time you open it. It asks which
+folder holds your profile, and a settings sheet writes your model and key to
+`~/.config/verbatim/env` at mode 600, never into the folder holding your
+profile. A menu item installs the skill bundle for Claude Code, and refuses
+rather than overwrite anything it did not put there itself.
+
+**It is not signed**, so macOS calls it damaged the first time you open it. It
+is not damaged; it is unsigned, which is not the same thing. One line clears
+it:
+
+```
+xattr -dr com.apple.quarantine /Applications/Verbatim.app
+```
+
+`uvx verbatim-linkedin ~/my-profile` remains the recommended way in, with no
+download and no warning.
+
+The app writes to `~/Library/Application Support/Verbatim` (the engine and its
+Python runtime), `~/Library/Logs/verbatim.log`, `~/.config/verbatim/env`, and
+`~/.claude/skills/verbatim` if you ask it to. Removing the app leaves those.
+
 ## 2.4.0, 4 September 2026
 
 **The first version of Verbatim to be published.** This repository has been
