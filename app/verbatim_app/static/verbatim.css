@@ -150,6 +150,9 @@ h3 { font-size: 0.95rem; font-family: var(--sans); font-weight: 700;
 a { color: var(--accent); }
 
 .hint { color: var(--muted); margin-top: -0.5rem; }
+/* Beside the send button rather than under it: the negative top margin above
+   is for a hint that follows a block, and this one follows a control. */
+#say .hint { display: inline-block; margin: 0 0 0 0.6rem; font-size: 0.85rem; }
 
 .empty { color: var(--muted); font-style: italic; }
 

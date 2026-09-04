@@ -266,6 +266,7 @@ interview:
   resume: "Ask for the reply again"
   your_turn: "Your answer"
   send: "Send"
+  send_hint: "or cmd + enter"
   needs_js: "This screen streams an answer as it is written, which needs JavaScript. Every other screen works without it."
   bank: "The angle bank"
   bank_hint: "Your own lines, out of ideas.md. Clicking one puts it in the box; edit it before sending."

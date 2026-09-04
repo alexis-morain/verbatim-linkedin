@@ -266,6 +266,7 @@ interview:
   resume: "Redemander la réponse"
   your_turn: "Votre réponse"
   send: "Envoyer"
+  send_hint: "ou cmd + entrée"
   needs_js: "Cet écran affiche la réponse au fil de l'écriture, ce qui demande JavaScript. Tous les autres écrans marchent sans."
   bank: "La banque d'angles"
   bank_hint: "Vos propres lignes, tirées de ideas.md. Cliquer sur l'une la met dans le champ ; modifiez-la avant d'envoyer."

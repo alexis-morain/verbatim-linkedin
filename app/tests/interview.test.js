@@ -529,3 +529,50 @@ test("clearing the box never reaches the answer box, which is not there",
   assert.deepStrictEqual(screen.thread(),
                          ["you-said Autre angle.", "verbatim-asked rewriting"]);
 });
+
+/* The keyboard accelerator on the answer box.
+
+   The interview screen is meant to feel like being asked something, not like
+   filling a form, and the gesture that carries that is sending from the
+   keyboard without reaching for a button. What is deliberately NOT done here
+   is removing the button: this page posts its forms without JavaScript, and a
+   form with no submit control is one a keyboard cannot send at all and a
+   screen reader cannot announce. The accelerator is an addition. */
+
+test("cmd+Enter sends the answer", async function () {
+  const screen = opened();
+  screen.reply = streamed([frame({kind: "said", text: "ok"})]);
+  screen.at("text").value = "onze conversations";
+  const prevented = screen.at("text").dispatch(
+    "keydown", {key: "Enter", metaKey: true});
+  await settled();
+  assert.ok(prevented, "the newline has to be stopped");
+  assert.equal(screen.calls.length, 1);
+  assert.match(screen.calls[0].url, /\/turn$/);
+});
+
+test("ctrl+Enter sends it too, for a keyboard that has no cmd", async function () {
+  const screen = opened();
+  screen.reply = streamed([frame({kind: "said", text: "ok"})]);
+  screen.at("text").value = "onze conversations";
+  screen.at("text").dispatch("keydown", {key: "Enter", ctrlKey: true});
+  await settled();
+  assert.equal(screen.calls.length, 1);
+});
+
+test("a plain Enter types a newline and sends nothing", async function () {
+  const screen = opened();
+  screen.at("text").value = "onze conversations";
+  const prevented = screen.at("text").dispatch("keydown", {key: "Enter"});
+  await settled();
+  assert.equal(prevented, false, "a paragraph break is a paragraph break");
+  assert.equal(screen.calls.length, 0);
+});
+
+test("a modifier on another key sends nothing", async function () {
+  const screen = opened();
+  screen.at("text").value = "onze conversations";
+  screen.at("text").dispatch("keydown", {key: "s", metaKey: true});
+  await settled();
+  assert.equal(screen.calls.length, 0);
+});

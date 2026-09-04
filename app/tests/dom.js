@@ -80,10 +80,14 @@ Element.prototype.addEventListener = function (type, handler) {
 };
 
 /* The test side of addEventListener. The event is the small object the
-   client reads off it, nothing more. */
-Element.prototype.dispatch = function (type) {
+   client reads off it, nothing more: `preventDefault`, plus whatever fields
+   the caller says this kind of event carries. A keydown is read for its key
+   and its modifiers, and a shim that could not carry them would let a
+   handler reading `event.key` pass while doing nothing in a browser. */
+Element.prototype.dispatch = function (type, fields) {
   let prevented = false;
-  const event = {preventDefault: function () { prevented = true; }};
+  const event = Object.assign(
+    {preventDefault: function () { prevented = true; }}, fields || {});
   (this.listeners[type] || []).forEach(function (handler) {
     handler(event);
   });

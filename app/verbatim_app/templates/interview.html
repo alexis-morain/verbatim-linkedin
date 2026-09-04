@@ -100,6 +100,10 @@
   <label class="mono" for="text">{{ t('interview.your_turn') }}</label>
   <textarea id="text" name="text" rows="4" autofocus>{{ seed }}</textarea>
   <button type="submit">{{ t('interview.send') }}</button>
+  {# The accelerator is announced rather than left to be discovered. The
+     button is what a keyboard and a screen reader reach first, and this
+     page posts without JavaScript, so it stays. #}
+  <span class="mono hint">{{ t('interview.send_hint') }}</span>
 </form>
 <noscript><p class="degraded">{{ t('interview.needs_js') }}</p></noscript>
 {% else %}

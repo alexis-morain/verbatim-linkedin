@@ -304,6 +304,20 @@
       event.preventDefault();
       send(box.value);
     });
+
+    /* Sending from the keyboard, which is the gesture that keeps this
+       feeling like being asked something rather than like filling a form.
+       An addition, never a replacement: the submit button stays, because
+       this page posts its forms with no JavaScript at all, and a form with
+       no submit control is one a keyboard cannot send and a screen reader
+       cannot announce. Both modifiers, since the machine under this is not
+       always a Mac. */
+    box.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        send(box.value);
+      }
+    });
   }
 
   var again = document.getElementById("resume");
