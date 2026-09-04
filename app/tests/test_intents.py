@@ -62,6 +62,50 @@ ANYWHERE = re.compile(r"`([a-z][a-z0-9-]*)`")
 #: The section carrying the per format ladder, in the same file.
 LADDER = "Where the interview breaks once, on purpose"
 
+#: The set the ladder climbs, holding both the rungs and, under a heading of
+#: its own, the rules they run under. The default ceiling is one of those.
+CLIMBED_SET = "Set B. Post interview"
+
+#: The ladder columns that name a rung, read by heading rather than by
+#: position. The row carries how far the climb goes beside the order it goes
+#: in, and a parser taking every id after the format would count a depth
+#: written in backticks as one more rung. `Then` repeats on purpose.
+RUNGS = ("Enters on", "Then")
+
+#: The two columns that say how far a format climbs, and which way a turn
+#: breaks when the material is arguably enough and arguably not.
+CEILING, PRESUMED = "Ceiling", "Presumed"
+
+#: The presumptions a row can carry, shallowest first. The order is the
+#: point and not a listing convenience: a presumption is not a second
+#: opinion about a format, it follows the ceiling, and a test reads this
+#: tuple as the order the rows have to come in.
+PRESUMPTIONS = ("short", "deep")
+
+#: Small numbers, because the bundle spells them and a table counts them. A
+#: test comparing the two has to cross that, and doing it here is cheaper
+#: than writing a digit into prose that says `Six is the ceiling`.
+WORDS = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8}
+
+#: The ceiling before a format is settled, read off the rule that states it
+#: rather than repeated here. The break happens after the first or second
+#: answer, so every interview runs its opening turns under this number.
+DEFAULT = re.compile(r"\*\*(\w+) is the ceiling until the format is settled")
+
+#: How many rungs the set says it has, in the sentence that opens it. The
+#: `#` column is the count; this is somebody writing it out again above.
+COUNTED = re.compile(r"^(\w+) rungs, and two doors into the first one", re.M)
+
+#: The same ceiling, restated where a model and a reader meet it: the skill
+#: body the engine sends, and the front page somebody arrives on. Both spell
+#: it out, neither is read by any module, and a number written in three
+#: files is three numbers unless something holds them to each other.
+RESTATED = (
+    ("skills/linkedin-post/SKILL.md",
+     re.compile(r"^- (\w+) is the ceiling until the format sets its own", re.M)),
+    ("README.md", re.compile(r"(\w+) turns at the outside")),
+)
+
 #: The packs that ship. `_template` is checked by its own test, against a
 #: stricter rule.
 SHIPPED = ("en", "fr")
@@ -126,20 +170,105 @@ def unwritten() -> list:
     return ANYWHERE.findall(said.group(1)) if said else []
 
 
-def ladder() -> dict:
+def _table(body: str = "") -> tuple:
+    """The ladder table as (header cells, format rows).
+
+    The header is the row opening on `Format`, and a format row is one
+    opening on a bare id, which is how the separator, the prose and the rule
+    under the table all stay out of it. Takes a body so the parser can be
+    tested on a table somebody wrote for the test rather than only on the one
+    in the file.
+    """
+    if not body:
+        body = sections(INTENTS.read_text(encoding="utf-8"))[LADDER]
+    header, rows = [], []
+    for line in body.splitlines():
+        row = cells(line)
+        if not row:
+            continue
+        if not header:
+            if row[0] == "Format":
+                header = row
+        elif CELL.match(row[0]):
+            rows.append(row)
+    return header, rows
+
+
+def _under(header: list, row: list, name: str) -> list:
+    """The cells under every column with this heading, in table order."""
+    return [row[at] for at, cell in enumerate(header)
+            if cell == name and at < len(row)]
+
+
+def ladder(body: str = "") -> dict:
     """The per format ladder: {format: (rung, ...)}, entry cell to last.
 
-    A row that does not open on an id is not a ladder row, which is how the
-    header and the rule under the table stay out of it.
+    Read by column heading. The row says how far the climb goes as well as
+    what order it goes in, so a parser taking every id on it would count a
+    depth written in backticks as one more rung and the map would still look
+    green.
     """
-    rows = {}
-    for line in sections(
-            INTENTS.read_text(encoding="utf-8"))[LADDER].splitlines():
-        row = [CELL.match(cell) for cell in cells(line)]
-        if row and row[0]:
-            rows[row[0].group(1)] = tuple(
-                match.group(1) for match in row[1:] if match)
-    return rows
+    header, rows = _table(body)
+    found = {}
+    for row in rows:
+        climbed = [CELL.match(cell) for name in RUNGS
+                   for cell in _under(header, row, name)]
+        found[CELL.match(row[0]).group(1)] = tuple(
+            match.group(1) for match in climbed if match)
+    return found
+
+
+def depth(body: str = "") -> dict:
+    """How far each format climbs and which way it leans, as
+    {format: (ceiling, presumed)}, both verbatim.
+
+    A column the row stops short of comes back empty rather than absent: a
+    half filled row is something to fail on, not something to raise on.
+    """
+    header, rows = _table(body)
+    found = {}
+    for row in rows:
+        said = [_under(header, row, name) for name in (CEILING, PRESUMED)]
+        found[CELL.match(row[0]).group(1)] = tuple(
+            cell[0] if cell else "" for cell in said)
+    return found
+
+
+def set_b_rows() -> list:
+    """The rows of the set B table, each opening on its `#` and naming one
+    rung. The rule bullets below the table are not rows and the separator
+    does not open on a digit, so neither reaches here."""
+    body = sections(INTENTS.read_text(encoding="utf-8"))[CLIMBED_SET]
+    return [row for line in body.splitlines()
+            for row in [cells(line)]
+            if len(row) > 1 and row[0].isdigit() and CELL.match(row[1])]
+
+
+def rungs() -> int:
+    """How many rungs the post interview has, counted off the `#` column and
+    not off the ids: rung 1 has two doors and taking one closes the other, so
+    seven intents are six rungs."""
+    return len({row[0] for row in set_b_rows()})
+
+
+def counted() -> int:
+    """How many rungs the prose above the table says there are. A fourth
+    copy of the same number, and the one inside the file everything else
+    here is anchored to."""
+    body = sections(INTENTS.read_text(encoding="utf-8"))[CLIMBED_SET]
+    said = COUNTED.search(body)
+    return WORDS.get(said.group(1).lower(), 0) if said else 0
+
+
+def default_ceiling(body: str = "") -> int:
+    """The ceiling an interview runs under before a format is settled, read
+    off the rule that states it. No assertion below names the number, which
+    is what would make this file the second copy it exists to catch; the
+    rules body is the argument only so the parser can be tested on one."""
+    if not body:
+        body = sections(INTENTS.read_text(encoding="utf-8"))[CLIMBED_SET]
+    said = DEFAULT.search(body)
+    return WORDS[said.group(1).lower()] if said else 0
 
 
 def worded(pack: str) -> list:
@@ -171,6 +300,39 @@ class TestTheParserItself(unittest.TestCase):
 
     def test_prose_outside_a_table_declares_nothing(self):
         self.assertEqual(declared("The `scene` rung comes first."), [])
+
+    def test_a_column_that_is_not_a_rung_is_not_read_as_one(self):
+        """The ladder row carries how far the climb goes beside the order it
+        goes in, and both are cells on the one row. A parser taking every id
+        after the format would read a depth as a further rung, and the map
+        would still look green."""
+        table = ("| Format | Enters on | Then | Ceiling | Presumed |\n"
+                 "|---|---|---|---|---|\n"
+                 "| `the-story` | `scene` | `number` | `six` | `deep` |")
+        self.assertEqual(ladder(table), {"the-story": ("scene", "number")})
+        # Backticked here because that is the hazard, and verbatim on the way
+        # out because reading a depth is not the same job as reading an id:
+        # what the real table may put in that cell is its own test.
+        self.assertEqual(depth(table), {"the-story": ("`six`", "`deep`")})
+
+    def test_a_row_that_stops_short_reads_empty_rather_than_raising(self):
+        """So a half filled row fails the test that says a climb states both,
+        and says which half is missing, instead of coming out as an index
+        error from a parser."""
+        table = ("| Format | Enters on | Ceiling | Presumed |\n"
+                 "|---|---|---|---|\n"
+                 "| `the-story` | `scene` |")
+        self.assertEqual(depth(table), {"the-story": ("", "")})
+
+    def test_the_default_ceiling_is_read_and_not_assumed(self):
+        """Both branches, on a rule written here rather than on the real
+        one: a parser falling back to a number of its own would prove the
+        agreement it is asked to check, and the real file is read by
+        `test_it_is_the_whole_ladder`, which names no number either."""
+        self.assertEqual(
+            default_ceiling("- **Four is the ceiling until the format is "
+                            "settled** and never a target."), 4)
+        self.assertEqual(default_ceiling("- the ceiling is four."), 0)
 
     def test_the_three_sets_are_all_found(self):
         found = intents()
@@ -207,16 +369,46 @@ class TestTheLadderMap(unittest.TestCase):
 
     def test_it_names_only_rungs_that_exist(self):
         known = set(intents(CLIMBED))
-        for name, rungs in ladder().items():
+        for name, climb in ladder().items():
             with self.subTest(format=name):
-                self.assertTrue(rungs, "a format with an empty climb")
-                unknown = [rung for rung in rungs if rung not in known]
+                self.assertTrue(climb, "a format with an empty climb")
+                unknown = [rung for rung in climb if rung not in known]
                 self.assertEqual(unknown, [], "a rung no intent declares")
 
     def test_the_story_climbs_in_the_order_the_ladder_was_written_in(self):
         """The one order that was measured before it was written down."""
         self.assertEqual(ladder()["the-story"],
                          ("scene", "friction", "number", "position"))
+
+    def test_set_b_is_one_list_and_not_two(self):
+        """The set is read twice, down the rows and by the `#` column, and
+        the prose above the table talks about `the list`. If the two ever
+        disagree there is no such thing as the listing order, and a sentence
+        about it is true or false depending on which one the reader took.
+
+        Read as the column never going backwards, which is the whole of the
+        agreement and is all of it that is defined: rung 1 has two doors,
+        the file says taking one closes the other, and nothing orders them
+        against each other. Sorting would have invented that order and
+        failed on a swap that means nothing.
+        """
+        numbered = [int(row[0]) for row in set_b_rows()]
+        self.assertEqual(numbered, sorted(numbered),
+                         "the `#` column runs against the rows")
+
+    def test_the_list_takes_number_first_and_the_story_takes_friction(self):
+        """The exact pair the prose above the table names. Asserting only
+        that the two sequences differ is a wider net with a hole in it:
+        somebody reordering `position` instead leaves them unequal, this
+        green, and the sentence about `friction` and `number` false. The
+        renumbering half is the test above; this is the reorder half.
+        """
+        listed = intents(CLIMBED)
+        climb = ladder()["the-story"]
+        self.assertLess(listed.index("number"), listed.index("friction"),
+                        "the list no longer takes `number` first")
+        self.assertLess(climb.index("friction"), climb.index("number"),
+                        "the story no longer takes `friction` first")
 
     def test_the_formats_left_out_are_named_and_spelled_right(self):
         """The three without a row are named in prose, and that prose is the
@@ -237,6 +429,147 @@ class TestTheLadderMap(unittest.TestCase):
         self.assertNotEqual(climb[0], "scene")
         self.assertIn("witnessed-instance", climb)
         self.assertNotIn("scene", climb)
+
+
+class TestTheDefaultCeiling(unittest.TestCase):
+    """The number an interview runs under before it has a format, which is
+    every interview for its first turn or two."""
+
+    def test_the_set_counts_its_own_rungs_right(self):
+        """The sentence opening set B says how many rungs it has, and the
+        `#` column is the rungs. Somebody adding a seventh moves the column
+        and the ceilings that answer to it, and that sentence stays where it
+        was, saying six."""
+        self.assertEqual(counted(), rungs())
+
+    def test_the_doors_are_two_and_they_are_into_the_first_rung(self):
+        """The same sentence says six rungs *and two doors into the first
+        one*, and counting the rungs holds only the first half. A tie moved
+        anywhere else down the column leaves six distinct rungs, passes
+        every count, and leaves that sentence describing a table it no
+        longer matches.
+        """
+        numbers = [int(row[0]) for row in set_b_rows()]
+        twice = sorted(n for n in set(numbers) if numbers.count(n) > 1)
+        self.assertEqual(twice, [min(numbers)], "the doors are not rung 1")
+        self.assertEqual(numbers.count(min(numbers)), 2, "not two doors")
+
+    def test_it_is_the_whole_ladder(self):
+        """Six is not a round number somebody liked. It is every rung there
+        is, which is what lets an interview that has not settled a format
+        run under it without prejudging one."""
+        self.assertEqual(default_ceiling(), rungs())
+
+    def test_it_is_the_same_number_everywhere_it_is_stated(self):
+        """The reference is pinned to the rungs, so moving it means moving
+        them. The skill is what the engine actually sends and the README is
+        what a reader arrives on, and neither would follow: they would go on
+        stating a ceiling the ladder no longer has, and every test here
+        would stay green while the model read the old number."""
+        for name, pattern in RESTATED:
+            with self.subTest(file=name):
+                said = pattern.search(
+                    (REPO / name).read_text(encoding="utf-8"))
+                self.assertIsNotNone(said, "the ceiling is not stated here")
+                self.assertEqual(WORDS.get(said.group(1).lower()),
+                                 default_ceiling())
+
+
+class TestHowFarEachFormatClimbs(unittest.TestCase):
+    """The ceiling is not one number for every format, and the row that says
+    what a format climbs is where it says how far.
+
+    A stance arrives with its thesis already said and its climb ends at the
+    objection; a story is still being told at the sixth rung. One length run
+    over both either closes a story early or keeps asking a stance for
+    material its format never had a rung for, which is the second way an
+    interview talks somebody into inventing something.
+    """
+
+    def test_a_climb_states_both_how_far_and_which_way_it_leans(self):
+        for name, (ceiling, presumed) in depth().items():
+            with self.subTest(format=name):
+                self.assertTrue(ceiling, "a climb with no ceiling")
+                self.assertTrue(presumed, "a ceiling with no presumption")
+
+    def test_the_ceiling_is_a_count_of_rungs(self):
+        for name, (ceiling, _) in depth().items():
+            with self.subTest(format=name):
+                self.assertRegex(ceiling, r"\A[0-9]+\Z")
+
+    def test_the_presumption_is_one_of_the_two(self):
+        for name, (_, presumed) in depth().items():
+            with self.subTest(format=name):
+                self.assertIn(presumed, PRESUMPTIONS)
+
+    def test_each_presumption_is_explained_under_the_table(self):
+        """One word in a cell decides which way a turn breaks, and the word
+        alone does not say that. A presumption nobody defined is a cell a
+        model reads as decoration."""
+        body = sections(INTENTS.read_text(encoding="utf-8"))[LADDER]
+        for word in PRESUMPTIONS:
+            with self.subTest(presumed=word):
+                self.assertIn(f"`{word}`", body)
+
+    def test_the_story_climbs_the_whole_ladder(self):
+        """Said twice in prose and held nowhere: the six rungs above are the
+        story's, and the story is what does not stop before the end of them.
+        Everything else about that number is a comparison, so a story
+        quietly dropped to five would leave two sentences wrong and the only
+        red in the repo would be a dollar figure on a cost estimate.
+        """
+        self.assertEqual(int(depth()["the-story"][0]), rungs())
+
+    def test_the_stance_stops_where_its_row_stops(self):
+        """The other half of the same sentence, and the half that had only
+        `TURNS` beside it: a stance nudged to five moves the span, somebody
+        follows the red to `TURNS` and moves that instead, and two files go
+        on saying a stance ends where its row does.
+        """
+        self.assertEqual(int(depth()["the-stance"][0]),
+                         len(ladder()["the-stance"]))
+
+    def test_a_stance_stops_before_a_story(self):
+        """Half of it in one line, and the reason the ceiling column exists.
+        The tiers Alchie offers halve between the two formats, and our own
+        stance row ends where the story keeps climbing."""
+        ceilings = {name: int(pair[0]) for name, pair in depth().items()}
+        self.assertLess(ceilings["the-stance"], ceilings["the-story"])
+
+    def test_the_shallower_climb_is_the_one_presumed_short(self):
+        """The other half, and the one with nothing else watching it. The
+        presumption is not free of the ceiling: a format that stops earlier
+        is the one that leans towards stopping, and a pair swapped between
+        two rows reads as sound as this one. Written the wrong way round it
+        would keep asking a stance for material its format has no rung for,
+        which is the whole of what B3 came out of.
+        """
+        low, high = PRESUMPTIONS
+        at = {name: [int(ceiling) for ceiling, presumed in depth().values()
+                     if presumed == name] for name in PRESUMPTIONS}
+        self.assertTrue(at[low] and at[high], "every row leans the same way")
+        # Strictly, so two formats stopping at the same rung cannot lean
+        # opposite ways: the presumption follows the ceiling, and a tie
+        # leaning both ways would mean it does not.
+        self.assertLess(max(at[low]), min(at[high]),
+                        f"a climb presumed {high} stops no later than one "
+                        f"presumed {low}")
+
+    def test_no_climb_stops_short_of_its_own_row(self):
+        """A row naming four rungs and stopping at three is a ladder that
+        cannot be climbed, and the interview would meet the ceiling with a
+        rung still written beside it."""
+        for name, climb in ladder().items():
+            with self.subTest(format=name):
+                self.assertGreaterEqual(int(depth()[name][0]), len(climb))
+
+    def test_no_climb_asks_for_a_rung_that_does_not_exist(self):
+        """A ceiling is a count of rungs, and there are six of them. Seven
+        would be a turn with no intent behind it, which is the question a
+        form asks and this does not."""
+        for name, (ceiling, _) in depth().items():
+            with self.subTest(format=name):
+                self.assertLessEqual(int(ceiling), rungs())
 
 
 if __name__ == "__main__":

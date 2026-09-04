@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.4.0
+version: 0.4.1
 ---
 
 # Write a post
@@ -38,8 +38,10 @@ For a voice note, transcribe locally. Nothing about this leaves the machine.
 Intents and ladder: `references/interview-intents.md`, set B.
 Wording: `locales/<interface_language>/interview.md`.
 
-**One question at a time. Never a numbered block.** Ask, wait, dig. Between
-four and six turns.
+**One question at a time. Never a numbered block.** Ask, wait, dig. The
+ceiling below until the format is settled, and the format's own after that.
+There is no floor: what ends an interview is the material, and a number
+underneath would be a quota to reach on a person who had already said enough.
 
 The rules that matter most, restated because they are the ones that get
 dropped:
@@ -50,7 +52,7 @@ dropped:
   that is the `witnessed-instance` door, not evasion.
 - **Quote the previous answer inside the next question.**
 - **Announce what is acquired and what is missing, every turn, in one line.**
-- Six is a ceiling, not a target.
+- Six is the ceiling until the format sets its own, and neither is a target.
 
 ## The break: format and angle
 
@@ -61,9 +63,18 @@ serve.
 Both are covered by `references/formats.md`, including the exact shape of an
 angle proposal. **Once the format is settled, the ladder is the one written
 for it**, under the break in `references/interview-intents.md`. A story and a
-stance do not climb in the same order, and only two of the five formats have
-their order written down. The other three climb the default and say nothing
-more than that.
+stance do not climb in the same order, and only the formats whose climb has
+been observed have a row there. The rest climb the default order, stop at the
+default ceiling, and say nothing more than that.
+
+**The row settles how far as well as in what order.** Its `Ceiling` is where
+that format stops, and it is not the count of rungs written on the row: a
+story keeps climbing past the ones it names, a stance does not. `Presumed`
+says which way a turn breaks when the material is arguably enough and
+arguably not: `deep` asks the next rung, `short` goes to the sheet. Neither
+overrules the sufficiency test, and a stance still missing its occurrence is
+unfinished rather than short. Before the break there is no format yet, so
+those turns run under the default ceiling.
 
 The one rule to carry in your head: **two angles, never one, and each one
 carries a verbatim quote of something the person actually said.** If it cannot

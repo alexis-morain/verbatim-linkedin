@@ -237,7 +237,7 @@ interview:
   context_truncation: "A runtime whose context window is smaller than this cuts it to fit and answers anyway, fluently, with part of the skill missing. Nothing in the reply says so. On Ollama the fix is OLLAMA_CONTEXT_LENGTH, and docs/smoke.md has the measurement."
   estimate: "Before you start"
   estimate_value: "roughly {low} to {high} USD"
-  estimate_hint: "An order of magnitude, not a quote: the block above, sent again on each of four to six turns, counted at {ratio} characters per token, which is what one runtime measured, at the input rate. What you type and what comes back are on top, and are small next to the block."
+  estimate_hint: "An order of magnitude, not a quote: the block above, sent again on each of {turns_low} to {turns_high} turns, counted at {ratio} characters per token, which is what one runtime measured, at the input rate. What you type and what comes back are on top, and are small next to the block."
   tokens: "{input} tokens in, {output} out"
   spent: "{amount} USD"
   refused_secrets_in_instance: "This instance holds credentials, and an instance is a directory people copy, sync and sometimes commit. Move these lines to your shell environment and delete them here, comments included."

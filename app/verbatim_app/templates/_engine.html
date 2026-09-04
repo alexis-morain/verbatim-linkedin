@@ -31,7 +31,8 @@
        interview screen does not, and neither shows a figure it cannot back. #}
     <dt>{{ t('interview.estimate') }}</dt>
     <dd class="mono">{{ t('interview.estimate_value', low='%.2f'|format(engine.estimate[0]), high='%.2f'|format(engine.estimate[1])) }}</dd>
-    <dd class="hint">{{ t('interview.estimate_hint', ratio=engine.ratio) }}</dd>
+    <dd class="hint">{{ t('interview.estimate_hint', ratio=engine.ratio,
+          turns_low=engine.turns[0], turns_high=engine.turns[1]) }}</dd>
     {% endif %}
   </dl>
   {% if engine.block_error %}

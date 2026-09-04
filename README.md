@@ -42,9 +42,10 @@ without you having said anything.
 
 So the interview comes first, one question at a time, and it refuses to advance
 on an abstract answer. It asks for the instance again: which one, when, how
-many, with whom. Between four and six turns, then it stops, because the test is
+many, with whom. Six turns at the outside, fewer when the format asks for
+fewer: a stance stops earlier than a story. Then it stops, because the test is
 whether there is a scene, a position and a consequence, not whether a counter
-reached six.
+reached its number.
 
 Then, before a single line is drafted, it hands you a validation sheet where
 every bullet has to trace to something you said. You approve it or you correct
@@ -134,8 +135,9 @@ uv run --project app verbatim ~/my-profile
 
 It needs a model to run an interview, and it is told which one by three
 environment variables rather than by an account. Before the first turn it
-shows an order of magnitude for four to six turns at the model's input rate,
-and says on the same line what that figure rests on. `.env.example` documents them.
+shows an order of magnitude spanning the shallowest and the deepest ceiling a
+format allows, at the model's input rate, and says on the same line what that
+figure rests on. `.env.example` documents them.
 Local and hosted are the same code path and neither is the recommended one:
 what decides is whether the model can hold a 6400 token system block, answer a
 forced tool call, and produce a five field validation sheet when asked.

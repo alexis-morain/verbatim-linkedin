@@ -26,11 +26,12 @@ is the normal case.
 the first turn.** The engine knows the price per million for the models in its
 table and the exact size of what it sends every turn. It does not know how
 many turns somebody will take, nor how many tokens its block is in the
-provider's own tokeniser, so the figure before the first turn is a range over
-the four to six turns the skill states, counted at a ratio the same screen
-names, and only for a model that has a rate. A single number to the cent over
-a conversation nobody has had yet would be the invented figure `providers.py`
-refuses when it declines to guess a price.
+provider's own tokeniser, nor which format the interview will settle on, so
+the figure before the first turn is a range over the ceilings the bundle
+states, counted at a ratio the same screen names, and only for a model that
+has a rate. A single number to the cent over a conversation nobody has had
+yet would be the invented figure `providers.py` refuses when it declines to
+guess a price.
 """
 
 from __future__ import annotations
@@ -88,8 +89,14 @@ def forget_lock(app, interview_id: str) -> None:
 #: figure, and the screen says this is not it.
 CHARS_PER_TOKEN = 4
 
-#: The length of an interview as the skill states it: four to six turns. The
-#: bounds of the range, never a middle.
+#: The shallowest and the deepest ceiling `references/interview-intents.md`
+#: states, and the bounds of the range, never a middle. It is a range because
+#: nothing here knows which format applies: the break that settles one comes
+#: after the first or second answer, and it is the format that says where its
+#: interview stops. A stance ends before its ladder runs out, a story climbs
+#: all of it, and a format with no row runs the default, which is why the
+#: default is in the span too: three of the five formats are on it.
+#: `test_interview_web.py` holds this pair against both.
 TURNS = (4, 6)
 
 
@@ -115,9 +122,10 @@ class Engine:
 
     @property
     def estimate(self):
-        """Dollars, low and high, for the block alone sent on each of four
-        to six turns at the input rate. What is typed and what comes back are
-        left out: both are small next to the block, and the screen says so.
+        """Dollars, low and high, for the block alone sent on each turn of
+        the shallowest and of the deepest interview the bundle states, at the
+        input rate. What is typed and what comes back are left out: both are
+        small next to the block, and the screen says so.
         None without a rate or without a block, since a range over a price
         nobody has is the invented figure twice over."""
         if not self.rate or not self.block_size:
@@ -128,6 +136,15 @@ class Engine:
     @property
     def ratio(self) -> int:
         return CHARS_PER_TOKEN
+
+    @property
+    def turns(self) -> tuple:
+        """The pair the estimate was computed over, for the sentence beside
+        it. Interpolated rather than written into the packs: the bounds come
+        off the ladder rows and the default between them, and a hint
+        spelling them out would go on saying four to six the day a format is
+        written shallower than four."""
+        return TURNS
 
 
 def _engine(request: Request, *, sized: bool = False) -> Engine:

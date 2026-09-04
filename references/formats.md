@@ -21,12 +21,21 @@ interview answer, because it decides which rungs of the ladder matter.
 A format is a container. It never supplies content: nothing enters a post
 because the format has a slot for it.
 
-Which rungs a format climbs, and in what order, is written once in
-`references/interview-intents.md`, under the break. Two of the five have a row
-there, keyed by the id an archived post already carries: the name above,
-lowercased and hyphenated. The other three are named in that file as not
-written yet, which is a different thing from a format that climbs the default
-order.
+Which rungs a format climbs, in what order, and how far it climbs before it
+stops, is written once in `references/interview-intents.md`, under the break.
+A format whose climb has been observed has a row there, keyed by the id an
+archived post already carries: the name above, lowercased and hyphenated. The
+rest are named in that file as not written yet. They run the default order and
+the default ceiling meanwhile, which is not the same as a row saying so: an
+absence records that nothing has been observed, and a row would record a
+decision.
+
+**How far is not a column here, on purpose.** A column in the table above
+would want a value for every format, and only the formats with a row over
+there have been observed: a stance stops earlier than a story, and the rest
+would be numbers invented to fill cells and then obeyed. On a ladder row it
+is two facts about one climb, written where the order is, and a format with
+no row has no depth of its own either. The one absence reads as the other.
 
 ## The objective labels
 

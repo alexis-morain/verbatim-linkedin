@@ -237,7 +237,7 @@ interview:
   context_truncation: "Un runtime dont la fenêtre de contexte est plus petite que ça la coupe pour la faire tenir, et répond quand même, avec aisance, une partie du skill en moins. Rien dans la réponse ne le dit. Sur Ollama, le réglage est OLLAMA_CONTEXT_LENGTH, et docs/smoke.md porte la mesure."
   estimate: "Avant de commencer"
   estimate_value: "entre {low} et {high} USD, à peu près"
-  estimate_hint: "Un ordre de grandeur, pas un devis : le bloc ci-dessus, renvoyé à chacun des quatre à six tours, compté à {ratio} signes par jeton, ce qu'un runtime a mesuré une fois, au tarif d'entrée. Ce que vous tapez et ce qui revient s'ajoutent, et pèsent peu à côté du bloc."
+  estimate_hint: "Un ordre de grandeur, pas un devis : le bloc ci-dessus, renvoyé à chacun des {turns_low} à {turns_high} tours, compté à {ratio} signes par jeton, ce qu'un runtime a mesuré une fois, au tarif d'entrée. Ce que vous tapez et ce qui revient s'ajoutent, et pèsent peu à côté du bloc."
   tokens: "{input} jetons en entrée, {output} en sortie"
   spent: "{amount} USD"
   refused_secrets_in_instance: "Cette instance porte des identifiants, et une instance est un dossier que les gens copient, synchronisent et parfois committent. Déplacez ces lignes dans votre environnement shell et supprimez-les ici, commentaires compris."

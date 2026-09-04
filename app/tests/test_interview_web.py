@@ -124,9 +124,10 @@ class TestTheHub(WebCase):
         self.assertIn('action="/interview"', self.client.get("/interview").text)
 
     def test_the_hub_gives_an_order_of_magnitude_before_the_first_turn(self):
-        # Four to six turns of the block alone, at the input rate, counted at
-        # the one ratio the engine states on the same screen. Low and high,
-        # two decimals, and the sentence that says it is not a quote.
+        # The shallowest and the deepest ceiling the formats state, of the
+        # block alone, at the input rate, counted at the one ratio the engine
+        # states on the same screen. Low and high, two decimals, and the
+        # sentence that says it is not a quote.
         page = self.client.get("/interview").text
         self.assertIn("roughly", page)
         found = re.search(r"roughly ([0-9]+\.[0-9]{2}) to ([0-9]+\.[0-9]{2}) USD",
@@ -134,10 +135,46 @@ class TestTheHub(WebCase):
         self.assertIsNotNone(found, page)
         low, high = float(found.group(1)), float(found.group(2))
         self.assertLess(low, high)
-        # Six turns over four, give or take the rounding of two figures that
-        # are both under a dollar on this block.
-        self.assertAlmostEqual(high, low * 1.5, delta=0.02)
+        # The deepest ceiling over the shallowest, read off the same span the
+        # bounds come from rather than written here as a third copy of the
+        # pair, give or take the rounding of two figures both under a dollar
+        # on this block. The default is in that span: it is what the three
+        # formats with no ladder row run, so a row going shallower than it
+        # moves neither bound and must not move this ratio either.
+        from test_intents import default_ceiling, depth
+        ceilings = sorted([int(ceiling) for ceiling, _ in depth().values()]
+                          + [default_ceiling()])
+        self.assertAlmostEqual(high, low * ceilings[-1] / ceilings[0],
+                               delta=0.02)
         self.assertIn("4 characters per token", page)
+        # And the sentence beside the figure counts the turns the figure was
+        # computed over. The packs used to spell that pair, which is a copy
+        # that goes stale on a screen while every test stays green.
+        self.assertIn(f"{ceilings[0]} to {ceilings[-1]} turns", page)
+
+
+class TestTheRangeIsTheSpanOfTheCeilings(unittest.TestCase):
+    """`TURNS` and the ceilings the bundle states are one fact written twice.
+
+    The screen quotes a range because before the first turn the format is not
+    settled, so nobody knows which ceiling applies: the honest figure is the
+    span of the ones the bundle states. A format written with a deeper climb
+    than any of these would leave the screen quoting a number the interview
+    walks past without a word, which is the invented figure `providers.py`
+    refuses when it declines to guess a price, arrived at from the other end.
+    """
+
+    def test_the_bounds_are_the_shallowest_and_the_deepest(self):
+        from test_intents import default_ceiling, depth
+        from verbatim_app.routes.interview import TURNS
+        # The default belongs in the span, not the rows alone: the three
+        # formats with no row run it, and it is what every interview runs
+        # under until the break settles a format at all. A span over the
+        # rows alone would understate a screen the moment a row went
+        # shallower than the default.
+        ceilings = sorted([int(ceiling) for ceiling, _ in depth().values()]
+                          + [default_ceiling()])
+        self.assertEqual(TURNS, (ceilings[0], ceilings[-1]))
 
 
 class TestAnUnpricedModel(WebCase):

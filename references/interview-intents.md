@@ -85,8 +85,10 @@ previous answer, and the climb stops as soon as the material is sufficient.
 - **Announce the missing material every turn, in one line.** "We have the scene
   and the number. What is missing is what it cost you to find out." This
   replaces a question counter with a sufficiency test.
-- **Six is a ceiling, not a target.** Stop at a scene, a position, and a
-  consequence.
+- **Six is the ceiling until the format is settled, and it is never a
+  target.** After the break the format carries its own, on its ladder row,
+  and the formats with no row go on running this one. Stop at a scene, a
+  position, and a consequence, whichever number stands.
 - **Rung 1 has two doors, and taking one closes the other.**
   `witnessed-instance` replaces `scene`, it never adds a step. It is the way
   in when the person arrives with a thesis and no moment behind it, which is
@@ -106,14 +108,16 @@ the angle was invented and it gets thrown away. See `references/formats.md`.
 
 ### The ladder each format climbs
 
-The six rungs above are listed in the story's order. It is not everybody's,
-and running it on a stance is how an interview asks for a scene the person
-never lived.
+The rungs above are the story's, and they are listed as a set rather
+than as anybody's climb: `the-story` takes `friction` before `number`, which
+its row below says and that list does not. The set is not everybody's
+either, and running it on a stance is how an interview asks for a scene the
+person never lived.
 
-| Format | Enters on | Then | Then | Then |
-|---|---|---|---|---|
-| `the-story` | `scene` | `friction` | `number` | `position` |
-| `the-stance` | `position` | `witnessed-instance` | `number` | `friction` |
+| Format | Enters on | Then | Then | Then | Ceiling | Presumed |
+|---|---|---|---|---|---|---|
+| `the-story` | `scene` | `friction` | `number` | `position` | 6 | deep |
+| `the-stance` | `position` | `witnessed-instance` | `number` | `friction` | 4 | short |
 
 Two climbs, not one with its steps shuffled:
 
@@ -127,10 +131,29 @@ Two climbs, not one with its steps shuffled:
   market's, and `friction` is read as **the objection somebody opposed to
   them**, with how they answered it asked inside that same rung.
 
+**How far, and which way it leans.** The last two columns are the same
+observation as the order, made once more: a story and a stance do not want an
+interview of the same length either.
+
+- **`Ceiling`** is where that format stops. It is not the length of the row:
+  `the-story` does not end on the rungs it names, because
+  `cost-of-not-knowing` and `contradiction` are the story's as well, which is
+  what the rungs above being the story's ladder means. The last of those
+  is optional, and a ceiling counting an optional rung is a ceiling rather
+  than a target. `the-stance` does end on the rungs it names, its resolution
+  asked inside `friction` rather than after it.
+- **`Presumed`** says which way a turn breaks when the material is arguably
+  enough and arguably not. `deep` asks the next rung, `short` stops and goes
+  to the sheet. It decides nothing else: a stance still missing its
+  occurrence is not short, it is unfinished, and the sufficiency test says so
+  before this column gets a say.
+
 `counter-intuitive-number`, `the-breakdown` and `the-post-mortem` have no row
 here, on purpose. Their climb gets written when an interview has been run in
-that format and somebody has an observation to write down. Filling the table
-by symmetry with these two would be inventing an order and then obeying it.
+that format and somebody has an observation to write down, and until then
+they take the default order and the default ceiling above. Filling the table
+by symmetry with these two would be inventing an order and a depth, and then
+obeying both.
 
 ## Set C. Page interview
 

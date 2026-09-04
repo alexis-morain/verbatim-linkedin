@@ -1,5 +1,113 @@
 # Journal
 
+## 2026-09-04 (nuit). B3, le plafond qui descend du format, et six revues pour six gardes posées à côté
+
+Sur la base `45684fc`, rebasé sur `ffbf5d5`, 1142 tests app au départ. Demande :
+B3 seul, B4 restant en basse priorité et G restant une décision d'Alexis. Fin
+de session : **1162 tests app, 94 JS**, `check.sh` vert, `linkedin-post`
+**0.4.1**, app inchangée en 2.4.0. Le backlog Alchie est fait sauf B4.
+
+### Six était le plafond de l'Histoire, pas celui de tout le monde
+
+La Réflexion arrive avec sa thèse déjà dite. Sa montée finit sur l'objection
+qu'on lui a opposée, la résolution demandée dans ce même barreau, quand
+l'Histoire en est encore à se raconter au sixième. Une seule longueur pour les
+deux ferme une Histoire trop tôt ou continue à demander à une Réflexion de la
+matière que son format n'a pas de barreau pour recevoir : la deuxième façon
+dont un entretien pousse quelqu'un à inventer.
+
+La ligne d'échelle porte donc maintenant **jusqu'où** en plus de **dans quel
+ordre**. `Ceiling` est là où le format s'arrête, et ce n'est pas la longueur de
+la ligne : `the-story` nomme quatre barreaux et ne finit pas dessus,
+`cost-of-not-knowing` et `contradiction` étant les siens aussi, le dernier
+facultatif, ce qui fait un plafond et non une cible. `the-stance` en nomme
+quatre et finit bien là. `Presumed` dit de quel côté bascule un tour quand la
+matière est discutablement assez et discutablement pas : `deep` demande le
+barreau suivant, `short` passe à la fiche. Il ne prime sur rien, une Réflexion
+à qui manque encore son occurrence est inachevée, pas courte.
+
+### Deux colonnes sur la ligne, pas une sur la table des cinq
+
+Le plan disait « le faire descendre de `formats.md` ». Une colonne là-bas veut
+une valeur par format, et il n'y a d'observation que pour ceux qui ont une
+ligne : les autres seraient des nombres inventés pour remplir une case, puis
+obéis, exactement ce que ce fichier refuse déjà pour l'ordre. Sur la ligne
+d'échelle ce sont deux faits d'une même montée, écrits là où l'ordre est écrit,
+et un format sans ligne n'a pas non plus de profondeur à lui. La même absence
+se lit des deux côtés. `formats.md` le dit et pointe ici, comme il pointait
+déjà pour l'ordre.
+
+**Le plancher est tombé avec.** « Between four and six turns » plus une
+Réflexion qui s'arrête à quatre aurait cloué la Réflexion à exactement quatre,
+la cible que la ligne suivante interdit. Ce qui termine un entretien est la
+matière.
+
+### `TURNS` ne bouge pas, sa raison change
+
+`routes/interview.py` porte `TURNS = (4, 6)`, qui nourrit `Engine.estimate`,
+la fourchette de coût de l'écran. La valeur ne bouge pas : c'était la longueur
+que le skill annonçait, c'est maintenant **l'étendue des plafonds**, honnête
+parce qu'avant le premier tour aucun format n'est arrêté et que l'écran ne peut
+pas savoir lequel s'applique. **Le défaut est dans cette étendue, pas seulement
+les lignes** : trois formats sur cinq tournent dessus, et une étendue sur les
+seules lignes sous-estimerait l'écran dès qu'une ligne descend sous le défaut.
+
+La phrase sous le chiffre épelait la paire dans les deux packs. Elle la prend
+maintenant interpolée, comme le ratio sur la même ligne le faisait déjà.
+
+### Ce que les revues ont trouvé, toutes de la même forme
+
+Six tours revenus REFUTED, le septième vert. Chaque défaut était **une garde
+posée à côté de ce qu'elle prétendait tenir**, jamais dessus. C'est la forme,
+et elle s'est répétée assez pour valoir d'être écrite ici.
+
+1. **Échanger les deux `Presumed` passait tous les tests du dépôt**, c'est à
+   dire précisément la moitié de B3 que le plan demande. La présomption est
+   maintenant clouée au plafond, pas à une ligne : la montée la moins profonde
+   est celle qui penche vers l'arrêt, et deux formats à égalité ne peuvent pas
+   pencher en sens contraires.
+2. `formats.md` et `interview-intents.md` avaient été édités en sens contraire
+   sur les trois formats sans ligne, dans le même commit. Et la phrase qui
+   affiche le devis épelait « quatre à six tours » dans les deux packs, sous
+   le chiffre que `TURNS` calcule : elle l'interpole maintenant, comme le
+   ratio de la même ligne le faisait déjà.
+3. **« Les six barreaux sont dans l'ordre de l'Histoire » est démenti par la
+   ligne de l'Histoire quatre lignes plus bas**, qui prend `friction` avant
+   `number`. Corrigé au deuxième tour dans la phrase *voisine*, ce que le tour
+   suivant a vu.
+4. **La correction du tour 3 avait été appliquée à un test et pas à son frère
+   douze lignes plus haut** : le plafond de l'Histoire baissé à cinq sortait un
+   rouge sur un montant en dollars, sur un écran pourtant juste. L'étendue de
+   `TURNS` ignorait aussi le défaut, que trois formats sur cinq tournent.
+5. **La moitié « Réflexion » d'une phrase dont j'avais cloué la moitié
+   « Histoire » au tour d'avant** n'avait que `TURNS` à côté d'elle : une
+   Réflexion poussée à cinq faisait rougir la fourchette, on suivait le rouge,
+   on déplaçait `TURNS`, et deux fichiers continuaient de mentir.
+6. **Un test qui ne pouvait pas échouer**, `depth()` et `ladder()` parcourant
+   les mêmes lignes et clefées pareil : l'assertion était vraie par
+   construction pendant que sa docstring annonçait qu'elle attrapait une
+   divergence. Supprimé plutôt que réparé, ce qu'il prétendait tenir l'étant
+   déjà ailleurs. Dans un changement dont toute la thèse est qu'une
+   affirmation doit être *tenue*, un test qui ne rougit jamais est la chose
+   elle-même.
+
+Cinq fois sur six, une docstring annonçait une couverture que son corps n'avait
+pas. C'est le piège à retenir de la session, et il vaut pour la prose comme
+pour les tests : le septième tour a encore trouvé trois comptes en toutes
+lettres que rien ne tenait, enlevés plutôt que cloués.
+
+Le nombre est cloué là où il est répété : la règle du défaut se lit au lieu de
+se recopier, elle répond aux barreaux que set B déclare, comptés sur la colonne
+`#` parce que le barreau 1 a deux portes, sept intentions font six barreaux ;
+et le skill, le README et la phrase qui ouvre set B sont tenus contre elle. Les
+comptes qui ne servaient à rien sont partis plutôt que d'être cloués :
+`formats.md` ne dit plus « deux des cinq », le skill non plus.
+
+### Ce qui reste
+
+B4, le registre par format, basse priorité chez le plan et à ne faire que si un
+post sonne faux. G reste une décision d'Alexis.
+
 ## 2026-09-04 (troisième session). La page du paquet avant l'envoi, et sept dépendances avalées par une table
 
 Base `45684fc`, 1142 tests app. Demande : préparer la publication 2.4.0, sans
