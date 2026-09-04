@@ -100,6 +100,7 @@
          or by the turn dying: hiding the affordance here would hide it for
          good on a stream that never gets to say anything else. */
       committed = true;
+      gauge(frame);
       if (pending !== null) { commit(); }
       return;
     }
@@ -145,6 +146,24 @@
       /* Only a turn that was accepted leaves the model owing a reply; a
          refusal decided before that wrote nothing to answer. */
       if (!frame.code || frame.code === "engine-failed") { owing(true); }
+    }
+  }
+
+  function gauge(frame) {
+    /* How much material is on the table, off the frame that says the words
+       reached disk. It reads what the person said, so this is the moment it
+       moves, and the server is the one that counts: a browser counting for
+       itself would be a second implementation of the rule about which text
+       credits, drifting from the one that matters.
+
+       A frame carrying no counts leaves the line alone. Filling it from
+       missing numbers would draw a gauge that fell to zero. */
+    if (frame.ratio === undefined || frame.ratio === null) { return; }
+    var ratio = document.getElementById("sufficiency-ratio");
+    var counts = document.getElementById("sufficiency-counts");
+    if (ratio) { ratio.textContent = fill(T.sufficiency, frame); }
+    if (counts) {
+      counts.textContent = fill(T.sufficiency_counts, frame);
     }
   }
 

@@ -538,6 +538,13 @@ mark.claim-fabricated {
   border-bottom: 2px solid var(--alarm);
 }
 
+/* How much material is on the table. Quiet, and one line: it sits between
+   the thread and the box, where somebody is about to type, and a gauge that
+   drew the eye there would be the loudest thing on a screen whose subject is
+   what was said. */
+.gauge { color: var(--muted); margin: 1.2rem 0 0.2rem; }
+.gauge .hint { margin-left: 0.5rem; }
+
 /* The drafting turn's own channel, inside the panel its request was typed
    in. Set apart from the box above it, because it is the engine talking and
    the panel around it is the person's. */

@@ -25,6 +25,8 @@ const {load, page, streamed, refused, settled} = require("./dom.js");
    the contract, and they are FRAME_KEYS in routes/interview.py. */
 const STRINGS = {
   said: "you-said", asked: "verbatim-asked",
+  sufficiency: "material {ratio}%",
+  sufficiency_counts: "{facts}/{enough} facts, {figures} num, {named} named",
   tool_call: "reads", tool_result: "answered", tool_failed: "refused",
   thinking: "waiting",
   stop_truncated: "cut", stop_max_tokens: "ceiling-of-tokens",
@@ -446,6 +448,52 @@ test("a drafting turn that lands nothing leaves the page where it is",
   assert.deepStrictEqual(screen.reloads, []);
   assert.deepStrictEqual(screen.panel(), ["sheet-missing"]);
   assert.strictEqual(screen.at("write-draft").disabled, false);
+});
+
+
+
+/* ------------------------------------------------ how much is on the table */
+
+test("the frame that says the words are on disk moves the gauge", async () => {
+  /* It reads what the person said, so it moves on the frame that says what
+     they said reached disk, and on no earlier one: a number drawn for words
+     still liable to be refused is a number that then has to be taken back. */
+  const screen = opened();
+  await turn(screen, "12 clients chez Malt", [
+    frame({kind: "accepted", facts: 2, figures: 1, named: 1, ratio: 25,
+           enough: 8}),
+    frame({kind: "text", text: "When?"})
+  ]);
+
+  assert.strictEqual(screen.at("sufficiency-ratio").textContent,
+                     "material 25%");
+  assert.strictEqual(screen.at("sufficiency-counts").textContent,
+                     "2/8 facts, 1 num, 1 named");
+});
+
+test("a turn refused before it was written leaves the gauge alone",
+     async () => {
+  const screen = opened();
+  screen.at("sufficiency-ratio").textContent = "material 25%";
+  screen.reply = refused(409, {detail: "turn-running"});
+  screen.at("text").value = "12 clients chez Malt";
+  screen.at("say").dispatch("submit");
+  await settled();
+
+  assert.strictEqual(screen.at("sufficiency-ratio").textContent,
+                     "material 25%");
+});
+
+test("an accepted frame with no gauge on it leaves the line where it is",
+     async () => {
+  /* Older frames, and any path that ever stops sending the counts. A line
+     rewritten from missing numbers reads as a gauge that fell to zero. */
+  const screen = opened();
+  screen.at("sufficiency-ratio").textContent = "material 25%";
+  await turn(screen, "encore", [frame({kind: "accepted"})]);
+
+  assert.strictEqual(screen.at("sufficiency-ratio").textContent,
+                     "material 25%");
 });
 
 

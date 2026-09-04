@@ -277,6 +277,12 @@ function page(strings, options) {
                                  {hidden: true});
   document.place(approve, "input", "sheet-digest", {value: ""});
 
+  /* The sufficiency line. On the page before the first turn, like the sheet
+     panel: the labels are the pack's and the client only ever fills them. */
+  const gauge = document.place(null, "p", "sufficiency");
+  document.place(gauge, "span", "sufficiency-ratio", {textContent: ""});
+  document.place(gauge, "span", "sufficiency-counts", {textContent: ""});
+
   document.place(null, "p", "awaiting", {hidden: !settings.awaiting});
   document.place(null, "button", "resume", {hidden: !settings.awaiting});
 

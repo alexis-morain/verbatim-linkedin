@@ -1308,6 +1308,75 @@ class TestTheVersionsOfADraft(InterviewCase):
             interview.load(self.root, conversation.id)
 
 
+
+class TestOnlyWhatTheAuthorSaidCredits(InterviewCase):
+    """D2, and it is A0 applied to a number.
+
+    The gauge reads `said()` and nothing else, so the four provenances split
+    the same way they split for an anchor: the transcript credits, the sheet
+    is a consent rather than an utterance, the profile is not this
+    interview, and a tool result is a machine's. Proved here rather than
+    trusted, because the day somebody hands this function a wider text is
+    the day the engine's own work is scored back to the person.
+    """
+
+    def test_what_the_person_said_moves_it(self):
+        conversation = started(self.root)
+        self.assertEqual(interview.sufficiency(conversation).facts, 0)
+        interview.say(conversation, "12 clients chez Malt en 3 semaines")
+        self.assertEqual(interview.sufficiency(conversation).facts, 3)
+
+    def test_a_revision_request_moves_it_because_it_is_something_said(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        before = interview.sufficiency(conversation).facts
+        interview.revise(conversation, "mets le vrai chiffre : 12 en 2024",
+                         now=EVEN_LATER)
+        self.assertEqual(interview.sufficiency(conversation).facts, before + 2)
+
+    def test_the_sheet_credits_nothing(self):
+        # An approval is a consent, not a parole. Every figure and every
+        # name on this sheet is the engine's wording of what it heard, and
+        # scoring it would pay the person twice for saying it once.
+        conversation = started(self.root)
+        before = interview.sufficiency(conversation)
+        interview.propose(conversation, proposal(
+            angle="4 mois perdus chez Malt",
+            elements=["12 clients", "3 semaines chez Doctolib"],
+            moment="on a signe 6800 euros",
+            conviction="le direct paie",
+            first_lines=["Quatre mois.", "2024 fut long."]), now=WHEN)
+        interview.approve(conversation, conversation.sheet.digest(), now=LATER)
+        self.assertEqual(interview.sufficiency(conversation), before)
+
+    def test_a_tool_result_credits_nothing(self):
+        # The profile arrives this way, and this is where a rich answer
+        # about somebody else would arrive if the source door ever opened.
+        conversation = started(self.root)
+        conversation.messages.append(
+            {"role": "user",
+             "content": [{"type": "tool_result", "tool_use_id": "c1",
+                          "content": "Le profil dit : 12 clients chez Malt, "
+                                     "3 ans chez Doctolib, 6800 euros.",
+                          "is_error": False}]})
+        self.assertEqual(interview.sufficiency(conversation).facts, 0)
+
+    def test_the_engine_asking_a_question_credits_nothing(self):
+        # The loudest of the four. The engine quotes the previous answer in
+        # its next question, on purpose, and a gauge reading the thread
+        # would count every figure a second time the moment it was quoted
+        # back, then climb on its own with nobody saying anything.
+        conversation = started(self.root)
+        interview.say(conversation, "12 clients")
+        after_one = interview.sufficiency(conversation)
+        conversation.messages.append(
+            {"role": "assistant",
+             "content": [{"type": "text",
+                          "text": "Ces 12 clients, c'etait chez Malt en "
+                                  "2024, sur 3 mois ?"}]})
+        self.assertEqual(interview.sufficiency(conversation), after_one)
+
+
 class TestTheDraftingStep(InterviewCase):
     """What a drafting turn is handed. Not the interview's own message list:
     a fresh request built from the material, which is what the skill asks

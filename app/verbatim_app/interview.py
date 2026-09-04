@@ -46,6 +46,7 @@ from .passages import (
 )
 from .providers import Usage
 from .shown import shown
+from .sufficiency import Reading, of
 
 #: Bumped when the stored shape changes in a way a reader has to know about.
 VERSION = 1
@@ -989,6 +990,20 @@ def sources(conversation: Conversation) -> dict:
     if sheet_approved(conversation):
         found[FROM_SHEET] = conversation.sheet.text()
     return found
+
+
+def sufficiency(conversation: Conversation) -> Reading:
+    """How much material is on the table, off `said()` and nothing else.
+
+    The one place that decides which text the gauge reads, and it reads the
+    same one an anchor of transcript provenance is verified against. That is
+    the rule of `references/anchoring.md` applied to a number: the sheet is a
+    consent rather than an utterance, the profile is not this interview, and
+    a tool result is a machine's. None of the three is material the author
+    put on the table, and a gauge crediting them would hand the engine's own
+    work back as theirs.
+    """
+    return of(conversation.said())
 
 
 def checked(conversation: Conversation) -> list:

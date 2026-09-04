@@ -92,6 +92,14 @@
    interview has enough material. The turn behind this button requires the
    tool, which is what makes the mechanism fire on a model that would
    otherwise answer the sheet in prose. #}
+{# How much material is on the table. Beside the sentence the engine writes
+   every turn, never instead of it: what is missing is a judgement about the
+   material and only that sentence carries it. This says how much there is,
+   and it shows its counts, so the percentage is a reading of something
+   somebody can check rather than a verdict of its own. #}
+<p class="gauge mono" id="sufficiency"><span id="sufficiency-ratio">{{ t('interview.sufficiency', **gauge) }}</span>
+  <span class="hint" id="sufficiency-counts">{{ t('interview.sufficiency_counts', **gauge) }}</span></p>
+<p class="hint">{{ t('interview.sufficiency_hint') }}</p>
 <p class="hint">{{ t('interview.sheet_ask_hint') }}</p>
 <button type="button" id="ask-sheet" data-url="/interview/{{ conversation.id }}/sheet/propose">{{ t('interview.sheet_ask') }}</button>
 <p class="callout" id="awaiting"{% if not awaiting %} hidden{% endif %}>{{ t('interview.awaiting') }}</p>

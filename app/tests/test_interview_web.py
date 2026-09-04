@@ -1808,6 +1808,47 @@ class TestAnApprovedSheetEndsTheQuestions(SheetCase):
         self.assertIn('id="say"', page.text)
 
 
+
+class TestHowMuchIsOnTheTable(SheetCase):
+    """The number beside the sentence. D1, and D2 as the thing it reads.
+
+    The engine names what is missing every turn, which is the honest half
+    and the unreadable one. This is the readable half, and it never replaces
+    the sentence.
+    """
+
+    def test_an_interview_with_nothing_in_it_reads_zero(self):
+        interview_id = self.open_interview()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(shown(self.app.state.t("interview.sufficiency",
+                                             ratio=0)), page.text)
+
+    def test_what_was_said_is_what_moved_it(self):
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "12 clients chez Malt en 3 semaines")
+        interview.save(self.root, conversation)
+        page = self.client.get(f"/interview/{interview_id}")
+        reading = interview.sufficiency(conversation)
+        self.assertEqual(reading.facts, 3)
+        self.assertIn(shown(self.app.state.t("interview.sufficiency",
+                                             ratio=reading.ratio)), page.text)
+
+    def test_the_frame_carries_the_same_reading_the_page_would_draw(self):
+        # One function for both, so the line rewritten mid interview is the
+        # line a reload draws. Two would drift, and the live one is the one
+        # nobody reloads to check.
+        interview_id = self.open_interview()
+        reply = self.client.post(f"/interview/{interview_id}/turn",
+                                 data={"text": "12 clients chez Malt"})
+        accepted = [f for f in frames(reply.text) if f["kind"] == "accepted"]
+        self.assertEqual(len(accepted), 1)
+        conversation = interview.load(self.root, interview_id)
+        reading = interview.sufficiency(conversation)
+        self.assertEqual(accepted[0]["ratio"], reading.ratio)
+        self.assertEqual(accepted[0]["facts"], reading.facts)
+
+
 DRAFT_ARGS = {
     "body": "Quatre mois pour rien.\n\nJ'ai écrit pour des agences, et le "
             "canal direct est le seul qui paie.",

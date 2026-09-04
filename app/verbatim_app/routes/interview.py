@@ -44,7 +44,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from . import render as _render
-from .. import anchors, archive, interview, prose
+from .. import anchors, archive, interview, prose, sufficiency
 from ..agent import Agent, AgentError, http_transport
 from ..instance import InstanceError, UnreadableError
 from ..passages import changed, line_blocks, passages_of
@@ -315,6 +315,23 @@ def panel(conversation) -> dict:
     }
 
 
+def _gauge_fields(conversation) -> dict:
+    """How much material is on the table, for the screen and for the frame.
+
+    One function for both, like `panel` above and for the same reason: the
+    line the browser rewrites mid interview has to be the line a reload
+    would draw. Computed, never stored. Which text it reads is
+    `interview.sufficiency`'s decision and not this one.
+    """
+    reading = interview.sufficiency(conversation)
+    return {"facts": reading.facts, "figures": reading.figures,
+            "named": reading.named, "ratio": reading.ratio,
+            # The threshold travels so the sentence can name it. A browser
+            # that carried its own copy would disagree with the server the
+            # day it moves.
+            "enough": sufficiency.ENOUGH}
+
+
 def _absent(notes, kinds) -> list:
     """The kinds the writing step was asked for and did not return.
 
@@ -378,6 +395,10 @@ def _screen(request: Request, conversation, **extra):
                   awaiting=_awaiting_answer(conversation),
                   notice=asked if asked in NOTICES else "",
                   engine=_engine(request), bank=bank,
+                  # The number beside the sentence. The engine names what is
+                  # missing every turn, which is the honest half and the
+                  # unreadable one; this says how much there is.
+                  gauge=_gauge_fields(conversation),
                   trace=panel(conversation), findings="",
                   # The blocks a revision can be aimed at. Off the draft on
                   # disk, so the digest in the form is a digest of what this
@@ -870,7 +891,11 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
         # a refusal means nothing was written and the words stay in the box;
         # after it, every failure is a failure of a turn that really happened.
         keep()
-        yield _frame("accepted")
+        # The gauge rides this frame rather than one of its own: it reads
+        # what the person said, and this is the frame that says what they
+        # said is on disk. Anything earlier would show a number for words
+        # that might still be refused.
+        yield _frame("accepted", **_gauge_fields(conversation))
 
         block = _block(request, conversation, sections=sections)
         tools = instance_tools(root, request.app.state.bundle,
@@ -1085,6 +1110,7 @@ FRAME_KEYS = (
     "interview.error_nothing_to_revise", "interview.error_passage_gone",
     "interview.error_sheet_not_read", "interview.error_draft_not_read",
     "interview.error_unknown", "interview.tokens", "interview.spent",
+    "interview.sufficiency", "interview.sufficiency_counts",
 )
 
 
