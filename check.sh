@@ -68,6 +68,36 @@ else
   printf '   skip uv not installed, the wheel was not built\n'
 fi
 
+step "the project page is more than one line"
+# That wheel is also the PyPI page, and a version there cannot be reused: a
+# page that ships wrong is fixed by publishing the next number. Nothing in a
+# checkout reads these fields, so an empty one stays invisible right up to
+# the moment it is permanent. Built by the step above, read here.
+# app/tests/test_packaging.py holds what goes in; this reads what came out.
+if [ -n "${wheel:-}" ] && [ -f "${wheel:-}" ]; then
+  meta="$(unzip -p "$wheel" '*.dist-info/METADATA' 2>/dev/null)"
+  thin=""
+  case "$meta" in *"Description-Content-Type: text/markdown"*) ;;
+                  *) thin="$thin long-description" ;; esac
+  case "$meta" in *"Project-URL: Source"*) ;; *) thin="$thin project-urls" ;; esac
+  case "$meta" in *"Classifier: "*) ;; *) thin="$thin classifiers" ;; esac
+  case "$meta" in *"Requires-Dist: fastapi"*) ;;
+                  # A table opened above the dependencies array takes it.
+                  # The wheel builds, installs, and imports nothing.
+                  *) thin="$thin requires-dist" ;; esac
+  # The README is written to be read on GitHub, where a relative target
+  # resolves. PyPI keeps it verbatim and serves it from a host with no
+  # docs/ under it, so one that survives the build is a broken image
+  # under the title. app/hatch_build.py makes them absolute.
+  case "$meta" in *"](docs/"*|*"](references/"*|*"](skills/"*|*"](examples/"*)
+                    thin="$thin relative-links" ;; *) ;; esac
+  if [ -z "$thin" ]; then ok "$(basename "$wheel") metadata"
+  else bad "the project page is missing:$thin"; fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip no wheel was built, the project page was not read\n'
+fi
+
 step "no model instruction lives under app/"
 # Prompts stay in skills/ and locales/. The app carries mechanics only.
 prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai|respond only with|never reveal' \
@@ -276,7 +306,7 @@ if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "th
 
 step "every engine file is actually tracked"
 missing=""
-for f in $(find references skills locales lib app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml; do
+for f in $(find references skills locales lib app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
   git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
 done
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi
