@@ -15,11 +15,45 @@ de revue, `45684fc` ce compte-rendu. Le retour arrière a été vérifié de bou
 en bout dans un vrai navigateur, formulaire compris, pas seulement en test :
 V2, clic, V1, et les deux horodatages justes.
 
-**Un écart à rattraper, noté ici parce qu'il ne doit pas se perdre.** La revue
-est revenue REFUTED. J'ai corrigé les trois défauts, `check.sh` est repassé
-vert et j'ai poussé sans relancer la revue jusqu'au vert, ce que la règle
-enregistrée demande. Les correctifs sont couverts par des tests écrits rouges
-d'abord, mais aucun regard neuf n'a relu `ceb25ae`.
+**L'écart rattrapé, et ce qu'il a coûté.** La première revue est revenue
+REFUTED, j'ai corrigé les trois défauts et poussé `ceb25ae` sans relancer la
+revue jusqu'au vert. Relancée après coup sur ce commit seul, elle est
+revenue REFUTED avec deux défauts que mes propres correctifs avaient
+introduits.
+
+`earlier` et `drafted` étaient écrits par deux instructions séparées, donc la
+forme « versions sur le disque, horodatage absent » était possible, et dans
+cette forme un retour arrière ramène comme instruction vivante une demande
+qu'un tour avait déjà satisfaite. La revue l'annonçait comme touchant tous
+les fichiers 2.3.0 ; c'est faux, et la revue suivante l'a confirmé
+indépendamment : un fichier 2.3.0 n'a pas non plus `earlier`, donc `revert`
+le refuse d'entrée. Ce qui est atteignable, c'est la forme elle-même, par un
+fichier édité à la main ou par tout futur écrivain qui remplirait l'un en
+oubliant l'autre. `_install` fait maintenant les trois choses d'un bloc, et
+`_build` sème l'horodatage depuis le brouillon quand le fichier ne le porte
+pas : migration et non devinette, la pile étant croissante par construction
+et `revert` dépilant le maximum.
+
+Second défaut, plus discret : en remplaçant `isdigit` par `int` j'avais fermé
+le 500 et ouvert `int("-2")`, qui vaut `NEITHER`. Une approbation qui n'a rien
+décidé pouvait donc s'enregistrer comme « j'ai lu les deux et je n'en prends
+aucune », la distinction même que F1 existe pour protéger, et le sentinel est
+un mot précisément pour qu'aucun nombre ne puisse le dire. `isdecimal` est le
+prédicat qui correspond, le `try` restant pour la chaîne décimale au-delà de
+la limite de conversion de l'interpréteur.
+
+`5f28aae` corrige les deux, revu et **CONFIRMED** au tour suivant, 36 valeurs
+balayées contre la vraie route. `672c57f` ajoute ce que ce tour a laissé :
+le commentaire disait que `isdecimal` correspond à ce qu'un formulaire
+envoie, alors qu'il est plus large, un chiffre décimal d'un autre système
+convertissant aussi ; c'est sans danger et la raison mérite d'être écrite.
+Plus un test sur une fiche sans première ligne, qui ne peut pas enregistrer
+« les deux refusées ». Poussés, 1146 tests app.
+
+**La leçon, pour la prochaine fois : la règle n'est pas décorative.** Pousser
+sur REFUTED après correction sans relancer la revue a laissé passer deux
+défauts pendant deux commits, dont un que je venais d'introduire en corrigeant
+le précédent.
 
 ### C4, la version, ce qui a bougé dedans, et le retour arrière
 
