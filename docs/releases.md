@@ -4,6 +4,66 @@ One entry per published version, newest first. The dated working log is
 [`journal.md`](journal.md), in French, and it is a different file: it records
 sessions, not versions.
 
+## 2.5.0, 4 September 2026
+
+A quieter interview screen, and a settings screen that tells you where the key
+goes without asking you for it.
+
+### The engine's errands are one line now
+
+Starting an interview used to print every file the engine opened and every
+answer it got back, each as its own block. Reading four files in order to be
+able to ask one question put fifteen blocks between your sentence and the
+question, two of them opened by default because a tool had asked for something
+outside the instance contract and been refused.
+
+None of that is gone. It is one closed line saying how many steps the engine
+took, and opening it shows exactly what used to be printed. A run that carries
+a refusal says so on that line and still opens closed: the model asked for
+something it could not have and carried on, which is worth being able to look
+up rather than worth being handed.
+
+The sufficiency gauge no longer draws itself over an interview nobody has
+answered yet, and the paragraph explaining how it counts is folded behind one
+line.
+
+### A settings screen
+
+The eleventh screen, and it holds what is about the installation rather than
+about you.
+
+**Language**, both axes: the one you are interviewed in and the one your posts
+are written in by default. They are lists of the packs actually installed now,
+rather than a text field that accepted anything and refused it afterwards.
+They moved off the profile screen, which shows the facts and links here: one
+field, one writer.
+
+**The model**, with what it would cost before you start, and a section for
+running one on your own machine. Ollama, LM Studio and vLLM all speak the
+OpenAI chat format, so the provider is `openai` and the endpoint is the
+runtime's own, with no key at all. The lines are copyable.
+
+That section also carries the failure nobody sees. Ollama picks its context
+window from free memory and lands on 4096, which is well under the skill this
+app sends every turn. The skill arrives cut, the model answers anyway, and
+nothing in the reply says so. `OLLAMA_CONTEXT_LENGTH=16384 ollama serve` is on
+the screen next to the warning.
+
+**The API key has no field on that screen, and will not get one.** A key typed
+into a page is a key in a form post and in a browser's history. This app reads
+it from the environment it was started in and from nowhere else, so the screen
+says where it goes instead: the Verbatim menu and its Settings sheet when you
+launched the app, or a shell export when you did not. It knows which of the
+two you are looking at.
+
+**About**: the version, the licence, and where to report a bug.
+
+### Upgrading
+
+`pip install --upgrade verbatim-linkedin`, or replace `Verbatim.app` with the
+disk image on this release. The app pins the engine version it installs, so
+the two travel together.
+
 ## 2.4.1, 4 September 2026
 
 A fix and a new way to install, and the fix is the reason to take it.
