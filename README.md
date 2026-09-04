@@ -254,19 +254,6 @@ than guesses.
 - **No invented facts, including inside a revision.** Revisions are where this
   usually breaks, so the traceability check runs again after every one.
 
-## Where it comes from
-
-Built out of a working setup, not out of a specification. The post it was
-calibrated on is real and public: Alexis Morain, [the La Growth Machine
-workflow](https://www.linkedin.com/feed/update/urn:li:share:7488195323551481856),
-29 July 2026, 2,200 characters.
-
-The scars in this bundle are from that setup. The validation sheet exists
-because a draft once claimed client experience that did not exist. The
-publishing guard exists because three test posts went to a company page. The
-disclosure rule exists because an affiliate disclosure survived the draft and
-not the published version.
-
 ## License
 
 MIT. See [LICENSE](LICENSE).
