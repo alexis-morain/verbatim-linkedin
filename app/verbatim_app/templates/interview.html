@@ -76,7 +76,7 @@
       <li>{% if sheet.state == 'proposed' and conversation.state == 'open' %}<label><input type="radio" name="first_line" value="{{ loop.index0 }}" form="sheet-approve" required> {{ line }}</label>{% else %}{% if sheet.first_line == loop.index0 %}<span class="badge mono">{{ t('interview.sheet_first_line_taken') }}</span> {% endif %}{{ line }}{% endif %}</li>
       {% endfor %}{% if sheet.state == 'proposed' and conversation.state == 'open' %}
       <li class="hint"><label><input type="radio" name="first_line" value="none" form="sheet-approve" required> {{ t('interview.sheet_first_line_none') }}</label></li>
-      {% elif sheet.first_line == -2 %}
+      {% elif sheet.first_line == neither %}
       <li class="hint">{{ t('interview.sheet_first_line_none_taken') }}</li>
       {% endif %}{% endif %}</ul></dd>
   </dl>

@@ -1144,7 +1144,11 @@ class TestTheFirstLineIsDecided(InterviewCase):
                           first_line=0, now=LATER)
         interview.save(self.root, conversation, now=LATER)
         path = self.directory(conversation) / interview.CONVERSATION
-        for wrong in ("0", True, 1.5, None):
+        # 99 is in the list for the same reason the others are: `chosen`
+        # would come back empty and `decided` true, and those two together
+        # are how this file spells "both proposals were refused". A line
+        # somebody took would read back as a line they turned down.
+        for wrong in ("0", True, 1.5, None, 99, -7):
             raw = json.loads(path.read_text(encoding="utf-8"))
             raw["sheet"]["first_line"] = wrong
             path.write_text(json.dumps(raw), encoding="utf-8")
@@ -1401,9 +1405,11 @@ class TestTheVersionsOfADraft(InterviewCase):
                              now=LATEST)
 
     def test_going_back_stamps_the_moment_of_the_click(self):
-        # `written` says when the engine wrote this body, because it did.
-        # `restored` says when it became the draft again, and `since` is
-        # what anything asking "what was asked after this draft" compares to.
+        # `written` says when the engine wrote this body, because it did,
+        # and `restored` says when it came back in front. Neither of them is
+        # what decides whether a request has been answered: that is a fact
+        # about turns, not about the body on screen, and it lives on the
+        # conversation.
         conversation = approved(self.root)
         interview.write(conversation, offer(), now=LATER)
         interview.write(conversation, offer(body="Autre chose."),
@@ -1414,14 +1420,11 @@ class TestTheVersionsOfADraft(InterviewCase):
                          LATER.strftime(interview.STAMP))
         self.assertEqual(conversation.draft.restored,
                          LATEST.strftime(interview.STAMP))
-        self.assertEqual(conversation.draft.since,
-                         LATEST.strftime(interview.STAMP))
 
-    def test_a_request_from_before_is_not_bundled_with_one_from_after(self):
-        # The whole of what `restored` buys. Going back moves the draft's
-        # stamp backwards in time, and the request whose answer was just
-        # thrown away would come back as an unanswered one, riding along
-        # with whatever is typed next. `_pending` reads `since` for this.
+    def test_going_back_does_not_un_run_the_turn_it_threw_away(self):
+        # A revert is not a drafting turn and it does not undo one. The
+        # request that version answered stays answered, and the stamp that
+        # says so does not move backwards with the body.
         conversation = approved(self.root)
         interview.write(conversation, offer(), now=LATER)
         interview.revise(conversation, "plus court", now=EVEN_LATER)
@@ -1429,11 +1432,54 @@ class TestTheVersionsOfADraft(InterviewCase):
                         now=EVEN_LATER)
         interview.revert(conversation, shown(conversation.draft.body),
                          now=LATEST)
+        self.assertEqual(conversation.drafted,
+                         EVEN_LATER.strftime(interview.STAMP))
         interview.revise(conversation, "garde celui-la mais plus court",
                          now=datetime(2026, 8, 28, 16, 0, 0))
         asked = interview.material(conversation).split("## Revision")[1]
         self.assertIn("garde celui-la mais plus court", asked)
         self.assertNotIn("plus court\n\ngarde", asked)
+
+    def test_going_back_keeps_every_request_no_turn_ever_answered(self):
+        # The case the first shape of this got wrong. Two requests that
+        # produced nothing, which `_pending` exists to carry together: a
+        # refusal, then the source somebody comes back with. A revert in
+        # the middle of that must not quietly mark the first one answered.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=WHEN)
+        interview.write(conversation, offer(body="Autre chose."), now=LATER)
+        interview.revise(conversation, "d'ou sortent ces chiffres",
+                         now=EVEN_LATER)
+        interview.revise(conversation, "barometre Malt, 2025",
+                         now=datetime(2026, 8, 28, 15, 10, 0))
+        interview.revert(conversation, shown(conversation.draft.body),
+                         now=LATEST)
+        asked = interview.material(conversation).split("## Revision")[1]
+        self.assertIn("d'ou sortent ces chiffres", asked)
+        self.assertIn("barometre Malt, 2025", asked)
+
+    def test_when_the_last_turn_ran_survives_the_disk(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.drafted, LATER.strftime(interview.STAMP))
+
+    def test_a_conversation_from_before_falls_back_to_its_draft(self):
+        # No key on disk, and the older rule applies rather than a guess:
+        # the body in front was written by the last turn that ran, which is
+        # true of every conversation written before a revert was possible.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        path = self.directory(conversation) / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        del raw["drafted"]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.drafted, "")
+        interview.revise(again, "plus court", now=EVEN_LATER)
+        self.assertIn("plus court", interview.material(again))
 
     def test_the_versions_round_trip_through_the_disk(self):
         conversation = approved(self.root)
@@ -1997,10 +2043,13 @@ class TestATurnThatProducedNothing(InterviewCase):
         self.assertIn("Demande 9.", tail)
         self.assertNotIn("Demande 0.", tail)
 
-    def test_a_draft_with_no_timestamp_keeps_the_old_rule(self):
-        # Written by a version that did not stamp its drafts. Nothing can be
-        # said about what came after what, so nothing new is claimed.
+    def test_a_conversation_with_no_timestamp_keeps_the_old_rule(self):
+        # Written by a version that stamped neither the turn nor the draft.
+        # Nothing can be said about what came after what, so nothing new is
+        # claimed. Both stamps, because a file from that version has neither
+        # and the fallback is what such a file has always got.
         conversation = self.drafted()
+        conversation.drafted = ""
         conversation.draft = replace(conversation.draft, written="")
         interview.revise(conversation, REVISION, now=AFTER)
         interview.revise(conversation, "Plus court.", now=LATEST)

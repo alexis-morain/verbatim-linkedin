@@ -5,4 +5,4 @@ files the skills do, in the format references/instance.md specifies, and
 holds no state of its own.
 """
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"

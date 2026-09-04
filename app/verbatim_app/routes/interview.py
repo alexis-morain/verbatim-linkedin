@@ -418,6 +418,11 @@ def _screen(request: Request, conversation, **extra):
                   # silence on the reload after a refusal.
                   scope=interview.pending_scope(conversation),
                   lint_failed=False, archive_problem="",
+                  # The value the sheet carries for "both were refused".
+                  # From the engine rather than written into the template:
+                  # a number spelled twice is a number that means two things
+                  # the day it moves.
+                  neither=interview.NEITHER,
                   formats=archive.FORMATS, labels=archive.LABELS,
                   states=archive.STATES, pillars=archive.PILLARS,
                   today=request.app.state.today().isoformat(), seed="",
@@ -477,11 +482,15 @@ def approve_sheet(request: Request, interview_id: str, sheet: str = Form(""),
     point of this step is that skipping it used to be silent.
     """
     root = request.app.state.instance.root
-    if first_line.strip() == NONE_OF_THEM:
-        taken = interview.NEITHER
-    elif first_line.strip().isdigit():
-        taken = int(first_line)
-    else:
+    try:
+        # `int` rather than `isdigit`, which says yes to a superscript and to
+        # other Unicode digits `int` then refuses, and yes to a digit string
+        # past the interpreter's own conversion limit. That gap is a 500 out
+        # of a form field rather than the refusal below. Its sibling `draft`
+        # has always parsed this way.
+        taken = (interview.NEITHER if first_line.strip() == NONE_OF_THEM
+                 else int(first_line))
+    except ValueError:
         taken = interview.UNDECIDED
     try:
         interview.load(root, interview_id)

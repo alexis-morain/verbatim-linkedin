@@ -283,21 +283,10 @@ class Draft:
     written: str = ""
     #: When this body was put back in front, on a version somebody went back
     #: to. `written` still says when the engine wrote it, because it did, and
-    #: this says when it became the draft again. Both, because `_pending`
-    #: reads one of them and the screen reads the other: going back moves the
-    #: draft's stamp backwards in time, and a single stamp would hand the
-    #: next turn the very request whose answer was just thrown away.
+    #: this says when it became the draft again. A screen fact, and only
+    #: that: whether a request has been answered is a fact about turns, not
+    #: about the body on screen, and it lives on the conversation.
     restored: str = ""
-
-    @property
-    def since(self) -> str:
-        """The stamp anything asking what came after this draft compares to.
-
-        The later of the two, and a plain `max` over strings works because
-        `STAMP` is fixed width and orders lexically, which is the property
-        `_pending` already relies on.
-        """
-        return max(self.written, self.restored)
 
 
 @dataclass
@@ -326,6 +315,14 @@ class Conversation:
     #: The engine's words rather than the person's, so nothing here is an
     #: anchoring source and `said` does not read it.
     earlier: list = field(default_factory=list)
+    #: When a drafting turn last ran. What `_pending` compares a request to,
+    #: and it belongs here rather than on the draft because that is the
+    #: question it answers: not which body is in front, but whether any turn
+    #: has answered this yet. Monotonic, because a turn that ran cannot
+    #: un-run. Going back throws a body away and leaves this alone, which is
+    #: the difference between the two facts. Empty on a conversation written
+    #: before it existed, where the older rule applies rather than a guess.
+    drafted: str = ""
     #: Append only, and written by a person's click alone. Part of what they
     #: said, which is why `said` reads it and the transcript renders it.
     revisions: list = field(default_factory=list)
@@ -699,6 +696,7 @@ def write(conversation: Conversation, arguments: dict, *, problems=(),
                   written=(now or datetime.now()).strftime(STAMP))
     _keep_version(conversation)
     conversation.draft = draft
+    conversation.drafted = draft.written
     return draft
 
 
@@ -769,6 +767,7 @@ def write_passage(conversation: Conversation, arguments: dict, *, scope=None,
         photos=conversation.draft.photos, tips=conversation.draft.tips,
         problems=tuple(problems),
         written=(now or datetime.now()).strftime(STAMP))
+    conversation.drafted = conversation.draft.written
     return conversation.draft
 
 
@@ -825,11 +824,11 @@ def revert(conversation: Conversation, body: str,
         raise DraftChanged(
             f"the post of {conversation.id} is not the one this was read "
             "from; it has been rewritten since the screen was drawn")
-    # The stamp is the moment of the click, not the moment the engine wrote
-    # this body, and it is why `restored` exists: `_pending` asks what was
-    # asked after the current draft, and going back moves that backwards.
-    # Without it, the request whose answer was just taken back would be
-    # handed to the next turn as an unanswered one.
+    # `drafted` is deliberately untouched. A revert is not a drafting turn
+    # and it does not un-run the one whose answer is being thrown away: the
+    # request that version answered stays answered, and the requests made
+    # after it stay unanswered. Moving a stamp with the body confuses those
+    # two, in both directions.
     conversation.draft = replace(
         conversation.earlier.pop(),
         restored=(now or datetime.now()).strftime(STAMP))
@@ -1023,7 +1022,8 @@ def _pending(conversation: Conversation) -> list:
     """
     if not conversation.revisions:
         return []
-    written = conversation.draft.since if conversation.draft else ""
+    written = conversation.drafted or (
+        conversation.draft.written if conversation.draft else "")
     if written:
         pending = [revision for revision in conversation.revisions
                    if revision.asked > written]
@@ -1253,6 +1253,11 @@ def _as_json(conversation: Conversation) -> str:
                   "output_tokens": conversation.usage.output_tokens},
         "spent": conversation.spent,
     }
+    if conversation.drafted:
+        # Absent until a turn has drafted, so a conversation from before this
+        # reads back byte for byte and falls back to its draft's own stamp,
+        # which is what it always compared to.
+        data["drafted"] = conversation.drafted
     if conversation.sheet is not None:
         # Absent until proposed, per the contract: a conversation without a
         # sheet stays a file an older reader already knows byte for byte.
@@ -1358,6 +1363,7 @@ def _build(data: dict, interview_id: str) -> Conversation:
         updated=str(data.get("updated", "")),
         state=str(data.get("state") or OPEN),
         post=str(data.get("post") or ""),
+        drafted=str(data.get("drafted", "")),
         usage=Usage(int(usage.get("input_tokens") or 0),
                     int(usage.get("output_tokens") or 0)),
         spent=spent,
@@ -1399,6 +1405,13 @@ def _check_sheet(data) -> Sheet | None:
         # A bool is an int in Python and `True` would read as index 1, a
         # choice nobody made, on the one field that says what the post was
         # written for.
+        raise ValueError("sheet")
+    if first_line not in (UNDECIDED, NEITHER) and not (
+            0 <= first_line < len(data["first_lines"])):
+        # An index into lines that are not there. `chosen` would come back
+        # empty, `decided` would come back true, and the two together are
+        # this file's spelling of "both proposals were refused": a line
+        # somebody took would read back as a line they turned down.
         raise ValueError("sheet")
     return Sheet(
         first_line=first_line,

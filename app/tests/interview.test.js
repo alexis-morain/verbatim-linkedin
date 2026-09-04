@@ -125,6 +125,17 @@ test("a sheet arriving mid stream offers the choice, refusal included",
   assert.deepStrictEqual(lines(screen), A_SHEET.first_lines);
 });
 
+test("an approved sheet arriving offers no choice, like the template",
+     async () => {
+  /* Frozen. A radio that changes nothing is a lie, and the template gates
+     on the same field. */
+  const screen = opened();
+  await turn(screen, "go on",
+             [frame(Object.assign({}, A_SHEET, {state: "approved"}))]);
+
+  assert.deepStrictEqual(choices(screen), []);
+});
+
 test("the choice travels with the approval form and is required",
      async () => {
   const screen = opened();
@@ -830,6 +841,28 @@ test("what the engine says about a revision lands in the revision panel",
      "verbatim-asked Give me the name and the year."]);
   assert.deepStrictEqual(screen.thread(), []);
   assert.strictEqual(screen.at("revision-reply").hidden, false);
+});
+
+test("what a tool answered stays in the panel with the rest of the turn",
+     async () => {
+  /* Every drafting turn calls a tool, so every drafting turn has one of
+     these. A refused rewrite renders it open, so the loudest half of a
+     refusal was the half displayed a screen away from its own question. */
+  const screen = opened({draft: true, revision: true});
+  screen.reply = streamed([
+    frame({kind: "accepted"}),
+    frame({kind: "tool_call", name: "rewrite_passage", phase: "post",
+           arguments: {}}),
+    frame({kind: "tool_result", name: "rewrite_passage",
+           result: "that passage has changed", is_error: true}),
+    frame({kind: "text", text: "Read the post again."})
+  ]);
+  screen.at("revision").value = "trop long";
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.deepStrictEqual(screen.thread(), []);
+  assert.strictEqual(screen.panel().length, 4);
 });
 
 test("a drafting turn that fails says so in the panel too", async () => {

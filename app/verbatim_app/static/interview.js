@@ -106,7 +106,8 @@
     body.textContent = frame.result;
     fold.appendChild(head);
     fold.appendChild(body);
-    turns.appendChild(fold);
+    into().appendChild(fold);
+    trailing();
   }
 
   function phase(key) {
@@ -301,7 +302,12 @@
       if (node) { node.textContent = slots[id]; }
     });
     refill(document.getElementById("sheet-elements"), frame.elements);
-    firstLines(frame.first_lines);
+    /* A choice only while the sheet is still a proposal, which is the gate
+       the template uses: an approved sheet is frozen, and a radio that
+       changes nothing is a lie. Unreachable today, a `sheet` frame being
+       emitted for a fresh proposal alone, and the two renderers still have
+       to agree about it. */
+    firstLines(frame.state === "proposed" ? frame.first_lines : []);
     /* How this sheet arrived, and it is not decoration. A sheet parsed out of
        an answer that ignored its tool is a weaker object than one a model
        committed to, and the person about to sign it decides with that in

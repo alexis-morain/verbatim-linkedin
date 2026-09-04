@@ -1859,7 +1859,12 @@ class TestTheFirstLineIsChosenOnTheScreen(SheetCase):
         # to be silent, so anything that is not one of the shapes the form
         # sends lands on undecided and is refused.
         interview_id = self.with_sheet()
-        for wrong in ("nope", "-1", "1.0", "nothing", "0x0", "none of them"):
+        # The superscript is not decoration. `str.isdigit` says yes to it and
+        # `int` says no, which is a 500 out of a form field rather than the
+        # refusal this route documents. Its sibling `draft` has always
+        # caught that; this one was written without the guard.
+        for wrong in ("nope", "-1", "1.0", "nothing", "0x0", "none of them",
+                      "\u00b2", "\u0662", "9" * 5000):
             reply = self.approve(interview_id, first_line=wrong)
             self.assertIn("notice=first-line-missing",
                           reply.headers["location"], wrong)

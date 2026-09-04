@@ -158,7 +158,10 @@ def changed(before: str, after: str) -> set:
     which block on the screen moved, not which texts are new. A set
     difference marks both copies of a repeated paragraph when one of them is
     edited, and it marks nothing at all when a block is only moved, which is
-    the opposite mistake. The matcher answers by position and gets both.
+    the opposite mistake. The matcher answers by position and gets the
+    first; on a pure reorder it marks the blocks it reads as displaced,
+    which is one of a swapped pair rather than both. A reorder is visible as
+    a change, which is what matters, and it is not underlined twice.
 
     An empty `before` marks nothing on purpose. A first draft is not a
     change, and every rule that answers this from the post alone paints the
