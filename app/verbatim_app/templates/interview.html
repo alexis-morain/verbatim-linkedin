@@ -100,8 +100,14 @@
 <p class="gauge mono" id="sufficiency"><span id="sufficiency-ratio">{{ t('interview.sufficiency', **gauge) }}</span>
   <span class="hint" id="sufficiency-counts">{{ t('interview.sufficiency_counts', **gauge) }}</span></p>
 <p class="hint">{{ t('interview.sufficiency_hint') }}</p>
-<p class="hint">{{ t('interview.sheet_ask_hint') }}</p>
-<button type="button" id="ask-sheet" data-url="/interview/{{ conversation.id }}/sheet/propose">{{ t('interview.sheet_ask') }}</button>
+{# Not before the first turn. A sheet asked for then is a sheet the model has
+   to invent, which is the failure the sheet exists to catch, and the server
+   refuses it: this is the same rule on the screen instead of behind a click.
+   Hidden rather than absent, because the page does not reload between two
+   interview turns and the client reveals it on the frame that says the
+   first words reached disk. #}
+<p class="hint" id="ask-sheet-hint"{% if not conversation.messages %} hidden{% endif %}>{{ t('interview.sheet_ask_hint') }}</p>
+<button type="button" id="ask-sheet"{% if not conversation.messages %} hidden{% endif %} data-url="/interview/{{ conversation.id }}/sheet/propose">{{ t('interview.sheet_ask') }}</button>
 <p class="callout" id="awaiting"{% if not awaiting %} hidden{% endif %}>{{ t('interview.awaiting') }}</p>
 <button type="button" id="resume"{% if not awaiting %} hidden{% endif %}>{{ t('interview.resume') }}</button>
 <form id="say" method="post" action="/interview/{{ conversation.id }}/turn">

@@ -452,6 +452,38 @@ test("a drafting turn that lands nothing leaves the page where it is",
 
 
 
+
+test("the sheet button appears with the first words that reach disk",
+     async () => {
+  /* The server refuses a sheet before anybody has said anything, so the
+     screen does not offer one. The page does not reload between two
+     interview turns, so the frame that says the words are on disk is what
+     puts the button up. */
+  const screen = opened({ask: true, asked: false});
+  assert.strictEqual(screen.at("ask-sheet").hidden, true);
+  assert.strictEqual(screen.at("ask-sheet-hint").hidden, true);
+
+  await turn(screen, "j'ai arrete les agences", [
+    frame({kind: "accepted"}),
+    frame({kind: "text", text: "When?"})
+  ]);
+
+  assert.strictEqual(screen.at("ask-sheet").hidden, false);
+  assert.strictEqual(screen.at("ask-sheet-hint").hidden, false);
+});
+
+test("a turn refused before it was written leaves the button hidden",
+     async () => {
+  const screen = opened({ask: true, asked: false});
+  screen.reply = refused(409, {detail: "turn-running"});
+  screen.at("text").value = "j'ai arrete les agences";
+  screen.at("say").dispatch("submit");
+  await settled();
+
+  assert.strictEqual(screen.at("ask-sheet").hidden, true);
+});
+
+
 /* ------------------------------------------------ how much is on the table */
 
 test("the frame that says the words are on disk moves the gauge", async () => {

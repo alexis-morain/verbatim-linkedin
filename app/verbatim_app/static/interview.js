@@ -101,6 +101,7 @@
          good on a stream that never gets to say anything else. */
       committed = true;
       gauge(frame);
+      offerSheet();
       if (pending !== null) { commit(); }
       return;
     }
@@ -147,6 +148,17 @@
          refusal decided before that wrote nothing to answer. */
       if (!frame.code || frame.code === "engine-failed") { owing(true); }
     }
+  }
+
+  function offerSheet() {
+    /* The sheet is refused before anybody has said anything, because a sheet
+       asked for then is a sheet the model has to invent. So the screen does
+       not offer one until there is a turn on disk, and this is the frame
+       that says there is. The page does not reload between two interview
+       turns, so nothing else would put the button up until somebody
+       reloaded and found out it had been there all along. */
+    [ask, document.getElementById("ask-sheet-hint")].forEach(
+      function (node) { if (node) { node.hidden = false; } });
   }
 
   function gauge(frame) {

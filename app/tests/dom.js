@@ -287,7 +287,11 @@ function page(strings, options) {
   document.place(null, "button", "resume", {hidden: !settings.awaiting});
 
   if (settings.ask) {
-    const ask = document.place(null, "button", "ask-sheet");
+    /* Hidden until something has been said, which is what the server
+       refuses on. `asked` is the screen of an interview with a turn in it. */
+    const hidden = settings.asked === false;
+    const ask = document.place(null, "button", "ask-sheet", {hidden: hidden});
+    document.place(null, "p", "ask-sheet-hint", {hidden: hidden});
     ask.setAttribute("data-url", "/interview/2026-08-28-01/sheet/propose");
   }
   if (settings.draft) {

@@ -1809,6 +1809,52 @@ class TestAnApprovedSheetEndsTheQuestions(SheetCase):
 
 
 
+
+class TestNothingIsOfferedWithNoHistoryBehindIt(SheetCase):
+    """E2. Alchie's back arrow does not exist until the third question, and
+    the rule under it is the one worth taking: a control with nothing behind
+    it is not on the screen.
+
+    Ours had one. The sheet is refused before anybody has said anything,
+    with `nothing-to-send`, because a sheet asked for then is a sheet the
+    model has to invent, and inventing it is the failure the sheet exists to
+    catch. The button was on the page all the same, and clicking it was the
+    only way to find out.
+    """
+
+    def test_the_sheet_is_not_offered_before_the_first_turn(self):
+        interview_id = self.open_interview()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="ask-sheet"', page.text)
+        self.assertIn('id="ask-sheet" hidden', page.text)
+        self.assertIn('id="ask-sheet-hint" hidden', page.text)
+
+    def test_the_server_refuses_what_the_screen_now_hides(self):
+        # The two halves have to agree, and this is the one that matters:
+        # hiding a control is a courtesy, and the refusal is the rule.
+        interview_id = self.open_interview()
+        reply = self.client.post(f"/interview/{interview_id}/sheet/propose")
+        self.assertEqual(reply.status_code, 422)
+
+    def test_it_is_offered_once_something_has_been_said(self):
+        interview_id = self.open_interview()
+        conversation = interview.load(self.root, interview_id)
+        interview.say(conversation, "j'ai arrete les agences")
+        interview.save(self.root, conversation)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="ask-sheet"', page.text)
+        self.assertNotIn('id="ask-sheet" hidden', page.text)
+        self.assertNotIn('id="ask-sheet-hint" hidden', page.text)
+
+    def test_the_answer_box_is_there_from_the_first_second(self):
+        # What is hidden is the control with nothing behind it, not the one
+        # that puts something there.
+        interview_id = self.open_interview()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn('id="say"', page.text)
+        self.assertIn('id="text"', page.text)
+
+
 class TestHowMuchIsOnTheTable(SheetCase):
     """The number beside the sentence. D1, and D2 as the thing it reads.
 
