@@ -147,6 +147,55 @@ class TestTheFiling(ArchiveCase):
                 archive.check(filing(pillar=wrong))
 
 
+class TestTheShapeOfAPost(ArchiveCase):
+    """What the post screen says a post is, structurally.
+
+    A character count alone hides two things a person editing a post wants:
+    how many paragraphs it breaks into, which is what a reader scrolls, and
+    how much of the length is the tail every post carries rather than
+    anything that was written for this one.
+    """
+
+    def test_paragraphs_are_blank_line_separated_blocks(self):
+        shape = archive.shape("Un.\n\nDeux.\n\nTrois.")
+        self.assertEqual(shape.paragraphs, 3)
+        self.assertEqual(shape.characters, len("Un.\n\nDeux.\n\nTrois."))
+        self.assertEqual(shape.signature, 0)
+
+    def test_a_single_block_is_one_paragraph(self):
+        self.assertEqual(archive.shape("Une seule ligne.").paragraphs, 1)
+
+    def test_an_empty_post_has_no_paragraph(self):
+        for empty in ("", "   ", "\n\n"):
+            self.assertEqual(archive.shape(empty).paragraphs, 0)
+            self.assertEqual(archive.shape(empty).characters, 0)
+
+    def test_a_run_of_blank_lines_is_one_break(self):
+        self.assertEqual(archive.shape("Un.\n\n\n\nDeux.").paragraphs, 2)
+
+    def test_the_session_notes_are_not_the_post(self):
+        # The seam the contract fixes. Counting below it reports a length
+        # nobody ever reads, and the notes are the rawest thing a file holds.
+        body = "Le post.\n\n" + archive.NOTES_MARKER + "\n\nDes notes."
+        self.assertEqual(archive.shape(body).paragraphs, 1)
+        self.assertEqual(archive.shape(body).characters, len("Le post."))
+
+    def test_the_signature_is_counted_when_the_post_ends_on_it(self):
+        shape = archive.shape("Le post.\n\n--\nNadia", signature="--\nNadia")
+        self.assertEqual(shape.signature, len("--\nNadia"))
+        self.assertEqual(shape.paragraphs, 2)
+
+    def test_a_signature_this_post_does_not_carry_is_not_counted(self):
+        # The instance's signature can have been rewritten since. A post
+        # published before that does not change shape because of it.
+        shape = archive.shape("Le post.\n\n--\nNadia", signature="--\nNadia F.")
+        self.assertEqual(shape.signature, 0)
+
+    def test_a_signature_in_the_middle_is_not_the_tail(self):
+        shape = archive.shape("--\nNadia\n\nLe post.", signature="--\nNadia")
+        self.assertEqual(shape.signature, 0)
+
+
 class TestTheFileItWrites(ArchiveCase):
     """The front matter of references/measure.md, the post, the signature
     concatenated rather than generated, then the session notes."""

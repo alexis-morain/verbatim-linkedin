@@ -205,6 +205,18 @@ class TestScreens(WebCase):
         page = self.client.get("/posts/2026-08-25-agency-segment.md")
         self.assertIn("I spent four months selling to agencies", page.text)
 
+    def test_post_detail_shows_both_axes(self):
+        # A format is a shape, a label is an effect on the reader, and
+        # references/formats.md keeps them apart. A screen showing one of
+        # them quietly makes them the same choice.
+        page = self.client.get("/posts/2026-08-18-board-pack-hours.md")
+        self.assertIn("The breakdown", page.text)
+        self.assertIn("TRUST", page.text)
+
+    def test_post_detail_counts_paragraphs(self):
+        page = self.client.get("/posts/2026-08-18-board-pack-hours.md")
+        self.assertIn("Paragraphs", page.text)
+
     def test_unknown_post_is_404(self):
         self.assertEqual(self.client.get("/posts/nope.md").status_code, 404)
 

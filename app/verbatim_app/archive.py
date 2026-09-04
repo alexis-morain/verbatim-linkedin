@@ -189,6 +189,37 @@ def post_only(body: str) -> str:
     return re.sub(r"\n-{3,}\s*\Z", "", post).strip()
 
 
+@dataclass(frozen=True)
+class Shape:
+    """What a post is, structurally. Three numbers, no verdict."""
+    paragraphs: int
+    characters: int
+    #: How much of `characters` is the tail every post carries. Zero when
+    #: this post does not end on the signature it was handed.
+    signature: int
+
+
+def shape(body: str, signature: str = "") -> Shape:
+    """How many paragraphs, how long, and how much of that is the signature.
+
+    Over the published post alone. `post_only` is what a reader gets, and
+    counting the session notes under it would report a length nobody reads.
+
+    The signature is measured by finding it at the end rather than by
+    trusting the instance to still hold the one this post was archived with.
+    A signature rewritten last month does not retroactively change the shape
+    of a post published before it, and a screen saying it did would be
+    inviting somebody to shorten a post over characters that are not there.
+    """
+    text = post_only(body).strip()
+    tail = signature.strip()
+    return Shape(
+        paragraphs=len([block for block in re.split(r"\n\s*\n", text)
+                        if block.strip()]),
+        characters=len(text),
+        signature=len(tail) if tail and text.endswith(tail) else 0)
+
+
 def notes_only(body: str) -> str:
     """What the session left beside the post, cut at the same seam.
 

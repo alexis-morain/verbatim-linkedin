@@ -10,8 +10,22 @@
   <dt>{{ t('posts.state') }}</dt>
   <dd><span class="state state-{{ post.state }}">{{ t('posts.state_' + (post.state or 'draft')) }}</span></dd>
   <dt>{{ t('posts.pillar') }}</dt><dd class="mono">P{{ post.pillar }}</dd>
+  {# Two axes, chosen separately: a format is a shape, a label is an effect
+     on the reader. references/formats.md keeps them apart, and a screen
+     showing only one of them quietly makes them the same choice. #}
+  <dt>{{ t('posts.format') }}</dt>
+  <dd class="mono">{% if post.format %}{{ t('interview.format_' + post.format.replace('-', '_')) }}{% endif %}</dd>
   <dt>{{ t('posts.label') }}</dt><dd class="mono">{{ post.label }}</dd>
   <dt>{{ t('posts.chars') }}</dt><dd class="mono">{{ post.chars }}</dd>
+  {# What a character count does not say: how many blocks a reader scrolls,
+     and how much of the length is the tail every post carries rather than
+     anything written for this one. Read off the file on screen, so a post
+     edited after archiving reports what it is now. #}
+  <dt>{{ t('posts.paragraphs') }}</dt><dd class="mono">{{ shape.paragraphs }}</dd>
+  {% if shape.signature %}
+  <dt>{{ t('posts.signature') }}</dt>
+  <dd class="mono">{{ t('posts.signature_value', signature=shape.signature) }}</dd>
+  {% endif %}
 </dl>
 
 <h2>{{ t('post.body') }}</h2>

@@ -21,7 +21,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from . import render as _render
-from ..archive import notes_only, post_only
+from ..archive import notes_only, post_only, shape as post_shape
 from ..instance import (
     LABELS, PILLARS, STATES, InstanceError, SectionChanged, UnreadableError,
 )
@@ -350,6 +350,11 @@ def post_screen(request: Request, name: str, **extra):
     except InstanceError:
         raise HTTPException(status_code=404)
     values = dict(post=matches[0], post_text=post_text, notes=notes,
+                  # Read off the file on screen, not off the front matter:
+                  # a post edited by hand after archiving has the shape it
+                  # has now, and the stored count is what it was then.
+                  shape=post_shape("" if unreadable else raw,
+                                   instance.signature()),
                   unreadable=unreadable, saved=0,
                   plan="", shown="", token="", publish_when="",
                   publish_problem="",
