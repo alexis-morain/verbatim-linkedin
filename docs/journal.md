@@ -1,5 +1,171 @@
 # Journal
 
+## 2026-09-04 (soir). Les huit lignes qui restaient du backlog Alchie, et une revue qui a trouvé un 500
+
+Deuxième session du jour, sur la base `dd84c2a` et 1051 tests app. Demande :
+C4 et C5, puis D1, D2, E2, F1, F4, F5. Fin de session : **1142 tests app,
+94 JS**, `check.sh` vert, app **2.4.0**, `linkedin-post` 0.4.0. Neuf commits.
+Le backlog Alchie est fait sauf B3 et B4, et G reste une décision d'Alexis.
+
+### C4, la version, ce qui a bougé dedans, et le retour arrière
+
+La garantie de C3, un bloc réécrit et tout le reste à sa place au caractère
+près, ne valait rien à l'écran : un seul corps ne peut pas la montrer.
+`conversation.earlier` garde les brouillons remplacés, `version()` compte
+dessus au lieu de stocker un numéro à côté de ce qu'il compte.
+
+**`revert` dépile, il n'empile pas.** Écrire l'ancien corps comme une version
+neuve aurait montré V3 à quelqu'un qui demandait V1, et V1 n'aurait jamais
+été atteignable. Ce qui se perd est un corps que le moteur a écrit, et rien
+ne s'y adosse : `said()` est la parole de la personne et ses demandes.
+
+**`passages.changed` répond par `SequenceMatcher` sur les condensés, pas par
+différence d'ensembles.** Une différence d'ensembles marque les deux copies
+d'un paragraphe répété quand on en édite une, et ne marque rien quand un bloc
+se déplace : les deux erreurs opposées. `line_blocks` est le pont vers
+`anchors.lines`, les deux parcourant `splitlines`, donc un bloc se peint sans
+redécouper le post.
+
+Le marqueur est un trait dans la marge, pas le lavis crème d'Alchie : le
+lavis est déjà pris, il veut dire « affirmation que rien n'adosse », et c'est
+le seul marqueur qui ne teinte pas la prose de quelqu'un.
+
+### C5, le tour de rédaction répond là où sa demande a été tapée
+
+Défaut d'Alchie : le refus s'affiche dans le canal général, loin du panneau
+de sélection, et répondre demande de re-sélectionner le passage à la main.
+Le nôtre le mettait en haut de la page, dans le fil d'entretien, ce qui est
+pire d'une façon : ce fil est l'image de la source d'ancrage, et un tour de
+rédaction n'y est pas.
+
+Le canal est vidé par la demande suivante, pas allongé : ce qu'il contient
+répond à la demande d'avant, et deux échanges empilés se lisent comme un
+écran qui se parle à lui-même.
+
+### D1 et D2, le chiffre à côté de la phrase
+
+`interview-intents.md` remplaçait déjà le compteur de questions par un test
+de suffisance : le moteur annonce ce qui manque à chaque tour, en une ligne.
+C'est la moitié honnête et la moitié illisible.
+
+`sufficiency.py` compte des faits, pas des tours : chiffres et noms propres,
+distincts plutôt que par mention, donc celui qui se répète n'est pas celui
+qui marque. **D2 est A0 appliqué à un nombre, et par construction** : la
+lecture se prend sur `said()`, le texte même contre lequel une ancre de
+provenance transcription est vérifiée. Cinq tests, un par source. Le plus
+fort est la question du moteur, qui cite la réponse précédente exprès : une
+jauge qui lirait le fil compterait chaque chiffre une seconde fois au moment
+où il est cité, et monterait toute seule sans que personne ne dise rien.
+
+Deux limites écrites plutôt que découvertes : un nombre en toutes lettres n'y
+entre pas, et quelqu'un qui tape en minuscules n'a aucun nom propre. Elle
+sous-compte, ce qui est le bon sens de l'erreur. **Pas de badge PRÊT** : ce
+qui suffit est un jugement sur de la matière, et ceci compte.
+
+### E2, ce qui n'a rien derrière soi n'est pas offert
+
+Pas de retour question par question chez nous, donc la règle plutôt que la
+forme. Nous avions un cas, et le plus bruyant possible : demander la fiche
+avant que quiconque ait parlé est refusé par le serveur, parce que c'est une
+fiche que le modèle doit inventer, et inventer la fiche est précisément la
+faute que la fiche existe pour attraper. Le bouton était là dès la première
+seconde et cliquer était le seul moyen de l'apprendre.
+
+Caché plutôt qu'absent : le client le lève sur la trame qui dit que les
+premiers mots ont atteint le disque, parce que la page ne recharge pas entre
+deux tours d'entretien.
+
+### F1, la première ligne est un choix, et refuser les deux en est un
+
+Le skill dit depuis toujours que le post est écrit pour la première ligne
+choisie, au caractère près. Personne n'a jamais été interrogé, donc rien n'a
+jamais été choisi, et ce que fait un modèle sans décision est ouvrir sur une
+auto-description tiède par-dessus deux propositions meilleures.
+
+`Sheet.first_line` est un index ou `NEITHER`, et la différence entre « les
+deux refusées » et « personne n'a décidé » est tout l'objet : un rédacteur
+qui ne les distingue pas écrit la même ouverture pour les deux. `approve`
+refuse une approbation qui n'a rien décidé ; le formulaire marque les radios
+`required` et le navigateur l'applique, mais la règle est côté serveur.
+
+Le choix n'entre pas dans le condensé : il fait partie de la signature, pas
+de ce qui est signé, et un condensé qui bougerait avec lui ne pourrait jamais
+être apparié par le formulaire qui porte le clic. Il ne crédite rien non
+plus, pour la raison d'A0 : prendre une ligne que le moteur a écrite est un
+consentement, pas une parole.
+
+### F4, le titre d'attente suit le tour
+
+Le nôtre disait « en attente du modèle » puis se retirait dès l'arrivée des
+en-têtes de réponse, c'est-à-dire avant que le modèle ait dit quoi que ce
+soit : le trou qu'il existait pour couvrir était celui pour lequel on
+l'enlevait. Trois attentes réelles n'avaient rien au-dessus, la plus longue
+étant celle entre un post qui atterrit et la page redemandée.
+
+Quelle phase est au serveur de le dire, d'après l'outil appelé : un
+navigateur qui porterait les noms d'outils serait un second endroit décidant
+quel outil écrit un post. Une phase sans phrase dans le pack retire la ligne
+au lieu de s'imprimer elle-même, et un test tient chaque phase que le serveur
+peut envoyer à en avoir une.
+
+**Pas de pourcentage et pas de six passes cochées.** Nous n'avons pas six
+passes, et une barre de progression sur un travail que personne ne compte est
+l'engagement décoratif que la section H du backlog refuse.
+
+### F5, un brouillon d'instruction survit à sa page
+
+Alchie le perd à la fermeture du panneau. Le nôtre n'a pas de panneau à
+fermer et le perdait pareil : un rechargement, un onglet fermé, un aller-
+retour vers l'écran Post. Cette boîte est le seul endroit de l'écran qui
+tient quelque chose qui n'est pas sur le disque.
+
+Dans le stockage du navigateur, par entretien, et nulle part ailleurs : pas
+sur la conversation, parce qu'une demande atteint le disque quand on
+l'envoie, et un brouillon que personne n'a envoyé n'est pas quelque chose
+qu'on a dit. Le passage visé revient avec, condensé compris, et les deux
+doivent correspondre à une option encore sur la page.
+
+### La revue, et les trois défauts que la suite ne voyait pas
+
+Un `checker` sur le diff complet. `check.sh` était vert, et trois défauts
+réels tenaient debout dessous.
+
+**Un 500 depuis un champ de formulaire.** `approve_sheet` lisait la première
+ligne avec `isdigit()` puis `int()`. `str.isdigit()` dit oui à un exposant et
+aux autres chiffres Unicode qu'`int()` refuse, et oui à une suite de chiffres
+au-delà de la limite de conversion de l'interpréteur. Son frère `draft` a
+toujours lu son index dans un `try`. **Le piège des frères et sœurs**, encore,
+dans le sens exact où le fichier prévient.
+
+**La moitié de C5.** Le commit avait routé `spoken` et `note` vers le panneau
+et laissé `answered` écrire dans le fil. Tout tour de rédaction appelle un
+outil, donc tout tour de rédaction posait son résultat d'outil en haut de la
+page, et un `is_error` s'affiche déplié : la moitié la plus bruyante d'un
+refus était celle affichée loin de sa propre question.
+
+**L'horodatage était sur le mauvais objet.** `Draft.restored` avait été fait
+pour répondre « cette demande a-t-elle une réponse », et il ne peut pas :
+c'est un fait sur les tours, pas sur le corps à l'écran. Inerte là où il
+visait, `_pending` retombant sur sa règle de dernier recours, et nuisible là
+où il mordait, marquant comme répondues deux demandes réellement sans réponse
+parce qu'un retour arrière avait eu lieu entre elles, ce que la fenêtre de
+`_pending` existe précisément pour porter. Le fait est passé sur la
+conversation, `drafted`, monotone : un tour qui a tourné ne se détourne pas.
+`Draft.restored` reste la ligne à l'écran, et `Draft.since` a disparu.
+
+Quatre plus petits avec : un `first_line` hors bornes sur le disque relisait
+une ligne prise comme une ligne refusée ; le gabarit épelait `NEITHER` en
+`-2` ; le client construisait les radios sans demander si la fiche était
+encore une proposition ; et `changed` prétendait marquer les deux moitiés
+d'une paire échangée.
+
+### Ce qui reste
+
+PyPI en 2.4.0, avec le jeton d'Alexis, et la page de release. Le brouillon
+Postiz du 28/08, à sortir à la main. Au backlog Alchie : B3 et B4, et B4 est
+en basse priorité chez le plan lui-même. G, la lecture par source, reste une
+décision d'Alexis, et l'avis du plan est de ne pas l'ouvrir.
+
 ## 2026-09-04. Cinq blocs du backlog, une revue qui a refusé trois fois, et l'app en 2.3.0
 
 Session longue, en anglais dans le dépôt et en français ici. Base `4499df2`,
