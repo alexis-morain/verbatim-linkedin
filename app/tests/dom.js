@@ -314,8 +314,13 @@ function page(strings, options) {
      revises nothing is a stale form, and the server refuses it. Its own flag,
      so a test can build the screen that offers a first draft and no box. */
   if (settings.revision) {
-    document.place(null, "textarea", "revision", {value: ""});
-    const scope = document.place(null, "select", "revision-scope", {value: ""});
+    const box = document.place(null, "textarea", "revision", {value: ""});
+    box.setAttribute("data-interview", "2026-08-28-01");
+    /* `scope` is what the server pre-selected, which is `pending_scope`: the
+       block of a request still waiting for an answer. Empty is the picker on
+       the whole post. */
+    const scope = document.place(null, "select", "revision-scope",
+                                 {value: settings.scope || ""});
     const blocks = settings.blocks || [];
     document.place(scope, "option", null, {}).setAttribute("value", "");
     blocks.forEach(function (block, index) {
@@ -354,9 +359,11 @@ function page(strings, options) {
     return node ? node.children.map(function (turn) { return turn.read(); }) : [];
   };
   screen.script = "interview.js";
+  screen.store = storage(settings.storage);
   screen.globals = {
     fetch: screen.fetch,
     location: screen.location,
+    localStorage: screen.store,
     TextDecoder: TextDecoder,
     URLSearchParams: URLSearchParams
   };
@@ -454,8 +461,33 @@ function copyPage(items, options) {
 /* Everything in this harness resolves without a timer, and the microtask
    queue drains fully before the next macrotask, so one hop through the
    macrotask queue is enough to let a whole turn finish. */
+/* The browser's own store, small enough to write out. `broken` is the case
+   that matters as much as the working one: a private window, blocked site
+   data, and a thumbnail renderer all throw on the accessor itself, and a
+   screen that dies there is a screen that dies for a convenience. */
+function storage(options) {
+  const kept = Object.assign({}, (options || {}).seeded);
+  const broken = Boolean((options || {}).broken);
+  function refuse() { throw new Error("storage is not available here"); }
+  return {
+    kept: kept,
+    getItem: function (key) {
+      if (broken) { refuse(); }
+      return Object.prototype.hasOwnProperty.call(kept, key) ? kept[key] : null;
+    },
+    setItem: function (key, value) {
+      if (broken) { refuse(); }
+      kept[key] = String(value);
+    },
+    removeItem: function (key) {
+      if (broken) { refuse(); }
+      delete kept[key];
+    }
+  };
+}
+
 function settled() {
   return new Promise(function (resolve) { setImmediate(resolve); });
 }
 
-module.exports = {load, page, copyPage, streamed, refused, settled};
+module.exports = {load, page, copyPage, streamed, refused, settled, storage};

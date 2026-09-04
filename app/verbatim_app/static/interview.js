@@ -328,6 +328,9 @@
        is holds a revision request. */
     spoken("turn-said", T.said).textContent = pending;
     if (origin) { origin.value = ""; }
+    /* On disk, so the revision history is where it lives now and the copy
+       the browser was holding has nothing left to protect. */
+    if (origin && origin === revision) { forget(); }
     pending = null;
   }
 
@@ -501,6 +504,50 @@
     });
   }
 
+  /* A half typed request outlives the page it was typed on.
+
+     Alchie loses it when the selection panel is closed. Ours has no panel to
+     close and loses it the same way: a reload, a tab closed, a look at the
+     post screen and back. What is typed there is a person's own words about
+     their own post, and the box is the one place on this screen where
+     something exists that is not on disk yet.
+
+     In the browser's own store, per interview, and never anywhere else: it
+     is not on the conversation, because a request only reaches disk when
+     somebody sends it, and a draft nobody sent is not something they said.
+     Cleared on the frame that says it did reach disk, where the revision
+     history takes over.
+
+     Every access is guarded. A private window, blocked site data and a
+     thumbnail renderer all throw on the accessor itself, and losing the
+     convenience is fine where losing the screen is not. */
+  var WHOSE = revision ? revision.getAttribute("data-interview") : "";
+
+  function keep(name, value) {
+    if (!WHOSE) { return; }
+    try {
+      if (value) {
+        localStorage.setItem("verbatim:" + name + ":" + WHOSE, value);
+      } else {
+        localStorage.removeItem("verbatim:" + name + ":" + WHOSE);
+      }
+    } catch (blocked) { /* nothing kept, and nothing broken */ }
+  }
+
+  function kept(name) {
+    if (!WHOSE) { return ""; }
+    try {
+      return localStorage.getItem("verbatim:" + name + ":" + WHOSE) || "";
+    } catch (blocked) {
+      return "";
+    }
+  }
+
+  function forget() {
+    keep("revision", "");
+    keep("scope", "");
+  }
+
   /* Which block this request is about, as the two fields the server needs:
      the index says which, and the digest says this page was not stale. Both
      are read at the click rather than kept in a variable, so a picker the
@@ -523,18 +570,65 @@
       : {};
   }
 
+  function aimed() {
+    /* The echo of the passage and the line on the action button, from
+       whatever the picker is on. Called on a change and on the way in, so a
+       restored scope arrives with the same three things on the screen as a
+       chosen one. */
+    var option = chosen();
+    /* The exact text, through textContent: a post is somebody's prose and
+       it reaches this page as prose, never as markup. */
+    if (echo) {
+      echo.textContent = option ? option.getAttribute("data-text") : "";
+      echo.hidden = !option;
+    }
+    if (scopeLine) { scopeLine.hidden = !option; }
+  }
+
   if (scope) {
     scope.addEventListener("change", function () {
+      aimed();
       var option = chosen();
-      /* The exact text, through textContent: a post is somebody's prose and
-         it reaches this page as prose, never as markup. */
-      if (echo) {
-        echo.textContent = option ? option.getAttribute("data-text") : "";
-        echo.hidden = !option;
-      }
-      if (scopeLine) { scopeLine.hidden = !option; }
+      keep("scope", option
+        ? scope.value + ":" + option.getAttribute("data-digest") : "");
     });
   }
+
+  if (revision) {
+    revision.addEventListener("input", function () {
+      keep("revision", revision.value);
+    });
+    var draft = kept("revision");
+    if (draft && !revision.value) { revision.value = draft; }
+  }
+
+  if (scope && !scope.value) {
+    /* Only into a picker the server left on the whole post. `pending_scope`
+       reads the disk and puts back the block of a request still waiting for
+       an answer; what is kept here is one browser's, and it fills a gap
+       rather than overruling that.
+
+       The digest travels with the index and both have to match, which is
+       the same staleness guard the form carries: a turn can have rewritten
+       that block since, and a picker restored onto its index alone would
+       aim the next request at other words. */
+    var was = kept("scope").split(":");
+    var found = null;
+    if (was.length === 2) {
+      /* Searched rather than indexed into. The first option is the whole
+         post, so an index into the list is the block's index plus one, and
+         an offset written down here is one renumbering away from selecting
+         the neighbour of the block somebody meant. */
+      Array.prototype.forEach.call(scope.options, function (option) {
+        if (option.getAttribute("value") === was[0]
+            && option.getAttribute("data-digest") === was[1]) {
+          found = option;
+        }
+      });
+      if (found) { scope.value = was[0]; } else { keep("scope", ""); }
+    }
+  }
+  aimed();
 
   function owing(yes) {
     /* Whether the model still owes a reply. The server decided it when the

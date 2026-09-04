@@ -538,6 +538,125 @@ test("a turn refused before it was written leaves the button hidden",
 
 
 
+
+/* ------------------------------------ a half typed request outlives the page */
+
+test("what is typed in the revision box is kept as it is typed", async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.at("revision").value = "trop vague, mets le vrai chiffre";
+  screen.at("revision").dispatch("input");
+
+  assert.strictEqual(screen.store.kept["verbatim:revision:2026-08-28-01"],
+                     "trop vague, mets le vrai chiffre");
+});
+
+test("a request kept from last time is in the box on the next page",
+     async () => {
+  const screen = opened({
+    draft: true, revision: true,
+    storage: {seeded: {"verbatim:revision:2026-08-28-01": "plus court"}}
+  });
+  assert.strictEqual(screen.at("revision").value, "plus court");
+});
+
+test("another interview's draft never lands in this box", async () => {
+  const screen = opened({
+    draft: true, revision: true,
+    storage: {seeded: {"verbatim:revision:2026-08-28-99": "someone else"}}
+  });
+  assert.strictEqual(screen.at("revision").value, "");
+});
+
+test("the box is emptied once the request is on disk, here and in the store",
+     async () => {
+  const screen = opened({
+    draft: true, revision: true,
+    storage: {seeded: {"verbatim:revision:2026-08-28-01": "plus court"}}
+  });
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.at("revision").value, "");
+  assert.strictEqual(
+    screen.store.kept["verbatim:revision:2026-08-28-01"], undefined);
+});
+
+test("a request refused before it was written is still there afterwards",
+     async () => {
+  const screen = opened({draft: true, revision: true});
+  screen.at("revision").value = "plus court";
+  screen.at("revision").dispatch("input");
+  screen.reply = refused(409, {detail: "nothing-to-revise"});
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.at("revision").value, "plus court");
+  assert.strictEqual(screen.store.kept["verbatim:revision:2026-08-28-01"],
+                     "plus court");
+});
+
+test("the passage it was aimed at comes back with it", async () => {
+  const screen = opened({
+    draft: true, revision: true,
+    blocks: [{digest: "aaa1", text: "Un bloc."},
+             {digest: "bbb2", text: "Un autre."}],
+    storage: {seeded: {
+      "verbatim:revision:2026-08-28-01": "trop vague",
+      "verbatim:scope:2026-08-28-01": "1:bbb2"
+    }}
+  });
+  assert.strictEqual(screen.at("revision-scope").value, "1");
+  assert.strictEqual(screen.at("revision-echo").hidden, false);
+  assert.strictEqual(screen.at("revision-scope-line").hidden, false);
+});
+
+test("a passage the post no longer has does not come back", async () => {
+  /* The digest is the staleness guard everywhere else, and it is the same
+     guard here: a turn can have rewritten that block since, and a picker
+     restored onto its index would aim the next request at other words. */
+  const screen = opened({
+    draft: true, revision: true,
+    blocks: [{digest: "aaa1", text: "Un bloc."},
+             {digest: "changed", text: "Un autre, reecrit."}],
+    storage: {seeded: {"verbatim:scope:2026-08-28-01": "1:bbb2"}}
+  });
+  assert.strictEqual(screen.at("revision-scope").value, "");
+  assert.strictEqual(screen.at("revision-echo").hidden, true);
+});
+
+test("a scope the server already chose is not overruled by a kept one",
+     async () => {
+  /* `pending_scope` puts back the block of a request still waiting for an
+     answer, and it reads the disk. What is kept here is a browser's, and it
+     only ever fills a gap. */
+  const screen = opened({
+    draft: true, revision: true, scope: "0",
+    blocks: [{digest: "aaa1", text: "Un bloc."},
+             {digest: "bbb2", text: "Un autre."}],
+    storage: {seeded: {"verbatim:scope:2026-08-28-01": "1:bbb2"}}
+  });
+  assert.strictEqual(screen.at("revision-scope").value, "0");
+});
+
+test("a browser that refuses to store anything still works", async () => {
+  /* A private window, blocked site data, a thumbnail renderer: the accessor
+     itself throws. Losing the convenience is fine and losing the screen is
+     not. */
+  const screen = opened({draft: true, revision: true,
+                         storage: {broken: true}});
+  screen.at("revision").value = "plus court";
+  screen.at("revision").dispatch("input");
+
+  screen.reply = streamed([frame({kind: "accepted"})]);
+  screen.at("write-draft").dispatch("click");
+  await settled();
+
+  assert.strictEqual(screen.calls.length, 1);
+  assert.strictEqual(screen.at("revision").value, "");
+});
+
+
 /* ----------------------------------------- the waiting line follows the turn */
 
 test("the waiting line survives the first byte and waits for the answer",

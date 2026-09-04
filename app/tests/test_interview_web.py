@@ -2458,6 +2458,28 @@ class TestWhereADraftingTurnTalks(DraftCase):
 
 
 
+
+class TestTheBoxSaysWhichInterviewItIs(DraftCase):
+    """F5's server half. What is typed in the revision box outlives the page
+    it was typed on, in the browser's own store and per interview, so the
+    box has to say which interview it belongs to.
+
+    Nothing is kept on the conversation: a request reaches disk when
+    somebody sends it, and a draft nobody sent is not something they said.
+    """
+
+    def test_the_box_carries_the_interview_it_belongs_to(self):
+        interview_id = self.drafted()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(f'id="revision" rows="3" data-interview="{interview_id}"',
+                      page.text)
+
+    def test_a_request_never_sent_is_nowhere_on_the_conversation(self):
+        interview_id = self.drafted()
+        conversation = interview.load(self.root, interview_id)
+        self.assertEqual(conversation.revisions, [])
+
+
 class TestTheTurnSaysWhichPhaseItIsIn(DraftCase):
     """F4. The waiting line follows the turn instead of saying one thing.
 

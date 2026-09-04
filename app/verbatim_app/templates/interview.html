@@ -184,7 +184,10 @@
   <p class="hint">{{ t('interview.revision_hint') }}</p>
   {# A placeholder that teaches by example rather than describing the field.
      Somebody who reads "your request" writes "make it better". #}
-  <textarea id="revision" rows="3" placeholder="{{ t('interview.revision_placeholder') }}"></textarea>
+  {# Which interview this box belongs to. What is typed here outlives the
+     page, in the browser's own store and per interview, so a request half
+     written for one post never turns up under another. #}
+  <textarea id="revision" rows="3" data-interview="{{ conversation.id }}" placeholder="{{ t('interview.revision_placeholder') }}"></textarea>
   {% endif %}
   <button type="button" id="write-draft" data-url="/interview/{{ conversation.id }}/draft">{{ t('interview.draft_rewrite')
     if trace else t('interview.draft_write') }}</button>
