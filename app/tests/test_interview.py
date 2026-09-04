@@ -1065,6 +1065,17 @@ class TestTheFirstLineIsDecided(InterviewCase):
                                           now=LATER))
         self.assertFalse(conversation.sheet.decided)
 
+    def test_an_empty_sheet_cannot_record_that_both_were_refused(self):
+        # Refusing both is an answer about two lines that were read. With
+        # no lines there is nothing to refuse, so a click carrying that
+        # answer stores no decision rather than a false one, and `decided`
+        # stays the field that says whether anybody was asked.
+        conversation = self.lineless()
+        interview.approve(conversation, conversation.sheet.digest(),
+                          first_line=interview.NEITHER, now=LATER)
+        self.assertEqual(conversation.sheet.first_line, interview.UNDECIDED)
+        self.assertFalse(conversation.sheet.decided)
+
     def test_a_second_click_is_the_same_decision_not_an_error(self):
         conversation = self.sheet()
         interview.approve(conversation, conversation.sheet.digest(),

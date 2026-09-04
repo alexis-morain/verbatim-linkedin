@@ -494,10 +494,14 @@ def approve_sheet(request: Request, interview_id: str, sheet: str = Form(""),
         # took neither". The sentinel is a word exactly so that no number
         # in this field can mean it. It also reads `1_0` as ten.
         #
-        # `isdecimal` is the predicate that matches what a form sends: no
-        # sign, no separator, no superscript. The `try` stays for the digit
-        # string past the interpreter's own conversion limit, which is
-        # decimal and still raises.
+        # `isdecimal` is the predicate that keeps those out: no sign, no
+        # separator, no superscript. It is wider than what a browser sends,
+        # since a decimal digit in another script converts too, and that is
+        # harmless on purpose: what comes back is a real index of a real
+        # line, indistinguishable from clicking that radio, and no value it
+        # admits can ever reach `NEITHER` or leave a sheet decided by
+        # nobody. The `try` stays for the decimal string past the
+        # interpreter's own conversion limit, which still raises.
         taken = (interview.NEITHER if picked == NONE_OF_THEM
                  else int(picked) if picked.isdecimal()
                  else interview.UNDECIDED)
