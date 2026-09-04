@@ -2,6 +2,17 @@
 
 ## 2026-09-04 (quatrième session). Le DMG, et le mur qui n'était pas celui qu'on croyait
 
+**Livré** : `cd03010` l'app macOS distribuable, `a031e68` le correctif OpenAI,
+`47ab21a` ce journal, `a166245` la release 2.4.1. Rebasés sur `56e04d1`, poussés
+sur `main`. Tag annoté `v2.4.1`. **verbatim-linkedin 2.4.1 sur PyPI**, résout
+depuis un cache vide. **Workflow `release.yml` vert à son premier run**, quatorze
+étapes, `Verbatim-2.4.1-arm64.dmg` (22,4 Mo) attaché à la release. 1180 tests
+app, 94 JS, `check.sh` vert.
+
+**Décision de fin de session : on garde le DMG.** Donc le certificat Developer
+ID et la notarisation cessent d'être reportés et deviennent la prochaine action,
+puisqu'ils sont la condition pour que l'image disque serve à quelqu'un.
+
 Base `edcb567`, 1163 tests app. Demande d'Alexis : rendre le projet
 téléchargeable depuis GitHub en DMG, pour faciliter la prise en main. Plan
 écrit, grillé, puis exécuté en autonomie. `check.sh` vert, rien de committé,
@@ -123,6 +134,28 @@ tuant « pousser sur GitHub est le processus de release », et c'est le prix à
 payer, pas un défaut. La version reste à 2.4.0 : la monter sans publier ferait
 un DMG épinglant une version absente de l'index, le piège même que le plan
 nomme.
+
+### Le pari du non-signé, testé et perdu
+
+2.4.1 publiée, tag poussé, workflow vert à son premier run, DMG attaché.
+Alexis l'a téléchargé et **macOS a dit que l'app était endommagée**, le pire
+des trois dialogues possibles : il est faux, et il conseille de jeter le
+fichier. Il est passé par Réglages, Confidentialité et sécurité.
+
+Ça marche, et ça ne suffit pas. « Ouvrir quand même » autorise le lancement
+sans retirer la quarantaine, donc l'app tourne en App Translocation, depuis
+une copie en lecture seule à chemin aléatoire sous `/private/var/folders`.
+Sans conséquence ici parce que tout l'état vit dans Application Support, mais
+personne ne sait que son app n'est pas là où il l'a mise.
+
+**Le déclencheur de D3 était un compteur de téléchargements. On a mieux, et
+plus tôt.** Le premier téléchargement réel a été fait par le mainteneur, qui
+connaît le sujet, et il a produit le chemin le plus mauvais : un message qui
+ment, un détour par les Réglages système, et une app translocalisée. La
+personne pour qui le DMG existe est celle qui n'ouvrira pas un terminal ;
+celle-là s'arrête au mot « endommagée ». Le pari est tranché par les faits,
+pas par un compteur : le certificat plus la notarisation deviennent la
+condition pour que le DMG serve à quelque chose.
 
 ### Ce qui est prouvé, et ce qui ne l'est pas
 
