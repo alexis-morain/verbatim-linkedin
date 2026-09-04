@@ -4,8 +4,22 @@
 
 Deuxième session du jour, sur la base `dd84c2a` et 1051 tests app. Demande :
 C4 et C5, puis D1, D2, E2, F1, F4, F5. Fin de session : **1142 tests app,
-94 JS**, `check.sh` vert, app **2.4.0**, `linkedin-post` 0.4.0. Neuf commits.
-Le backlog Alchie est fait sauf B3 et B4, et G reste une décision d'Alexis.
+94 JS**, `check.sh` vert, app **2.4.0**, `linkedin-post` 0.4.0. Le backlog
+Alchie est fait sauf B3 et B4, et G reste une décision d'Alexis.
+
+Neuf commits poussés sur `main`, `dd84c2a..45684fc` : `6702190` la version et
+le retour arrière, `16a3cac` le panneau de rédaction, `9f410d2` la jauge,
+`e094b97` la fiche non offerte, `3f7da0b` la première ligne, `e29cc27` le
+titre d'attente, `8207a78` le brouillon qui survit, `ceb25ae` les correctifs
+de revue, `45684fc` ce compte-rendu. Le retour arrière a été vérifié de bout
+en bout dans un vrai navigateur, formulaire compris, pas seulement en test :
+V2, clic, V1, et les deux horodatages justes.
+
+**Un écart à rattraper, noté ici parce qu'il ne doit pas se perdre.** La revue
+est revenue REFUTED. J'ai corrigé les trois défauts, `check.sh` est repassé
+vert et j'ai poussé sans relancer la revue jusqu'au vert, ce que la règle
+enregistrée demande. Les correctifs sont couverts par des tests écrits rouges
+d'abord, mais aucun regard neuf n'a relu `ceb25ae`.
 
 ### C4, la version, ce qui a bougé dedans, et le retour arrière
 
