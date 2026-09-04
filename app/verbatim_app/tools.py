@@ -42,6 +42,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from .agent import Tool, ToolRefused
+from .i18n import pack_dirs
 from .instance import Instance, InstanceError, WRITABLE
 from . import interview
 from .interview import InterviewError
@@ -88,9 +89,10 @@ READABLE = WRITABLE
 
 
 def available_langs(bundle_root) -> list:
-    root = Path(bundle_root) / "locales"
-    return sorted(path.name for path in root.iterdir()
-                  if path.is_dir() and not path.name.startswith("_"))
+    """The codes alone, for a sentence a tool answers with. What counts as a
+    language directory is `i18n.pack_dirs` and only there: two walks of
+    `locales/` would be two answers to one question."""
+    return [path.name for path in pack_dirs(bundle_root)]
 
 
 def _required(arguments: dict, name: str) -> str:

@@ -36,6 +36,11 @@ DEFAULT_BASE_URL = {
 
 # Only the native wire gets a default. There is no model name that would be
 # right for "any endpoint speaking the OpenAI format", so that one is asked for.
+#: What answers when nothing names a provider. Beside the two tables
+#: rather than spelled again at the one place that reads it: a screen
+#: that printed its own copy would hand somebody yesterday's default
+#: the day this moves.
+DEFAULT_PROVIDER = "anthropic"
 DEFAULT_MODEL = {"anthropic": "claude-opus-5"}
 
 # Per million tokens, input and output. Prices are shown only for a model that
@@ -228,7 +233,7 @@ def resolve(instance_root, environ) -> Settings:
     def setting(name, default=""):
         return environ.get(name) or from_file.get(name) or default
 
-    provider = setting("VERBATIM_PROVIDER", "anthropic")
+    provider = setting("VERBATIM_PROVIDER", DEFAULT_PROVIDER)
     base_url = setting("VERBATIM_BASE_URL", DEFAULT_BASE_URL.get(provider, ""))
     _refuse_userinfo(base_url)
     api_key = _api_key(provider, environ)

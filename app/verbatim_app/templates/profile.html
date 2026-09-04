@@ -20,23 +20,23 @@
 <h2>{{ t('profile.status') }}</h2>
 <p class="hint">{{ t('profile.status_hint') }}</p>
 {% if status %}
-<form class="status" method="post" action="/profile/status">
-  <dl class="facts">
-    <dt>{{ t('overview.filled') }}</dt>
-    <dd class="mono">{% if status.filled %}{{ t('overview.yes') }}{% else %}{{ t('overview.no') }}{% endif %}</dd>
-    <dt>{{ t('overview.source') }}</dt>
-    <dd class="mono">{{ status.source }}</dd>
-    <dt>{{ t('overview.updated') }}</dt>
-    <dd class="mono">{{ status.updated }}</dd>
-  </dl>
-  <label for="interface_language">{{ t('profile.interface_language') }}</label>
-  <input type="text" id="interface_language" name="interface_language"
-         value="{{ status.interface_language }}" spellcheck="false">
-  <label for="output_language_default">{{ t('profile.output_language_default') }}</label>
-  <input type="text" id="output_language_default" name="output_language_default"
-         value="{{ status.output_language_default }}" spellcheck="false">
-  <button type="submit">{{ t('profile.status_save') }}</button>
-</form>
+{# Facts, not a form. The two language axes used to be edited here and are on
+   the settings screen now: they are about the installation rather than about
+   the person, and one field wants one writer, not a form on each screen that
+   happens to show it. #}
+<dl class="facts">
+  <dt>{{ t('overview.filled') }}</dt>
+  <dd class="mono">{% if status.filled %}{{ t('overview.yes') }}{% else %}{{ t('overview.no') }}{% endif %}</dd>
+  <dt>{{ t('overview.source') }}</dt>
+  <dd class="mono">{{ status.source }}</dd>
+  <dt>{{ t('overview.updated') }}</dt>
+  <dd class="mono">{{ status.updated }}</dd>
+  <dt>{{ t('profile.interface_language') }}</dt>
+  <dd class="mono">{{ status.interface_language }}</dd>
+  <dt>{{ t('profile.output_language_default') }}</dt>
+  <dd class="mono">{{ status.output_language_default }}</dd>
+</dl>
+<p class="hint"><a href="/settings">{{ t('profile.language_elsewhere') }}</a></p>
 {% endif %}
 
 {{ blocks.editor(sections, '/profile/section') }}

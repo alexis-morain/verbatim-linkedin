@@ -147,9 +147,14 @@ class Engine:
         return TURNS
 
 
-def _engine(request: Request, *, sized: bool = False) -> Engine:
-    """Resolved per request on purpose: somebody who fixes their instance
-    `.env` and reloads gets a working screen instead of a restart."""
+def engine_for(request: Request, *, sized: bool = False) -> Engine:
+    """What would answer, and what is missing before anything can.
+
+    Resolved per request on purpose: somebody who fixes their instance
+    `.env` and reloads gets a working screen instead of a restart. Public
+    because the settings screen shows the same panel, and a second reading
+    of the same environment would be a second answer to one question.
+    """
     instance = request.app.state.instance
     try:
         settings = resolve(instance.root, request.app.state.environ)
@@ -201,7 +206,7 @@ def _conversation(request: Request, interview_id: str):
 @router.get("/interview")
 def hub(request: Request):
     instance = request.app.state.instance
-    engine = _engine(request, sized=True)
+    engine = engine_for(request, sized=True)
     try:
         entries = interview.listing(instance.root)
     except interview.InterviewError:
@@ -222,7 +227,7 @@ def begin(request: Request, seed: str = Form("")):
     the URL and put in the answer box, and nothing writes it: what starts an
     interview is somebody pressing send, not somebody opening a screen.
     """
-    engine = _engine(request)
+    engine = engine_for(request)
     if not engine.ready:
         # This one is a plain form navigation, so an error body would be the
         # whole page, in whatever language it was written in here. The hub
@@ -412,11 +417,13 @@ def _screen(request: Request, conversation, **extra):
         bank = None
     asked = request.query_params.get("notice", "")
     fields = dict(conversation=conversation,
-                  moments=interview.timeline(conversation),
+                  # Folded, not filtered: a stretch of tool traffic is
+                  # one line on the screen and all of itself inside.
+                  moments=interview.runs(interview.timeline(conversation)),
                   spent=conversation.spent,
                   awaiting=_awaiting_answer(conversation),
                   notice=asked if asked in NOTICES else "",
-                  engine=_engine(request), bank=bank,
+                  engine=engine_for(request), bank=bank,
                   # The number beside the sentence. The engine names what is
                   # missing every turn, which is the honest half and the
                   # unreadable one; this says how much there is.
@@ -754,7 +761,7 @@ def turn(request: Request, interview_id: str, text: str = Form("")):
     and that interview would answer 409 forever. So this end only refuses what
     it can refuse with a status code, and the turn itself takes the lock.
     """
-    engine = _engine(request)
+    engine = engine_for(request)
     if not engine.ready:
         raise HTTPException(status_code=503, detail="not-configured")
     conversation = _conversation(request, interview_id)
@@ -787,7 +794,7 @@ def _start(request: Request, interview_id: str, *, require: str = "",
     committed on this side of the `StreamingResponse`, and the lock is taken
     inside the generator, never here.
     """
-    engine = _engine(request)
+    engine = engine_for(request)
     if not engine.ready:
         raise HTTPException(status_code=503, detail="not-configured")
     conversation = _conversation(request, interview_id)
@@ -1177,7 +1184,8 @@ def _prose_draft(conversation, said: str, road=()) -> bool:
 #: user facing text is ever written in a script file.
 FRAME_KEYS = (
     "interview.said", "interview.asked", "interview.tool_call",
-    "interview.tool_result", "interview.tool_failed", "interview.thinking",
+    "interview.tool_result", "interview.tool_failed",
+    "interview.tool_fold", "interview.tool_fold_failed", "interview.thinking",
     "interview.stop_truncated", "interview.stop_max_tokens",
     "interview.stop_other", "interview.stop_tool_use",
     "interview.stop_refusal",

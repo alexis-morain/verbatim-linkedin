@@ -34,6 +34,14 @@
   var current = null;
   var channel = null;   /* where this turn's words go: see `into` below */
   var waiting = null;   /* the status line, for as long as the turn runs */
+  var trace = null;     /* the fold this run of tool traffic goes into */
+  /* The frame kinds that do not end a run of tool traffic. Tool traffic
+     itself, plus `usage`: that is a figure about the bill, it arrives mid
+     turn and says nothing about what the engine is doing, so a run cut in two
+     by one would count the same work twice. `interview.INSIDE_RUN` is the
+     same list for the replay, and a Python test reads this one and holds them
+     against each other. */
+  var INSIDE_RUN = ["tool_call", "tool_result", "usage"];
   var pending = null;   /* what was typed, until the turn is known to be real */
   var origin = null;    /* the box it was typed in, so the right one clears */
   var committed = false;  /* whether this turn's words reached disk */
@@ -93,10 +101,61 @@
     return line;
   }
 
-  function answered(frame) {
-    var fold = document.createElement("details");
-    fold.className = "turn tool";
-    if (frame.is_error) { fold.open = true; }
+  function tools() {
+    /* Where a stretch of tool traffic goes: one fold, closed, holding all of
+       it. The engine reading four files to be able to ask one question is
+       machinery, and printed step by step it buries the question. The
+       boundary is any frame that is not tool traffic, which is the rule
+       `interview.runs` folds the replay on: two arrivals of one conversation
+       have to break in the same places or a reload rewrites the screen.
+
+       Made on the first frame of the run rather than up front, so a turn
+       that calls nothing leaves nothing behind. */
+    if (trace) { return trace; }
+    var node = document.createElement("details");
+    node.className = "turn tool trace";
+    var head = document.createElement("summary");
+    head.className = "mono";
+    var steps = document.createElement("div");
+    steps.className = "tool-steps";
+    node.appendChild(head);
+    node.appendChild(steps);
+    into().appendChild(node);
+    trailing();
+    trace = {node: node, head: head, body: steps,
+             calls: 0, answers: 0, failed: 0};
+    return trace;
+  }
+
+  function counted(fold) {
+    /* The one line the fold shows. `fold` is the record `tools` keeps, never
+       a DOM node: the node is on it, as `fold.node`.
+
+       A step is a call and the answer to it, so
+       the pairs are counted rather than the frames: a turn cut between the
+       two leaves a run holding one of them, and one thing half done is
+       still one thing. The same count `interview.runs` takes.
+
+       A refusal inside is named on this line and the fold still opens
+       closed: the model asked for something outside the contract and
+       carried on, which is worth being able to look up rather than worth
+       being handed. */
+    var steps = Math.max(fold.calls, fold.answers);
+    fold.head.textContent = fold.failed
+      ? fill(T.tool_fold_failed, {count: steps, failed: fold.failed})
+      : fill(T.tool_fold, {count: steps});
+    if (fold.failed && fold.node.className.indexOf("tool-failed") < 0) {
+      fold.node.className += " tool-failed";
+    }
+  }
+
+  function answered(frame, host) {
+    /* One answer, inside the run it belongs to. Not `fold`, which in this
+       file means the record `tools` keeps, and not `box`, which is the
+       textarea somebody types in: neither of those is a `<details>`. */
+    var row = document.createElement("details");
+    row.className = "tool-line";
+    if (frame.is_error) { row.open = true; }
     var head = document.createElement("summary");
     head.className = "mono";
     head.textContent = (frame.is_error ? T.tool_failed : T.tool_result)
@@ -104,10 +163,9 @@
     var body = document.createElement("pre");
     body.className = "mono";
     body.textContent = frame.result;
-    fold.appendChild(head);
-    fold.appendChild(body);
-    into().appendChild(fold);
-    trailing();
+    row.appendChild(head);
+    row.appendChild(body);
+    host.appendChild(row);
   }
 
   function phase(key) {
@@ -153,11 +211,13 @@
       /* Words are arriving, so the words are the signal. A line under them
          saying the model is thinking says something that is not true. */
       phase("");
+      trace = null;
       if (!current) { current = spoken("turn-asked", T.asked); }
       current.textContent += frame.text;
       return;
     }
     current = null;
+    if (INSIDE_RUN.indexOf(frame.kind) < 0) { trace = null; }
     if (frame.kind === "sheet") {
       sheet(frame);
     } else if (frame.kind === "draft") {
@@ -170,11 +230,21 @@
          asked again, and nothing else on the screen says why. */
       phase("waiting_finishing");
     } else if (frame.kind === "tool_call") {
-      note(T.tool_call + " " + frame.name + " "
-           + JSON.stringify(frame.arguments));
+      var calling = tools();
+      var step = document.createElement("div");
+      step.className = "mono tool-line";
+      step.textContent = T.tool_call + " " + frame.name + " "
+        + JSON.stringify(frame.arguments);
+      calling.body.appendChild(step);
+      calling.calls += 1;
+      counted(calling);
       if (frame.phase) { phase("waiting_" + frame.phase); }
     } else if (frame.kind === "tool_result") {
-      answered(frame);
+      var answering = tools();
+      answering.answers += 1;
+      if (frame.is_error) { answering.failed += 1; }
+      answered(frame, answering.body);
+      counted(answering);
     } else if (frame.kind === "usage") {
       var line = fill(T.tokens, {input: frame.input_tokens,
                                  output: frame.output_tokens});
@@ -208,7 +278,11 @@
        that says there is. The page does not reload between two interview
        turns, so nothing else would put the button up until somebody
        reloaded and found out it had been there all along. */
-    [ask, document.getElementById("ask-sheet-hint")].forEach(
+    [ask, document.getElementById("ask-sheet-hint"),
+     /* And the gauge with them, for the same reason: a gauge reading zero
+        over an interview nobody has answered yet measures nothing. */
+     document.getElementById("sufficiency"),
+     document.getElementById("sufficiency-why")].forEach(
       function (node) { if (node) { node.hidden = false; } });
   }
 

@@ -9,6 +9,7 @@ would still accept.
 """
 
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -561,7 +562,8 @@ class TestARetryAfterAFailedTurn(InterviewCase):
 class TestTimeline(InterviewCase):
     """What a screen shows. Tool traffic is in it, on purpose: the brief for
     this screen is that the engine's reaching for files is visible, not
-    tucked away."""
+    tucked away. Visible is not the same as printed line by line, which is
+    what `TestRuns` below is about."""
 
     def build(self):
         conversation = started(self.root)
@@ -601,6 +603,139 @@ class TestTimeline(InterviewCase):
                           "content": "no such file", "is_error": True}]})
         result = interview.timeline(conversation)[0]
         self.assertTrue(result.is_error)
+
+
+class TestRuns(InterviewCase):
+    """Tool traffic gathered into folds. Kept and not dropped: the brief says
+    the engine's reaching for files is visible, and one line somebody can
+    open still is. What this refuses is a dozen blocks between somebody's
+    words and the question they were read in order to ask."""
+
+    def build(self, *, refused=False):
+        conversation = started(self.root)
+        interview.say(conversation, "Quatre mois sur les agences.")
+        conversation.messages.append(assistant(
+            "", calls=[("toolu_01", "read_instance", {"path": "voice.md"}),
+                       ("toolu_02", "read_instance", {"path": "ideas.md"})]))
+        conversation.messages.append(
+            {"role": "user",
+             "content": [{"type": "tool_result", "tool_use_id": "toolu_01",
+                          "content": "phrases courtes"},
+                         {"type": "tool_result", "tool_use_id": "toolu_02",
+                          "content": "hors contrat" if refused else "un angle",
+                          **({"is_error": True} if refused else {})}]})
+        conversation.messages.append(assistant("Quelle agence ?"))
+        return conversation
+
+    def test_a_stretch_of_tool_traffic_becomes_one_thing(self):
+        found = interview.runs(interview.timeline(self.build()))
+        self.assertEqual([item.kind for item in found],
+                         [interview.SAID, interview.TOOLS, interview.ASKED])
+
+    def test_the_run_holds_every_moment_it_gathered(self):
+        run = [i for i in interview.runs(interview.timeline(self.build()))
+               if i.kind == interview.TOOLS][0]
+        self.assertEqual([m.kind for m in run.moments],
+                         [interview.CALL, interview.CALL,
+                          interview.RESULT, interview.RESULT])
+
+    def test_a_step_is_a_call_and_the_answer_to_it(self):
+        run = [i for i in interview.runs(interview.timeline(self.build()))
+               if i.kind == interview.TOOLS][0]
+        self.assertEqual(run.steps, 2)
+        self.assertEqual(run.failed, 0)
+
+    def test_a_refusal_inside_is_counted_on_the_line(self):
+        run = [i for i in interview.runs(
+            interview.timeline(self.build(refused=True)))
+               if i.kind == interview.TOOLS][0]
+        self.assertEqual(run.failed, 1)
+
+    def test_words_end_a_run_rather_than_joining_it(self):
+        """The boundary the browser folds the live stream on. Two arrivals of
+        one conversation breaking in different places would mean a reload
+        rewrote the screen."""
+        conversation = started(self.root)
+        conversation.messages.append(assistant(
+            "Je regarde.",
+            calls=[("toolu_01", "read_instance", {"path": "voice.md"})]))
+        conversation.messages.append(results(("toolu_01", "phrases courtes")))
+        conversation.messages.append(assistant(
+            "Encore une.",
+            calls=[("toolu_02", "read_instance", {"path": "ideas.md"})]))
+        conversation.messages.append(results(("toolu_02", "un angle")))
+        found = interview.runs(interview.timeline(conversation))
+        self.assertEqual([item.kind for item in found],
+                         [interview.ASKED, interview.TOOLS,
+                          interview.ASKED, interview.TOOLS])
+
+    def test_an_answer_whose_call_is_gone_is_still_one_step(self):
+        """A turn cut between the call and the answer. One thing half done is
+        still one thing, and a run reading zero over a block on the screen is
+        the count contradicting what is under it."""
+        conversation = started(self.root)
+        conversation.messages.append(
+            {"role": "user",
+             "content": [{"type": "tool_result", "tool_use_id": "toolu_01",
+                          "content": "phrases courtes"}]})
+        run = interview.runs(interview.timeline(conversation))[0]
+        self.assertEqual(run.steps, 1)
+
+    def test_a_conversation_with_no_tools_comes_back_untouched(self):
+        conversation = started(self.root)
+        interview.say(conversation, "Quatre mois sur les agences.")
+        conversation.messages.append(assistant("Quelle agence ?"))
+        moments = interview.timeline(conversation)
+        self.assertEqual(interview.runs(moments), moments)
+
+
+class TestTheFoldIsOneRule(InterviewCase):
+    """The boundary held against the browser's, because neither side can see
+    it alone.
+
+    `interview.runs` folds the replay and `tools()` in interview.js folds the
+    live stream. Each suite is right about its own half, and both stay green
+    while the two drift: what that costs is a reload that rewrites the screen,
+    folding a conversation in different places than the stream just did. So
+    this reads the script and holds the two declarations together, the same
+    shape as the launcher's provider list in check.sh.
+    """
+
+    SCRIPT = REPO / "app" / "verbatim_app" / "static" / "interview.js"
+
+    def browser(self) -> set:
+        found = re.search(r"var INSIDE_RUN = \[(.*?)\];",
+                          self.SCRIPT.read_text(encoding="utf-8"), re.S)
+        self.assertIsNotNone(
+            found, "interview.js no longer declares INSIDE_RUN; the two folds "
+                   "cannot be compared and this test is the only thing that "
+                   "was comparing them")
+        return set(re.findall(r'"([^"]+)"', found.group(1)))
+
+    def test_the_two_folds_break_in_the_same_places(self):
+        # The two vocabularies for one thing: a wire frame is named for the
+        # tool, a moment on disk for the block it came out of.
+        frames = {interview.CALL: "tool_call", interview.RESULT: "tool_result"}
+        self.assertEqual(self.browser() - {"usage"},
+                         {frames[kind] for kind in interview.INSIDE_RUN})
+
+    def test_a_figure_about_the_bill_is_the_one_the_browser_keeps_alone(self):
+        """`usage` is on the browser's list and not on this one. It arrives
+        mid turn and says nothing about what the engine is doing, and nothing
+        ever writes one to a conversation, so `timeline` cannot produce a
+        moment of that kind for `runs` to meet."""
+        self.assertIn("usage", self.browser())
+        self.assertNotIn("usage", interview.INSIDE_RUN)
+        conversation = started(self.root)
+        conversation.usage = Usage(4200, 310)
+        interview.say(conversation, "Quatre mois sur les agences.")
+        conversation.messages.append(assistant(
+            "Je regarde.",
+            calls=[("toolu_01", "read_instance", {"path": "voice.md"})]))
+        conversation.messages.append(results(("toolu_01", "phrases courtes")))
+        kinds = {m.kind for m in interview.timeline(conversation)}
+        self.assertEqual(kinds, {interview.SAID, interview.ASKED,
+                                 interview.CALL, interview.RESULT})
 
 
 class TestWhatATurnCost(InterviewCase):

@@ -29,6 +29,8 @@ const STRINGS = {
   sufficiency: "material {ratio}%",
   sufficiency_counts: "{facts}/{enough} facts, {figures} num, {named} named",
   tool_call: "reads", tool_result: "answered", tool_failed: "refused",
+  tool_fold: "engine-did {count}",
+  tool_fold_failed: "engine-did {count} refused {failed}",
   thinking: "waiting",
   waiting_sheet: "putting-the-sheet-together",
   waiting_post: "writing-your-post",
@@ -254,9 +256,63 @@ test("a tool call between two answers opens a second bubble", async () => {
 
   assert.deepStrictEqual(screen.thread(), [
     "verbatim-asked before",
-    'reads read_profile {"path":"p"}',
+    'engine-did 1 reads read_profile {"path":"p"}',
     "verbatim-asked after"
   ]);
+});
+
+test("a run of tool traffic is one fold, closed, holding all of it",
+     async () => {
+  /* The complaint this answers: the engine reading four files in order to
+     be able to ask one question printed a dozen blocks between somebody's
+     words and the question they were read for. Folded, nothing is dropped
+     and the question is next to the sentence it answers. */
+  const screen = opened();
+  await turn(screen, "go", [
+    frame({kind: "tool_call", name: "read_instance", arguments: {path: "a"}}),
+    frame({kind: "tool_call", name: "read_instance", arguments: {path: "b"}}),
+    frame({kind: "tool_result", name: "read_instance", result: "A"}),
+    frame({kind: "tool_result", name: "read_instance", result: "B"}),
+    frame({kind: "text", text: "and so my question"})
+  ]);
+
+  const [fold, said] = screen.at("turns").children;
+  assert.strictEqual(fold.open, false);
+  assert.strictEqual(fold.children[0].textContent, "engine-did 2");
+  assert.strictEqual(fold.children[1].children.length, 4);
+  assert.strictEqual(said.read(), "verbatim-asked and so my question");
+});
+
+test("words after a run start a second fold rather than joining the first",
+     async () => {
+  /* The boundary is any frame that is not tool traffic, which is the rule
+     `interview.runs` folds the replay on. Two arrivals of one conversation
+     breaking in different places would mean a reload rewrote the screen. */
+  const screen = opened();
+  await turn(screen, "go", [
+    frame({kind: "tool_call", name: "read_instance", arguments: {}}),
+    frame({kind: "text", text: "thinking"}),
+    frame({kind: "tool_call", name: "read_instance", arguments: {}})
+  ]);
+
+  assert.deepStrictEqual(
+    screen.at("turns").children.map((node) => node.children[0].textContent),
+    ["engine-did 1", "verbatim-asked", "engine-did 1"]);
+});
+
+test("a figure about the bill does not end a run", async () => {
+  /* Usage frames arrive mid turn and say nothing about what the engine is
+     doing, so a run cut in two by one would count the same work twice. */
+  const screen = opened();
+  await turn(screen, "go", [
+    frame({kind: "tool_call", name: "read_instance", arguments: {}}),
+    frame({kind: "usage", input_tokens: 10, output_tokens: 2, price: null}),
+    frame({kind: "tool_result", name: "read_instance", result: "ok"})
+  ]);
+
+  assert.strictEqual(screen.at("turns").children.length, 1);
+  assert.strictEqual(screen.at("turns").children[0].children[0].textContent,
+                     "engine-did 1");
 });
 
 // ------------------------------------------------------------------- the wire
@@ -408,9 +464,13 @@ test("a tool result that looks like markup reaches the screen as text",
   await turn(screen, "go", [frame({kind: "tool_result", name: "read_file",
                                    result: hostile, is_error: true})]);
 
+  /* The run stays closed carrying a refusal; the refusal inside it does not,
+     so opening the one line lands on the thing that went wrong. */
   const fold = screen.at("turns").children[0];
-  assert.strictEqual(fold.open, true);
-  assert.deepStrictEqual(screen.thread(), ["refused read_file " + hostile]);
+  assert.strictEqual(fold.open, false);
+  assert.strictEqual(fold.children[1].children[0].open, true);
+  assert.deepStrictEqual(screen.thread(),
+                         ["engine-did 1 refused 1 refused read_file " + hostile]);
 });
 
 // ------------------------------------------------------------ the affordances
@@ -862,7 +922,8 @@ test("what a tool answered stays in the panel with the rest of the turn",
   await settled();
 
   assert.deepStrictEqual(screen.thread(), []);
-  assert.strictEqual(screen.panel().length, 4);
+  /* The status line, the run its call and answer fold into, and the words. */
+  assert.strictEqual(screen.panel().length, 3);
 });
 
 test("a drafting turn that fails says so in the panel too", async () => {

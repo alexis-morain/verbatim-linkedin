@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% import "_copy.html" as copy %}
+{% block title %}{{ t('settings.title') }} - {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('settings.title') }}</h1>
+<p class="hint">{{ t('settings.hint') }}</p>
+
+{% if problem %}<p class="degraded">{{ t(problem) }}</p>{% endif %}
+{% if saved %}<p class="flash">{{ t('profile.saved') }}</p>{% endif %}
+
+<h2>{{ t('settings.language') }}</h2>
+<p class="hint">{{ t('settings.language_hint') }}</p>
+{% if not languages %}
+<p class="empty">{{ t('settings.language_none') }}</p>
+{% elif not status %}
+{# The two axes live in the Status block of profile.md, so with no readable
+   block there is nothing to write into. The conformance report at the top of
+   every screen already says which file is missing. #}
+<p class="empty">{{ t('profile.missing') }}</p>
+{% else %}
+{# The two axes live in the Status block of profile.md and are written by the
+   one endpoint that writes it. A second form posting elsewhere would be a
+   second writer of one field; `back` is what brings somebody home, and it is
+   checked against an allowlist rather than followed. #}
+<form class="status" method="post" action="/profile/status">
+  <input type="hidden" name="back" value="/settings">
+  {% for axis, current in (('interface_language', status.interface_language if status else ''),
+                           ('output_language_default', status.output_language_default if status else '')) %}
+  <label for="{{ axis }}">{{ t('profile.' + axis) }}</label>
+  {# A list and not a text field: both axes name a directory under locales/,
+     the app knows which ones are there, and a typo used to come back as a
+     refusal after the fact. A code that is set with no pack installed is on
+     the list anyway, so that saving this form cannot quietly change it. #}
+  <select id="{{ axis }}" name="{{ axis }}">
+    {% for pack in languages %}
+    <option value="{{ pack.code }}"{% if pack.code == current %} selected{% endif %}>{{ pack.code }}{% if not pack.reviewed %} ({{ t('settings.language_unreviewed') }}){% endif %}</option>
+    {% endfor %}
+    {% for code in unknown %}
+    <option value="{{ code }}"{% if code == current %} selected{% endif %}>{{ code }}</option>
+    {% endfor %}
+  </select>
+  {% endfor %}
+  <button type="submit">{{ t('settings.language_save') }}</button>
+</form>
+{% if unknown %}
+<p class="degraded">{{ t('settings.language_unknown', detail=unknown | join(', ')) }}</p>
+{% endif %}
+{% endif %}
+
+<h2>{{ t('settings.engine') }}</h2>
+<p class="hint">{{ t('settings.engine_hint') }}</p>
+{% include "_engine.html" %}
+
+<section class="key">
+  <h3>{{ t('settings.key') }}</h3>
+  <p class="hint">{{ t('settings.key_hint') }}</p>
+  {# Where it goes, in the words of the way this app was actually started.
+     The launcher exports its own name, so the sentence somebody reads is the
+     one about the window they are looking at rather than both at once. #}
+  <p>{% if launcher == 'macos' %}{{ t('settings.key_macos') }}{% else %}{{ t('settings.key_shell') }}{% endif %}</p>
+  <p class="hint">{{ t('settings.key_never_instance') }}</p>
+  <div class="copy-bar">{{ copy.slot('key-lines', 'settings.key_lines') }}</div>
+  <pre class="copy-source mono" id="key-lines">
+export VERBATIM_PROVIDER={{ engine.settings.provider if engine.settings and engine.settings.provider else defaults.provider }}
+export VERBATIM_MODEL={{ engine.settings.model if engine.settings and engine.settings.model else defaults.model }}
+export ANTHROPIC_API_KEY=...</pre>
+  <p class="hint">{{ t('settings.key_none') }}</p>
+</section>
+
+<section class="key">
+  <h3>{{ t('settings.local') }}</h3>
+  <p class="hint">{{ t('settings.local_hint') }}</p>
+  <div class="copy-bar">{{ copy.slot('local-lines', 'settings.key_lines') }}</div>
+  <pre class="copy-source mono" id="local-lines">
+export VERBATIM_PROVIDER=openai
+export VERBATIM_BASE_URL=http://127.0.0.1:11434/v1
+export VERBATIM_MODEL=qwen2.5:14b</pre>
+  {# The one failure this app cannot see from the inside, and the fix for it.
+     Ungated on purpose. It used to hang off `engine.block_size`, which is
+     zero whenever the configuration was refused outright, and the loudest
+     refusal here is `endpoint-untrusted`: somebody pointing at an Ollama that
+     is not on this machine. That is the reader who most needs this. #}
+  <p class="degraded">{{ t('settings.local_context') }}</p>
+  <div class="copy-bar">{{ copy.slot('ollama-lines', 'settings.key_lines') }}</div>
+  <pre class="copy-source mono" id="ollama-lines">
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve</pre>
+</section>
+
+<h2>{{ t('settings.about') }}</h2>
+<dl class="facts">
+  <dt>{{ t('settings.version') }}</dt>
+  <dd class="mono">{{ version }}</dd>
+  <dt>{{ t('settings.licence') }}</dt>
+  <dd class="mono">MIT</dd>
+  <dt>{{ t('settings.author') }}</dt>
+  <dd class="mono">Alexis Morain</dd>
+  <dt>{{ t('settings.source') }}</dt>
+  <dd class="mono"><a href="https://github.com/alexis-morain/verbatim-linkedin">github.com/alexis-morain/verbatim-linkedin</a></dd>
+  <dt>{{ t('settings.report') }}</dt>
+  <dd class="mono"><a href="https://github.com/alexis-morain/verbatim-linkedin/issues">github.com/alexis-morain/verbatim-linkedin/issues</a></dd>
+  <dd class="hint">{{ t('settings.report_hint') }}</dd>
+</dl>
+{% endblock %}
+{% block scripts %}<script src="{{ asset('copy.js') }}" defer></script>{% endblock %}

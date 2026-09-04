@@ -29,12 +29,29 @@
       <p class="who mono">{{ t('interview.asked') }}</p>
       <div class="words">{{ moment.text }}</div>
     </div>
-    {% elif moment.kind == 'call' %}
-    <div class="turn tool mono">{{ t('interview.tool_call') }} {{ moment.name }} {{ moment.arguments | tojson }}</div>
     {% else %}
-    <details class="turn tool"{% if moment.is_error %} open{% endif %}>
-      <summary class="mono">{% if moment.is_error %}{{ t('interview.tool_failed') }}{% else %}{{ t('interview.tool_result') }}{% endif %}</summary>
-      <pre class="mono">{{ moment.text }}</pre>
+    {# A stretch of tool traffic, folded. Reading four files to be able to ask
+       one question is machinery: printed step by step it buries the question,
+       so it is one line, closed, holding all of itself. A run with a refusal
+       in it says so on that line and stays closed too: the model asked for
+       something outside the contract and carried on, which is a thing to be
+       able to look up, not a thing to be handed. #}
+    <details class="turn tool trace{% if moment.failed %} tool-failed{% endif %}">
+      <summary class="mono">{{ t('interview.tool_fold_failed', count=moment.steps,
+        failed=moment.failed) if moment.failed
+        else t('interview.tool_fold', count=moment.steps) }}</summary>
+      <div class="tool-steps">
+      {% for step in moment.moments %}
+        {% if step.kind == 'call' %}
+        <div class="mono tool-line">{{ t('interview.tool_call') }} {{ step.name }} {{ step.arguments | tojson }}</div>
+        {% else %}
+        <details class="tool-line"{% if step.is_error %} open{% endif %}>
+          <summary class="mono">{% if step.is_error %}{{ t('interview.tool_failed') }}{% else %}{{ t('interview.tool_result') }}{% endif %}</summary>
+          <pre class="mono">{{ step.text }}</pre>
+        </details>
+        {% endif %}
+      {% endfor %}
+      </div>
     </details>
     {% endif %}
   {% endfor %}
@@ -112,9 +129,18 @@
    material and only that sentence carries it. This says how much there is,
    and it shows its counts, so the percentage is a reading of something
    somebody can check rather than a verdict of its own. #}
-<p class="gauge mono" id="sufficiency"><span id="sufficiency-ratio">{{ t('interview.sufficiency', **gauge) }}</span>
+{# Hidden until something has been said, on the same rule as the button
+   below it: a gauge reading zero over an interview nobody has answered yet
+   measures nothing, and it says it in four lines. The client reveals it on
+   the frame that says the first words reached disk. #}
+<p class="gauge mono" id="sufficiency"{% if not conversation.messages %} hidden{% endif %}><span id="sufficiency-ratio">{{ t('interview.sufficiency', **gauge) }}</span>
   <span class="hint" id="sufficiency-counts">{{ t('interview.sufficiency_counts', **gauge) }}</span></p>
-<p class="hint">{{ t('interview.sufficiency_hint') }}</p>
+{# The rule behind the number, folded. It is worth reading once and it is
+   worth finding again; it is not worth four lines under every turn. #}
+<details class="why" id="sufficiency-why"{% if not conversation.messages %} hidden{% endif %}>
+  <summary class="mono">{{ t('interview.sufficiency_why') }}</summary>
+  <p class="hint">{{ t('interview.sufficiency_hint') }}</p>
+</details>
 {# Not before the first turn. A sheet asked for then is a sheet the model has
    to invent, which is the failure the sheet exists to catch, and the server
    refuses it: this is the same rule on the screen instead of behind a click.

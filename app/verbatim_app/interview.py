@@ -77,6 +77,18 @@ NEITHER = -2
 #: engine reaching for a file. The screen shows all four, the transcript keeps
 #: the first two, and anchoring reads `said` alone.
 SAID, ASKED, CALL, RESULT = "said", "asked", "call", "result"
+#: Not a moment anybody had: a stretch of the ones above, gathered.
+TOOLS = "tools"
+#: The moment kinds that do not end a run of tool traffic. Declared rather
+#: than spelled into a condition because the browser declares the same thing
+#: for the live stream, and `test_the_two_folds_break_in_the_same_places`
+#: holds the two lists against each other.
+#:
+#: The browser's list carries one more, `usage`: it gets a figure about the
+#: bill mid turn and keeps the run open across it. Nothing ever writes one to
+#: a conversation, so no moment of that kind exists for `runs` to meet, and a
+#: name here for a moment that cannot arrive would be a rule about nothing.
+INSIDE_RUN = (CALL, RESULT)
 
 #: What the writing step is asked for beside the post itself. The skill names
 #: two photo ideas, a staged portrait and a visual of the number or object, and
@@ -413,6 +425,58 @@ def timeline(conversation: Conversation) -> list:
                 found.append(Moment(CALL, name=str(block.get("name", "")),
                                     call_id=str(block.get("id", "")),
                                     arguments=block.get("input") or {}))
+    return found
+
+
+@dataclass(frozen=True)
+class Run:
+    """A stretch of tool traffic, as one thing on a screen.
+
+    The engine reading four files to answer one sentence is machinery, not
+    conversation, and printed line by line it buries the question it was
+    reading in order to ask. So the screen folds it: one line saying how many
+    steps, holding exactly what used to be a dozen blocks, and nothing is
+    dropped on the way.
+
+    `kind` is here so a reader dispatching on `Moment.kind` meets this the
+    same way it meets the rest. A step is a call and the answer to it, so
+    `steps` counts the pairs rather than the blocks: a turn cut between the
+    two leaves a run holding one of them, and one thing half done is still
+    one thing. `failed` is the reason to open the fold.
+    """
+    moments: tuple
+    steps: int = 0
+    failed: int = 0
+    kind: str = TOOLS
+
+
+def runs(moments) -> list:
+    """`timeline` again, with every stretch of tool traffic gathered into one.
+
+    The boundary is `INSIDE_RUN`: anything else ends a run, so words resuming
+    end one. The browser folds the live stream on the same boundary, because
+    the replay and the stream are two arrivals of one conversation and two
+    that broke in different places would mean a reload rewrote the screen.
+    Neither side can see that on its own, so the list is declared on both and
+    `test_the_two_folds_break_in_the_same_places` reads them together.
+    """
+    found = []
+    run = []
+    def close():
+        if not run:
+            return
+        found.append(Run(moments=tuple(run),
+                         steps=max(sum(1 for m in run if m.kind == CALL),
+                                   sum(1 for m in run if m.kind == RESULT)),
+                         failed=sum(1 for m in run if m.is_error)))
+        run.clear()
+    for moment in moments:
+        if moment.kind in INSIDE_RUN:
+            run.append(moment)
+            continue
+        close()
+        found.append(moment)
+    close()
     return found
 
 

@@ -452,6 +452,50 @@ details.raw > .copy-source { margin-top: 0.75rem; }
 .tool pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0 0; }
 .tool-failed { border-color: var(--alarm); color: var(--alarm); }
 
+/* A run of tool traffic, folded into one line.
+
+   A line and not a box: the boxes on this screen belong to what somebody
+   said, and the engine reading four files in order to be able to ask one
+   question is machinery standing beside the conversation, not a turn in it.
+   Opened, the steps come back as the boxes they always were, indented under
+   the line that counts them, so the fold reads as one thing containing many
+   rather than as a second border around the first. */
+.tool.trace { border: 0; padding: 0; }
+.tool.trace > summary { color: var(--muted); }
+.tool.trace > summary:hover { color: var(--accent); }
+.tool.trace.tool-failed { border-color: transparent; }
+.tool.trace.tool-failed > summary { color: var(--alarm); }
+.tool-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0 1rem;
+  color: var(--muted);
+}
+.tool-line {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+.tool-line > summary { cursor: pointer; }
+.tool-line pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0.5rem 0 0;
+}
+
+/* The rule behind a number, one click away from it. Worth reading once,
+   worth finding again, not worth four lines under every turn. */
+details.why { margin: 0 0 1.2rem; }
+details.why > summary {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+details.why > summary:hover { color: var(--accent); }
+details.why .hint { margin: 0.5rem 0 0; }
+
 /* The validation sheet. Same rule as the turns: the lines meant to reach the
    post (the strong moment, the conviction, the first line proposals) are the
    person's material and sit in serif; the engine's restatement stays in the

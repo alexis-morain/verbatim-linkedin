@@ -58,7 +58,7 @@ class WebCase(unittest.TestCase):
 
 
 class TestTheScreensRender(WebCase):
-    SCREENS = ("/profile", "/voice", "/pillars", "/page", "/ideas")
+    SCREENS = ("/profile", "/voice", "/pillars", "/page", "/ideas", "/settings")
 
     def test_every_new_screen_answers_on_the_example_instance(self):
         for path in self.SCREENS:
@@ -76,10 +76,21 @@ class TestTheScreensRender(WebCase):
         self.assertIn('action="/profile/section"', page)
 
     def test_the_status_block_is_a_form_and_not_a_textarea(self):
-        page = self.client.get("/profile").text
+        """It moved to the settings screen, and it is still a form there. The
+        two language axes are about the installation rather than about the
+        person, and what this refuses either way is a textarea holding a whole
+        profile as the way to change one of them."""
+        page = self.client.get("/settings").text
         self.assertIn('action="/profile/status"', page)
         self.assertIn('name="interface_language"', page)
+        self.assertNotIn('name="content"', page)
+
+    def test_the_profile_screen_shows_the_status_and_points_at_it(self):
+        page = self.client.get("/profile").text
         self.assertIn(shown(self.strings()("profile.status_hint")), page)
+        self.assertIn(shown(self.strings()("profile.language_elsewhere")), page)
+        # One writer, and it is not this screen any more.
+        self.assertNotIn('action="/profile/status"', page)
 
     def test_the_whole_file_is_still_reachable(self):
         page = self.client.get("/profile").text
@@ -359,3 +370,130 @@ class TestFrenchPack(WebCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestTheSettingsScreen(WebCase):
+    """What this installation is set to, and who it came from.
+
+    The one thing this screen must never grow is a field for the key. It says
+    where the key goes; taking it would put a secret in a form post, in a
+    browser's history, and in an app whose whole boundary is that the machine
+    owns the key and the instance owns the person.
+    """
+
+    def test_both_language_axes_are_lists_of_the_packs_that_exist(self):
+        page = self.client.get("/settings").text
+        for axis in ("interface_language", "output_language_default"):
+            self.assertIn(f'<select id="{axis}" name="{axis}">', page)
+        for code in ("en", "fr"):
+            self.assertIn(f'<option value="{code}"', page)
+        # The contract is not a language. A translator copies it; nobody is
+        # interviewed in it.
+        self.assertNotIn('value="_template"', page)
+
+    def test_the_key_is_never_a_field_on_this_screen(self):
+        page = self.client.get("/settings").text
+        self.assertNotIn('type="password"', page)
+        self.assertNotIn('name="api_key"', page)
+        self.assertNotIn("sk-test", page)
+
+    def test_saving_from_here_comes_back_here(self):
+        reply = self.client.post("/profile/status",
+                                 data={"interface_language": "fr",
+                                       "output_language_default": "en",
+                                       "back": "/settings"},
+                                 follow_redirects=False)
+        self.assertEqual(reply.headers["location"], "/settings?saved=1")
+        self.assertEqual(self.instance.status().interface_language, "fr")
+
+    def test_a_back_nobody_offered_lands_on_the_profile(self):
+        """The field is posted, so it is somebody else's to write. An echoed
+        path is an open redirect, and this app is one a browser is already
+        trusting with a local origin."""
+        reply = self.client.post("/profile/status",
+                                 data={"interface_language": "fr",
+                                       "output_language_default": "en",
+                                       "back": "https://example.invalid/"},
+                                 follow_redirects=False)
+        self.assertEqual(reply.headers["location"], "/profile?saved=1")
+
+    def test_a_refused_language_comes_back_to_the_screen_it_left(self):
+        reply = self.client.post("/profile/status",
+                                 data={"interface_language": "not a code",
+                                       "output_language_default": "en",
+                                       "back": "/settings"},
+                                 follow_redirects=False)
+        self.assertEqual(reply.headers["location"],
+                         "/settings?problem=bad-language")
+
+    def test_a_language_set_with_no_pack_is_still_offered(self):
+        """Saving this form must not quietly change what somebody chose, and
+        a select that dropped the value would do exactly that."""
+        self.instance.update_status(interface_language="pt-BR",
+                                    output_language_default="en",
+                                    today="2026-09-04")
+        page = self.client.get("/settings").text
+        self.assertIn('<option value="pt-BR" selected>', page)
+        self.assertIn(shown(self.strings()("settings.language_unknown",
+                                           detail="pt-BR")), page)
+
+    def test_where_the_key_goes_is_said_in_the_words_of_this_launcher(self):
+        page = self.client.get("/settings").text
+        self.assertIn(shown(self.strings()("settings.key_shell")), page)
+        self.assertNotIn(shown(self.strings()("settings.key_macos")), page)
+
+    def test_the_macos_launcher_says_so_and_the_screen_follows(self):
+        app = create_app(self.root, lang=self.lang,
+                         environ=dict(self.environ, VERBATIM_LAUNCHER="macos"))
+        page = TestClient(app, base_url="http://127.0.0.1:8747") \
+            .get("/settings").text
+        self.assertIn(shown(self.strings()("settings.key_macos")), page)
+        self.assertNotIn(shown(self.strings()("settings.key_shell")), page)
+
+    def test_the_local_model_fix_survives_a_refused_configuration(self):
+        """The `OLLAMA_CONTEXT_LENGTH` line used to hang off the engine's
+        block size, which is zero whenever the configuration was refused
+        outright. The loudest refusal here is somebody pointing at an Ollama
+        that is not on this machine, and that is exactly the reader this
+        paragraph exists for: their window is the silent failure."""
+        (self.root / ".env").write_text(
+            "VERBATIM_BASE_URL=https://ollama.example.invalid/v1\n",
+            encoding="utf-8")
+        page = self.client.get("/settings").text
+        # The panel above it is a refusal, so there is no block size to gate on.
+        self.assertNotIn(shown(self.strings()("interview.context")), page)
+        self.assertIn("OLLAMA_CONTEXT_LENGTH=16384", page)
+        self.assertIn(shown(self.strings()("settings.local_context")), page)
+
+    def test_the_copy_block_never_spells_a_default_of_its_own(self):
+        """The one block on this screen somebody is told to trust. A second
+        spelling of the engine's default hands them yesterday's model the day
+        `providers.DEFAULT_MODEL` moves."""
+        from verbatim_app.providers import DEFAULT_MODEL, DEFAULT_PROVIDER
+        page = self.client.get("/settings").text
+        self.assertIn(f"export VERBATIM_PROVIDER={DEFAULT_PROVIDER}", page)
+        self.assertIn(f"export VERBATIM_MODEL={DEFAULT_MODEL[DEFAULT_PROVIDER]}",
+                      page)
+        template = (REPO / "app" / "verbatim_app" / "templates"
+                    / "settings.html").read_text(encoding="utf-8")
+        for spelled in (DEFAULT_PROVIDER, DEFAULT_MODEL[DEFAULT_PROVIDER]):
+            self.assertNotIn(spelled, template)
+
+    def test_a_root_with_no_locales_comes_back_empty_rather_than_raising(self):
+        """The walk used to be `root.iterdir()` with nothing in front of it,
+        so a root with no `locales/` raised where it now returns nothing.
+
+        Empty is the right answer and the screen turns it into a sentence
+        saying the bundle is broken. Only the walk is exercised here: this
+        cannot be driven through the screen, because `bundle_root` refuses to
+        resolve a directory that has no `locales/` at all, so the branch
+        exists for a root handed in from elsewhere."""
+        from verbatim_app.i18n import pack_dirs
+        self.assertEqual(pack_dirs(self.tmp), ())
+        self.assertTrue(pack_dirs())
+
+    def test_the_licence_and_the_place_to_report_are_on_it(self):
+        page = self.client.get("/settings").text
+        self.assertIn("MIT", page)
+        self.assertIn("github.com/alexis-morain/verbatim-linkedin/issues", page)
+        self.assertIn(self.app.version, page)

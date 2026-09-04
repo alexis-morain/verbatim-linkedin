@@ -371,7 +371,7 @@ class TestTheDiskLeadsTheScreen(WebCase):
     def stream(self, interview_id, text):
         from verbatim_app.routes import interview as screen
         request = Bare(self.app)
-        return screen._run(request, screen._engine(request), interview_id, text,
+        return screen._run(request, screen.engine_for(request), interview_id, text,
                            screen.lock_for(self.app, interview_id))
 
     def blocks(self, conversation, kind):
@@ -468,7 +468,7 @@ class TestTheAcceptedFrame(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        stream = screen._run(request, screen._engine(request), interview_id,
+        stream = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months on agencies.",
                              screen.lock_for(self.app, interview_id))
         first = json.loads(next(stream)[len("data: "):])
@@ -500,7 +500,7 @@ class TestTheAcceptedFrame(WebCase):
         interview_id = self.open_interview()
         held = screen.lock_for(self.app, interview_id)
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", held)
         self.assertTrue(held.acquire(blocking=False))
         try:
@@ -645,7 +645,7 @@ class TestAnAnswerAfterAnInterruptedToolCall(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", screen.lock_for(self.app, interview_id))
         for raw in frames:
             if '"tool_result"' in raw:
@@ -992,7 +992,7 @@ class TestATurnAbandonedMidAnswer(WebCase):
     def walk_away(self, interview_id, text):
         from verbatim_app.routes import interview as screen
         request = Bare(self.app)
-        stream = screen._run(request, screen._engine(request), interview_id,
+        stream = screen._run(request, screen.engine_for(request), interview_id,
                              text, screen.lock_for(self.app, interview_id))
         shown = None
         for raw in stream:
@@ -1137,7 +1137,7 @@ class TestTheTurnLock(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", screen.lock_for(self.app, interview_id))
         frames.close()
         self.assertFalse(screen.lock_for(self.app, interview_id).locked())
@@ -1163,7 +1163,7 @@ class TestTheTurnLock(WebCase):
         interview_id = self.open_interview()
         held = screen.lock_for(self.app, interview_id)
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", held)
         self.assertTrue(held.acquire(blocking=False))
         try:
@@ -1189,7 +1189,7 @@ class TestDiscardingMidTurn(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", screen.lock_for(self.app, interview_id))
         sent = []
         for raw in frames:
@@ -1226,7 +1226,7 @@ class TestAClosedInterview(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Four months.", screen.lock_for(self.app, interview_id))
         interview.close(self.root, interview_id, post="2026-08-28-agency.md")
         sent = [json.loads(raw[len("data: "):]) for raw in frames]
@@ -1411,7 +1411,7 @@ class TestNothingEnglishReachesAFrenchScreen(WebCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.open_interview()
         request = Bare(self.app)
-        frames = screen._run(request, screen._engine(request), interview_id,
+        frames = screen._run(request, screen.engine_for(request), interview_id,
                              "Quatre mois.", screen.lock_for(self.app, interview_id))
         sent = []
         for raw in frames:
@@ -1830,7 +1830,7 @@ class TestAnApprovedSheetEndsTheQuestions(SheetCase):
         from verbatim_app.routes import interview as screen
         interview_id = self.with_sheet(approved=True)
         request = Bare(self.app)
-        stream = screen._run(request, screen._engine(request), interview_id,
+        stream = screen._run(request, screen.engine_for(request), interview_id,
                              "One more thing.",
                              screen.lock_for(self.app, interview_id))
         first = json.loads(next(stream)[len("data: "):])
@@ -2651,13 +2651,13 @@ class TestTheGuardUnderTheLock(DraftCase):
     scripts = (says("should never run"),)
 
     def test_the_running_turn_refuses_on_its_own_reading(self):
-        from verbatim_app.routes.interview import _engine, _run, lock_for
+        from verbatim_app.routes.interview import engine_for, _run, lock_for
         interview_id = self.open_interview()
         conversation = interview.load(self.root, interview_id)
         interview.say(conversation, "something")
         interview.save(self.root, conversation)
         request = Bare(self.app)
-        engine = _engine(request)
+        engine = engine_for(request)
         sent = frames("".join(_run(request, engine, interview_id, "",
                                    lock_for(self.app, interview_id),
                                    require="propose_draft", drafting=True)))
@@ -2945,7 +2945,7 @@ class TestTheRevisionUnderTheLock(DraftCase):
     fresh as losing the race left it."""
 
     def test_a_draft_that_vanished_between_the_two_is_a_frame(self):
-        from verbatim_app.routes.interview import _engine, _run, lock_for
+        from verbatim_app.routes.interview import engine_for, _run, lock_for
         interview_id = self.drafted()
         request = Bare(self.app)
         # The draft goes away between the handler's read and the lock: another
@@ -2953,7 +2953,7 @@ class TestTheRevisionUnderTheLock(DraftCase):
         conversation = interview.load(self.root, interview_id)
         conversation.draft = None
         interview.save(self.root, conversation)
-        sent = frames("".join(_run(request, _engine(request), interview_id,
+        sent = frames("".join(_run(request, engine_for(request), interview_id,
                                    "Ouvre sur le chiffre.",
                                    lock_for(self.app, interview_id),
                                    require="propose_draft", drafting=True)))

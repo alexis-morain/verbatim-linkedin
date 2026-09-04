@@ -228,6 +228,11 @@ if [ -f "\$HOME/.config/verbatim/env" ]; then
   set -a; . "\$HOME/.config/verbatim/env"; set +a
 fi
 
+# Which of the two ways in this is. The settings screen tells somebody where
+# the key goes, and the answer is a menu item here and a shell export there;
+# printing both would leave them to work out which one they are looking at.
+export VERBATIM_LAUNCHER=macos
+
 # ------------------------------------------------------------- the engine
 HAVE="\$(cat "\$SUPPORT/engine.version" 2>/dev/null || true)"
 BIN="\$UV_TOOL_BIN_DIR/verbatim"

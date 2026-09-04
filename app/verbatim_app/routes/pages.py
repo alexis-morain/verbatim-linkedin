@@ -1,5 +1,5 @@
 """The cold screens: overview, profile, voice, pillars, page, ideas, posts,
-corpus.
+corpus, settings.
 
 No model, no network, no state outside the instance directory. Reading is
 free; the writes are one section of a contract file at a time, the Status
@@ -21,11 +21,15 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from . import render as _render
+from .interview import engine_for
 from ..archive import notes_only, post_only, shape as post_shape
+from ..i18n import packs
+from ..providers import DEFAULT_MODEL, DEFAULT_PROVIDER
 from ..instance import (
     LABELS, PILLARS, STATES, InstanceError, SectionChanged, UnreadableError,
 )
 from ..sections import sections_of
+from .. import __version__
 
 router = APIRouter()
 
@@ -159,20 +163,70 @@ def save_pillars(request: Request, content: str = Form(...)):
     return _save_whole(request, "pillars.md", "/pillars", content)
 
 
+#: Where the language form is allowed to send somebody back to. An allowlist
+#: and not the field itself: a redirect that echoes a posted path is an open
+#: redirect, and this app is one a browser is already trusting.
+BACK = ("/settings", "/profile")
+
+
 @router.post("/profile/status")
 def save_status(request: Request, interface_language: str = Form(""),
-                output_language_default: str = Form("")):
+                output_language_default: str = Form(""),
+                back: str = Form("/profile")):
+    where = back if back in BACK else "/profile"
     try:
         request.app.state.instance.update_status(
             interface_language=interface_language.strip(),
             output_language_default=output_language_default.strip(),
             today=request.app.state.today().isoformat())
     except UnreadableError:
-        return RedirectResponse("/profile", status_code=303)
+        return RedirectResponse(where, status_code=303)
     except InstanceError:
-        return RedirectResponse("/profile?problem=bad-language",
+        return RedirectResponse(f"{where}?problem=bad-language",
                                 status_code=303)
-    return RedirectResponse("/profile?saved=1", status_code=303)
+    return RedirectResponse(f"{where}?saved=1", status_code=303)
+
+
+@router.get("/settings")
+def settings(request: Request, saved: int = 0, problem: str = ""):
+    """What this copy of Verbatim is set to, and who it came from.
+
+    Three things sit here because they are about the installation rather than
+    about the person: the two language axes, the model that would answer, and
+    the licence and the address to report a bug to. The key is not one of
+    them and never will be: this screen says where it goes, in the words of
+    the two ways there are of starting this app, and takes nothing.
+    """
+    status = request.app.state.instance.status()
+    # Once. Each call reads and flattens every pack's app.yml to answer one
+    # boolean per pack, and this screen asks the same question twice.
+    languages = packs()
+    known = {pack.code for pack in languages}
+    chosen = {status.interface_language if status else "",
+              status.output_language_default if status else ""}
+    return _render(request, "settings.html",
+                   # Handed over, not read twice: what the selects were built
+                   # from is what the screen shows.
+                   status=status,
+                   saved=saved, problem=problem,
+                   engine=engine_for(request, sized=True),
+                   languages=languages,
+                   # A pack that is set and not installed. Offered rather than
+                   # quietly swapped: this screen does not get to change what
+                   # somebody chose by drawing itself. It stays here rather
+                   # than in `i18n` because it is a fact about what this screen
+                   # decided to show, not about what a bundle holds.
+                   unknown=tuple(sorted(code for code in chosen
+                                        if code and code not in known)),
+                   # What the engine would fall back to, read from the engine.
+                   # A copy-paste block is the one thing on this screen
+                   # somebody is told to trust, so it never carries a second
+                   # spelling of a default.
+                   defaults={"provider": DEFAULT_PROVIDER,
+                             "model": DEFAULT_MODEL.get(DEFAULT_PROVIDER, "")},
+                   version=__version__,
+                   launcher=request.app.state.environ.get(
+                       "VERBATIM_LAUNCHER", ""))
 
 
 @router.post("/profile/section")
