@@ -1,5 +1,130 @@
 # Journal
 
+## 2026-09-04. Cinq blocs du backlog, une revue qui a refusé trois fois, et l'app en 2.3.0
+
+Session longue, en anglais dans le dépôt et en français ici. Base `4499df2`,
+959 tests app. Fin de session : **1051 tests app, 64 JS**, `check.sh` vert,
+app **2.3.0**, `linkedin-post` 0.3.0. Six commits poussés plus C3.
+
+### B1 et B2, l'échelle d'entretien
+
+Les six barreaux étaient écrits dans un ordre et lus comme celui de tout le
+monde. C'est celui de l'histoire. Les faire monter sur une prise de position,
+c'est demander à quelqu'un une scène qu'il n'a pas vécue, et c'est la route la
+plus courte vers un entretien qui convainc son interlocuteur d'en inventer
+une. La carte vit sous la rupture de `interview-intents.md` : `the-story`
+monte scene, friction, number, position ; `the-stance` entre par `position`,
+parce qu'une prise de position arrive avec sa thèse déjà dite, puis
+`witnessed-instance`, puis number sur les chiffres propres de la personne,
+puis friction lue comme l'objection qu'on lui a opposée. Les trois autres
+formats n'ont pas de ligne et le fichier dit pourquoi.
+
+`witnessed-instance` est la deuxième porte du barreau 1, jamais un septième
+barreau : le cas qu'aucun des six ne couvrait, tous supposant une scène déjà
+sur la table. Suffisance : qui, quand, où.
+
+**Ce que le test a trouvé en s'écrivant.** `app/tests/test_intents.py` tient un
+contrat qui ne vit que dans la prose du bundle. Premier passage rouge sur autre
+chose que ce que je visais : `locales/_template/interview.md` n'avait jamais
+listé la série C, alors que son propre README promet que le fichier couvre
+toutes les intentions. Trois intentions qu'aucun traducteur n'avait jamais vues.
+
+**Le conflit d'identifiants.** J'allais donner aux cinq formats des slugs neufs,
+plus jolis dans un tableau. `test_archive.py` a montré qu'ils existaient déjà
+dans `archive.FORMATS`, `the-story`, `the-stance`, et que chaque post archivé
+les porte dans son front matter. La carte est clavetée dessus.
+
+### C1 et C2, la révision
+
+C1, le contrat de refus : refuser en une phrase, nommer les formes qu'une
+réponse peut prendre plutôt que poser une question ouverte, offrir la sortie.
+
+C2 : `material()` ne donnait au tour de rédaction que `revisions[-1]`. Vrai
+tant que chaque tour produit un brouillon, faux dès qu'un tour n'en produit
+pas. Après un refus, la personne répond une source, et cette source devenait
+la consigne. Le tour reçoit maintenant toutes les demandes postérieures au
+brouillon courant, lues sur les deux horodatages que les objets portent déjà,
+donc aucune clé neuve et `VERSION` ne bouge pas. Plafonné à quatre.
+
+**La moitié non faite, et c'est voulu.** Le plan demande qu'un tel tour « ne
+s'inscrive nulle part ». La consigne reste écrite : c'est une chose que la
+personne a dite, c'est une source d'adossement par `said()`, et la supprimer
+ferait ressortir fabriquée une citation vraie à la lecture suivante.
+
+### E1, F2, F3, et un 500 que j'ai posé moi-même
+
+E1 était une vérification. Notre écran a un bouton d'envoi et aucun raccourci.
+cmd+Entrée et ctrl+Entrée envoient maintenant, et le bouton reste : cette app
+poste sans JavaScript, un formulaire sans bouton ne s'envoie plus au clavier
+ni au lecteur d'écran. La moitié du modèle est refusée, exprès.
+
+F2 et F3 sont partis avec deux défauts, tous deux trouvés par la revue. La
+fiche du post lisait le profil pour mesurer la signature, et `signature()`
+lève par conception quand le titre `## Signature block` a été renommé : l'appel
+était hors du `try`, donc ce seul écran tombait en 500 pendant que tous les
+autres peignaient le rapport de conformité. La liste `SCREENS` qui tient cet
+invariant ne contenait pas la fiche du post ; elle la contient. Et la part de
+signature était mesurée contre le `chars` du front matter pendant que les
+paragraphes venaient du fichier : une signature à 91 % du post annoncée à
+8,5 %. Un seul triplet sur un seul texte maintenant.
+
+### C3, la révision par span
+
+La plus grosse ligne du backlog. `passages.py` est `sections.py` pour la prose :
+le bloc entre deux lignes vides porte son span et son condensé. Une révision
+peut viser un bloc, et le reste du post est hors d'atteinte par construction.
+Outil séparé, `rewrite_passage`, qui ne prend que le bloc, parce qu'un corps
+entier offert à `propose_draft` est un corps entier écrit. Aucun repli prose
+sur un tour de passage : deviner quelle partie d'une réponse est le bloc, ce
+serait recoller la devinette au milieu du post de quelqu'un.
+
+**Cinq tours de revue, cinq refus.**
+
+1. `pair.fragment in body` était une seconde définition de « ce fragment est
+   dans le post ». Le moteur en a une, `anchors.contains`, qui replie la
+   typographie, les espaces et la casse, et c'est celle du panneau. Une
+   apostrophe droite stockée contre une courbe dans le post : le panneau dit
+   que la paire adosse, mon `in` disait non, et l'ancre partait sur un bloc que
+   personne n'avait demandé à changer.
+2. La portée du tour se lisait sur la conversation. Une demande abandonnée
+   restait en attente et cadrait le tour suivant pendant que le sélecteur
+   affichait « Le post entier » et que la ligne de portée était masquée.
+   Corrigé en deux moitiés qui vont ensemble : `passage_for` lit la portée sur
+   le formulaire et rien d'autre, `pending_scope` la repropose pré-sélectionnée
+   pour qu'un refus ou un rechargement ne la perde pas.
+3. Deux appels de l'outil dans un même message découpaient le post. Le second
+   arrivait avec les offsets du corps que le premier venait de réécrire :
+   il mangeait le bloc suivant et coupait le suivant en plein mot. `tool_choice`
+   demande au moins un appel, jamais au plus un.
+4. Ma garde comparait le texte au span, et elle passe dès que le premier appel
+   renvoie le bloc **plus** une phrase, la forme ordinaire d'une révision
+   additive. Le second appel soudait son texte sur la queue du premier.
+5. La garde suivante retrouvait le bloc par index et condensé, et elle rate la
+   révision qui **découpe** le bloc : la première moitié reste identique au bit
+   près, index et condensé matchent encore pendant que tout ce qui suit a bougé.
+
+   Deux fois la même erreur : chercher à prouver « une réécriture a-t-elle
+   atterri » en regardant le bloc, alors qu'un bloc peut être intact pendant que
+   le post autour de lui n'est plus le même. Un `Passage` porte maintenant `of`,
+   le condensé du post d'où il a été lu, et `replace_passage` refuse tout autre
+   corps. Le champ n'a pas de défaut, pour que rien ne puisse construire un
+   passage muet sur son origine.
+
+Une garde manquante trouvée en chemin : rien ne vérifiait que les noms de
+section cités par `interview.py` existent comme titres dans le skill.
+`skills._select` lève à l'exécution, donc une constante qui dérive était un
+tour qui meurt chez le fournisseur.
+
+### Ce qui reste
+
+PyPI, avec le jeton d'Alexis, et la première version publiée sera 2.3.0 : les
+tags 2.0.0 à 2.2.0 n'y existeront jamais. Le README propose `uvx
+verbatim-linkedin` sur un dépôt public alors que le paquet ne résout pas.
+Le brouillon Postiz du 28/08, à sortir à la main, l'agent MCP Postiz tombant
+sur une clé OpenAI manquante côté serveur. Au backlog : C4 et C5, qui
+dépendaient de C3 et sont maintenant ouverts, D1, D2, E2, F1, F4, F5. G, la
+lecture par source, reste une décision d'Alexis.
+
 ## 2026-09-03. La couture de la fiche : `SHEET:`, et chaque ancre dit d'où vient sa citation
 
 Le matin, `anchoring.md` avait reçu sa section `## Provenance`, doc seul, avec

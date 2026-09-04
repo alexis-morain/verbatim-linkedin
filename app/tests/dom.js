@@ -36,6 +36,26 @@ function Element(tag) {
   this.focused = false;
 }
 
+/* A select is read for its options and for which one is chosen. The client
+   reaches for `options[selectedIndex]`, so the shim answers the same way a
+   browser does rather than letting a test invent a shape. */
+Object.defineProperty(Element.prototype, "options", {
+  get: function () {
+    return this.children.filter(function (child) {
+      return child.tagName === "option";
+    });
+  }
+});
+
+Object.defineProperty(Element.prototype, "selectedIndex", {
+  get: function () {
+    const values = this.options.map(function (option) {
+      return option.getAttribute("value");
+    });
+    return values.indexOf(this.value);
+  }
+});
+
 Object.defineProperty(Element.prototype, "firstChild", {
   get: function () { return this.children.length ? this.children[0] : null; }
 });
@@ -273,6 +293,17 @@ function page(strings, options) {
      so a test can build the screen that offers a first draft and no box. */
   if (settings.revision) {
     document.place(null, "textarea", "revision", {value: ""});
+    const scope = document.place(null, "select", "revision-scope", {value: ""});
+    const blocks = settings.blocks || [];
+    document.place(scope, "option", null, {}).setAttribute("value", "");
+    blocks.forEach(function (block, index) {
+      const option = document.place(scope, "option", null, {});
+      option.setAttribute("value", String(index));
+      option.setAttribute("data-digest", block.digest);
+      option.setAttribute("data-text", block.text);
+    });
+    document.place(null, "blockquote", "revision-echo", {hidden: true});
+    document.place(null, "p", "revision-scope-line", {hidden: true});
   }
 
   /* An approved sheet ends the questions, so the screen that offers drafting

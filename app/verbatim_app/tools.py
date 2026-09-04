@@ -394,6 +394,60 @@ def draft_tool(write) -> Tool:
         run=run)
 
 
+PASSAGE_TOOL = "rewrite_passage"
+
+
+def passage_tool(write) -> Tool:
+    """The tool of a rewrite confined to one block of the post.
+
+    It takes the block and nothing else. That is the point rather than a
+    convenience: the span comes from `passages.py`, the engine splices this
+    text into it, and the rest of the post is out of reach even for a model
+    that decided to improve it. `propose_draft` cannot make that promise,
+    because a whole body offered for it is a whole body written.
+    """
+    def run(arguments: dict) -> str:
+        try:
+            write(arguments)
+        except InterviewError as refusal:
+            raise ToolRefused(str(refusal)) from None
+        return ("the passage is rewritten on the person's screen; the rest "
+                "of the post is untouched, and they decide what happens next")
+    return Tool(
+        name=PASSAGE_TOOL,
+        description=(
+            "Rewrite one passage of the post, the one quoted under "
+            "'## Passage' in the material, and only that one. 'passage' is "
+            "that block as it should now read, on its own: not the whole "
+            "post, and not the block with the rest around it. What you send "
+            "replaces those characters exactly, so anything else you write "
+            "here lands inside the post in that spot. 'anchors' backs what "
+            "the new passage claims, in the same shape as the draft tool: "
+            "'post', a fragment of the new block copied exactly, with "
+            "'said', an interview sentence quoted word for word, or "
+            "'sheet', a line of the approved sheet. Pairs backing the rest "
+            "of the post are kept for you. A claim nothing backs stays "
+            "bare."),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "passage": {"type": "string"},
+                "anchors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"post": {"type": "string"},
+                                       "said": {"type": "string"},
+                                       "sheet": {"type": "string"}},
+                        "required": ["post"],
+                    },
+                },
+            },
+            "required": ["passage"],
+        },
+        run=run)
+
+
 def _notes_schema(kinds) -> dict:
     """The shape `photos` and `tips` share. Kinds are the vocabulary the
     interview store enforces, read from there rather than repeated here: two

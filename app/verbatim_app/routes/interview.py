@@ -47,13 +47,14 @@ from . import render as _render
 from .. import anchors, archive, interview, prose
 from ..agent import Agent, AgentError, http_transport
 from ..instance import InstanceError, UnreadableError
+from ..passages import passages_of
 from ..providers import (
     PRICES, ProviderError, Settings, Usage, price, problems, resolve,
 )
 from ..skills import SkillError, system_block
 from ..tools import (
-    DRAFT_TOOL, SHEET_TOOL, ToolRefused, draft_tool, instance_tools,
-    lint_body, redact, sheet_tool,
+    DRAFT_TOOL, PASSAGE_TOOL, SHEET_TOOL, ToolRefused, draft_tool,
+    instance_tools, lint_body, passage_tool, redact, sheet_tool,
 )
 
 router = APIRouter()
@@ -358,6 +359,18 @@ def _screen(request: Request, conversation, **extra):
                   notice=asked if asked in NOTICES else "",
                   engine=_engine(request), bank=bank,
                   trace=panel(conversation), findings="",
+                  # The blocks a revision can be aimed at. Off the draft on
+                  # disk, so the digest in the form is a digest of what this
+                  # page is showing: a turn behind the page can replace the
+                  # post, and the refusal on a stale one is the whole reason
+                  # the digest travels at all.
+                  blocks=(passages_of(conversation.draft.body)
+                          if conversation.draft else []),
+                  # Offered back pre-selected. A request that named a
+                  # passage and got nothing back is still pending, and a
+                  # picker that reset itself would drop the scope in
+                  # silence on the reload after a refusal.
+                  scope=interview.pending_scope(conversation),
                   lint_failed=False, archive_problem="",
                   formats=archive.FORMATS, labels=archive.LABELS,
                   states=archive.STATES, pillars=archive.PILLARS,
@@ -468,16 +481,27 @@ def propose_sheet(request: Request, interview_id: str):
 
 
 @router.post("/interview/{interview_id}/draft")
-def draft(request: Request, interview_id: str, text: str = Form("")):
+def draft(request: Request, interview_id: str, text: str = Form(""),
+          passage: str = Form(""), passage_index: str = Form("")):
     """Write the post. Refused until the sheet is signed, which is the
     sentence `linkedin-post` opens the sheet with, made mechanical.
 
     `text` is the revision request, empty on the first draft and on a plain
     rewrite. It is kept, on the `Said` side: the skill's revision loop is
     free, and what somebody types to steer it is theirs.
+
+    `passage` and `passage_index` say the request is about one block rather
+    than about the post. Both come off the screen that showed that block:
+    the index says which, the digest says the screen was not stale. The
+    index arrives as text because a form field does, and a field that is not
+    a number is not a scope; it is read here rather than trusted.
     """
+    try:
+        index = int(passage_index) if passage_index.strip() else -1
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bad-passage")
     return _start(request, interview_id, require=DRAFT_TOOL, drafting=True,
-                  text=text)
+                  text=text, passage=passage, passage_index=index)
 
 
 @router.post("/interview/{interview_id}/archive")
@@ -606,7 +630,8 @@ def turn(request: Request, interview_id: str, text: str = Form("")):
 
 
 def _start(request: Request, interview_id: str, *, require: str = "",
-           drafting: bool = False, text: str = ""):
+           drafting: bool = False, text: str = "", passage: str = "",
+           passage_index: int = -1):
     """Refuse what a status code can refuse, then stream.
 
     Same reasoning as `turn` above and for the same reason: nothing is
@@ -638,7 +663,7 @@ def _start(request: Request, interview_id: str, *, require: str = "",
         raise HTTPException(status_code=409, detail="turn-running")
     return StreamingResponse(
         _run(request, engine, interview_id, text, lock, require=require,
-             drafting=drafting),
+             drafting=drafting, passage=passage, passage_index=passage_index),
         media_type="text/event-stream",
         headers={"cache-control": "no-store", "x-accel-buffering": "no"})
 
@@ -680,7 +705,8 @@ def _frame(kind: str, **fields) -> str:
 
 
 def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
-         *, require: str = "", drafting: bool = False):
+         *, require: str = "", drafting: bool = False, passage: str = "",
+         passage_index: int = -1):
     """The loop, one frame at a time, with the disk kept ahead of the screen.
 
     `drafting` swaps what the turn is about without swapping the machinery
@@ -746,9 +772,29 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
                     # race for this lock left it.
                     yield _frame("error", code="nothing-to-revise")
                     return
-                interview.revise(conversation, text)
+                try:
+                    interview.revise(conversation, text, passage=passage,
+                                     passage_index=passage_index)
+                except interview.InterviewError:
+                    # The one thing that refuses here is a scope that no
+                    # longer resolves: a turn rewrote the post behind a page
+                    # somebody was still reading. Nothing is written, and
+                    # the screen is told to read the post again rather than
+                    # having its request land on another paragraph.
+                    yield _frame("error", code="passage-gone")
+                    return
             else:
                 interview.say(conversation, text)
+        # The scope of this turn, from what the screen sent and from nothing
+        # else. A scope read off the conversation outlives the screen: a
+        # request that named a passage and got nothing back stays pending,
+        # and the next turn would be confined to that block while the picker
+        # in front of the person reads "the whole post".
+        try:
+            scope = interview.passage_for(conversation, passage, passage_index)
+        except interview.InterviewError:
+            yield _frame("error", code="passage-gone")
+            return
         conversation.provider = engine.settings.provider
         conversation.model = engine.settings.model
         base = conversation.usage
@@ -756,8 +802,8 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
         # Read after the revision is on the conversation, and off the
         # conversation: a rewrite gets the skill's rules about rewriting, a
         # first draft does not.
-        sections = interview.drafting_sections(conversation) if drafting \
-            else None
+        sections = interview.drafting_sections(conversation, scope=scope) \
+            if drafting else None
         # What somebody typed is on disk before a single token is spent on it,
         # and the frame that says so is the seam the screen needs: before it,
         # a refusal means nothing was written and the words stay in the box;
@@ -770,10 +816,21 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
                                environ=request.app.state.environ)
         # Bound to this conversation, not to the instance: what they write
         # lands on the object the turn is saving, so the next `keep` writes it.
-        tools.append(draft_tool(
-            lambda arguments: interview.write(conversation, arguments))
-            if drafting else sheet_tool(
-            lambda arguments: interview.propose(conversation, arguments)))
+        # Which tool this turn is required to call is decided after the
+        # request is on the conversation, because that is when the scope
+        # exists. A request naming a block gets the tool that can only reach
+        # that block; every other drafting turn gets the whole post tool.
+        if drafting and scope is not None:
+            require = PASSAGE_TOOL
+            tools.append(passage_tool(
+                lambda arguments: interview.write_passage(
+                    conversation, arguments, scope=scope)))
+        elif drafting:
+            tools.append(draft_tool(
+                lambda arguments: interview.write(conversation, arguments)))
+        else:
+            tools.append(sheet_tool(
+                lambda arguments: interview.propose(conversation, arguments)))
         agent = Agent(engine.settings, tools,
                       transport=request.app.state.transport or http_transport())
         #: Which required tools actually ran. Read from the loop rather than
@@ -788,7 +845,8 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
         # material, every time.
         messages = ([{"role": "user",
                       "content": [{"type": "text",
-                                   "text": interview.material(conversation)}]}]
+                                   "text": interview.material(
+                                       conversation, scope=scope)}]}]
                     if drafting else conversation.messages)
         for step in agent.run(block.text, messages, require=require):
             if step.kind == "text":
@@ -820,7 +878,8 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
                 if step.call.name == SHEET_TOOL and not step.is_error:
                     # Already on disk: the save above ran after the tool did.
                     yield _frame("sheet", **_sheet_fields(conversation.sheet))
-                elif step.call.name == DRAFT_TOOL and not step.is_error:
+                elif step.call.name in (DRAFT_TOOL, PASSAGE_TOOL) \
+                        and not step.is_error:
                     yield _frame("draft", **panel(conversation))
             elif step.kind == "stop":
                 # Whether the model still owes a reply is read off the
@@ -850,6 +909,13 @@ def _run(request: Request, engine: Engine, interview_id: str, text: str, lock,
             # and the pack's heading over this list carries the meaning.
             road = (f"{require} was required and was not called; "
                     "this was read out of the answer instead",)
+            # PASSAGE_TOOL has no branch here, deliberately. Reading a
+            # passage out of prose would mean deciding which part of an
+            # answer is the block and which part is the model talking about
+            # it, and whatever that guess returned would be spliced straight
+            # into the middle of somebody's post. A whole post read out of
+            # prose is at least visibly a whole post. So a scoped turn that
+            # ignored its tool lands nothing and says so.
             if require == DRAFT_TOOL and _prose_draft(conversation, said, road):
                 keep()
                 yield _frame("draft", **panel(conversation))
@@ -955,7 +1021,7 @@ FRAME_KEYS = (
     "interview.error_gone", "interview.error_engine_failed",
     "interview.error_bundle_broken", "interview.error_sheet_approved",
     "interview.error_sheet_not_approved",
-    "interview.error_nothing_to_revise",
+    "interview.error_nothing_to_revise", "interview.error_passage_gone",
     "interview.error_sheet_not_read", "interview.error_draft_not_read",
     "interview.error_unknown", "interview.tokens", "interview.spent",
 )

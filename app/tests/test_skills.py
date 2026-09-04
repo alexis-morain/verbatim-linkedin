@@ -291,5 +291,27 @@ class TestALanguageCodeIsAPathSegment(unittest.TestCase):
             self.assertEqual(found[0].resolved, f"locales/{good}/style.md")
 
 
+
+class TestTheSectionsTheEngineNames(unittest.TestCase):
+    """Every section name in interview.py has to be a heading in the skill.
+
+    `skills._select` raises on a name it cannot find, so a constant that
+    drifts from the file is a turn that dies at the provider rather than a
+    test that fails here. Nothing else checks this: the names are strings on
+    one side and `## ` headings on the other, and the only thing that ever
+    put them together was a real run.
+    """
+
+    def test_every_named_section_is_a_heading_in_linkedin_post(self):
+        from verbatim_app import interview
+        body = (REPO / "skills" / "linkedin-post" / "SKILL.md").read_text(
+            encoding="utf-8")
+        headings = {line[3:].strip() for line in body.splitlines()
+                    if line.startswith("## ")}
+        named = set(interview.STEP_SECTIONS) | set(interview.DRAFT_SECTIONS)
+        named |= {interview.REVISION_SECTION, interview.PASSAGE_SECTION}
+        self.assertEqual(named - headings, set())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2 if "-v" in sys.argv else 1)

@@ -154,6 +154,13 @@ a { color: var(--accent); }
    is for a hint that follows a block, and this one follows a control. */
 #say .hint { display: inline-block; margin: 0 0 0 0.6rem; font-size: 0.85rem; }
 
+/* The passage a revision is aimed at, quoted above the field. Set in from
+   the edge, because it is the post talking and not the screen. */
+.passage-echo { border-left: 3px solid var(--line); margin: 0.4rem 0 0.8rem;
+                padding: 0.2rem 0 0.2rem 0.8rem; white-space: pre-wrap; }
+.scope-line { margin: 0.4rem 0 0; }
+#revision-scope { max-width: 46ch; }
+
 .empty { color: var(--muted); font-style: italic; }
 
 .flash { color: var(--ok); font-weight: 700; }

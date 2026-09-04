@@ -576,3 +576,84 @@ test("a modifier on another key sends nothing", async function () {
   await settled();
   assert.equal(screen.calls.length, 0);
 });
+
+/* Aiming a revision at one passage.
+
+   The three things the panel has to do, and none of them is decoration: the
+   exact passage is echoed so somebody sees the text that will be replaced
+   rather than a description of where it is; the field teaches by example
+   rather than naming itself; and the scope sits on the action line, which is
+   the sentence read with a hand already on the button.
+
+   What travels is the index and the digest. The index says which block, the
+   digest says this page was not stale, and the server refuses on the second
+   rather than landing the request on whatever is there now. */
+
+const BLOCKS = [
+  {digest: "aaaaaaaaaaaaaaaa", text: "Quatre mois à vendre aux agences."},
+  {digest: "bbbbbbbbbbbbbbbb", text: "Onze conversations, deux propositions."}
+];
+
+function withBlocks() {
+  return load(page(STRINGS, {draft: true, revision: true, blocks: BLOCKS}));
+}
+
+test("choosing a passage echoes it word for word", async function () {
+  const screen = withBlocks();
+  screen.at("revision-scope").value = "1";
+  screen.at("revision-scope").dispatch("change");
+  assert.equal(screen.at("revision-echo").textContent, BLOCKS[1].text);
+  assert.equal(screen.at("revision-echo").hidden, false);
+  assert.equal(screen.at("revision-scope-line").hidden, false);
+});
+
+test("going back to the whole post takes the echo away", async function () {
+  const screen = withBlocks();
+  screen.at("revision-scope").value = "0";
+  screen.at("revision-scope").dispatch("change");
+  screen.at("revision-scope").value = "";
+  screen.at("revision-scope").dispatch("change");
+  assert.equal(screen.at("revision-echo").hidden, true);
+  assert.equal(screen.at("revision-scope-line").hidden, true);
+});
+
+test("the request carries the index and the digest", async function () {
+  const screen = withBlocks();
+  screen.reply = streamed([frame({kind: "draft", body: "ok", anchors: []})]);
+  screen.at("revision").value = "Trop vague, mets le vrai chiffre.";
+  screen.at("revision-scope").value = "1";
+  screen.at("revision-scope").dispatch("change");
+  screen.at("write-draft").dispatch("click");
+  await settled();
+  const sent = new URLSearchParams(screen.calls[0].init.body);
+  assert.equal(sent.get("passage"), BLOCKS[1].digest);
+  assert.equal(sent.get("passage_index"), "1");
+  assert.equal(sent.get("text"), "Trop vague, mets le vrai chiffre.");
+});
+
+test("a request about the whole post carries no scope", async function () {
+  const screen = withBlocks();
+  screen.reply = streamed([frame({kind: "draft", body: "ok", anchors: []})]);
+  screen.at("revision").value = "Plus court.";
+  screen.at("write-draft").dispatch("click");
+  await settled();
+  const sent = new URLSearchParams(screen.calls[0].init.body);
+  assert.equal(sent.get("passage"), null);
+  assert.equal(sent.get("passage_index"), null);
+});
+
+test("the picker is read at the click, not when it moved", async function () {
+  /* Somebody chooses a passage, types, then changes their mind about which
+     one. What travels is the one in front of them when they press it. */
+  const screen = withBlocks();
+  screen.reply = streamed([frame({kind: "draft", body: "ok", anchors: []})]);
+  screen.at("revision").value = "Trop vague.";
+  screen.at("revision-scope").value = "1";
+  screen.at("revision-scope").dispatch("change");
+  screen.at("revision-scope").value = "0";
+  screen.at("revision-scope").dispatch("change");
+  screen.at("write-draft").dispatch("click");
+  await settled();
+  assert.equal(new URLSearchParams(screen.calls[0].init.body).get("passage"),
+               BLOCKS[0].digest);
+});

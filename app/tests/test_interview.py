@@ -20,7 +20,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "app"))
 
-from verbatim_app import interview  # noqa: E402
+from verbatim_app import interview, passages  # noqa: E402
+from verbatim_app.shown import shown  # noqa: E402
 from verbatim_app.anchors import Anchor  # noqa: E402
 from verbatim_app.providers import Usage  # noqa: E402
 from verbatim_app.skills import system_block  # noqa: E402
@@ -1624,6 +1625,298 @@ class TestATurnThatProducedNothing(InterviewCase):
         tail = self.pending(conversation)
         self.assertIn("Plus court.", tail)
         self.assertNotIn(REVISION, tail)
+
+
+class TestARevisionAimedAtOnePassage(InterviewCase):
+    """A revision used to be aimed at the post. It can be aimed at a block.
+
+    The mechanism is `passages.py`, which is `sections.py` for prose: the
+    block carries its span, and a rewrite of it touches those characters and
+    leaves every other byte of the post where it was. What that buys is not
+    tidiness. It is that a person asking for a sharper second paragraph
+    cannot lose the first one to a model that decided to improve it too.
+    """
+
+    BODY = ("Quatre mois à vendre aux agences.\n\n"
+            "Onze conversations, deux propositions, rien de signé.\n\n"
+            "J'ai arrêté.")
+    #: One anchor per block, so a test can say which pairs a rewrite keeps.
+    PAIRS = [{"post": "Quatre mois à vendre aux agences.",
+              "said": "le canal direct est le seul qui paie"},
+             {"post": "rien de signé",
+              "said": "le canal direct est le seul qui paie"}]
+
+    def drafted(self):
+        conversation = approved(self.root)
+        interview.write(conversation,
+                        offer(body=self.BODY, anchors=self.PAIRS), now=LATER)
+        return conversation
+
+    def blocks(self, conversation):
+        return passages.passages_of(conversation.draft.body)
+
+    def test_a_request_can_name_the_block_it_is_about(self):
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague, mets le vrai chiffre.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        kept = conversation.revisions[0]
+        self.assertEqual(kept.passage, block.digest)
+        self.assertEqual(kept.passage_index, 1)
+
+    def test_a_request_about_nothing_in_particular_still_works(self):
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        self.assertEqual(conversation.revisions[0].passage, "")
+        self.assertEqual(conversation.revisions[0].passage_index, -1)
+        self.assertIsNone(interview.passage_for(conversation, "", -1))
+        self.assertIsNone(interview.pending_scope(conversation))
+
+    def test_a_stale_screen_is_refused_at_the_click(self):
+        # The turn behind a page can rewrite the post while somebody is
+        # reading it. A request aimed at what used to be the second block
+        # must not land on whatever is there now.
+        conversation = self.drafted()
+        with self.assertRaises(interview.InterviewError):
+            interview.revise(conversation, "Trop vague.",
+                             passage=shown("what the screen used to show"),
+                             passage_index=1, now=AFTER)
+        self.assertEqual(conversation.revisions, [])
+
+    def test_an_index_that_is_not_there_is_refused(self):
+        conversation = self.drafted()
+        with self.assertRaises(interview.InterviewError):
+            interview.revise(conversation, "Trop vague.",
+                             passage=self.blocks(conversation)[0].digest,
+                             passage_index=9, now=AFTER)
+
+    def test_the_scope_of_a_turn_is_what_the_screen_sent(self):
+        # From the form and from nothing else. A scope read off the
+        # conversation outlives the screen: the request below stays pending
+        # after a turn that produced nothing, and a later turn whose picker
+        # said "the whole post" would still be confined to this block.
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        self.assertEqual(
+            interview.passage_for(conversation, block.digest, 1).text,
+            block.text)
+        self.assertIsNone(interview.passage_for(conversation, "", -1))
+
+    def test_a_stale_scope_from_a_form_is_refused(self):
+        conversation = self.drafted()
+        with self.assertRaises(interview.InterviewError):
+            interview.passage_for(conversation, shown("stale"), 1)
+
+    def test_the_screen_offers_a_pending_scope_back(self):
+        # So a refusal, a failed turn or a reload does not drop the passage
+        # somebody chose. It decides what the picker shows, never what a
+        # turn does.
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        self.assertEqual(interview.pending_scope(conversation).text, block.text)
+
+    def test_nothing_is_offered_back_once_a_draft_answered_it(self):
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        interview.write_passage(conversation, {"passage": "Onze."},
+                                scope=block, now=LATEST)
+        self.assertIsNone(interview.pending_scope(conversation))
+
+    def test_the_material_carries_the_passage_word_for_word(self):
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        material = interview.material(conversation, scope=block)
+        self.assertIn("## Passage", material)
+        head, _, tail = material.partition("## Passage")
+        self.assertIn(block.text, tail)
+
+    def test_the_material_of_an_unscoped_request_names_no_passage(self):
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        self.assertNotIn("## Passage", interview.material(conversation))
+
+    def test_the_scoped_turn_is_handed_its_own_section(self):
+        conversation = self.drafted()
+        block = self.blocks(conversation)[1]
+        interview.revise(conversation, "Trop vague.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        self.assertIn(interview.PASSAGE_SECTION,
+                      interview.drafting_sections(conversation, scope=block))
+
+    def test_an_unscoped_revision_is_not(self):
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        self.assertNotIn(interview.PASSAGE_SECTION,
+                         interview.drafting_sections(conversation))
+
+
+class TestRewritingOnePassage(InterviewCase):
+    """What the engine hands back for a scoped request, and what the post
+    becomes. The guarantee is that every other byte is where it was."""
+
+    BODY = TestARevisionAimedAtOnePassage.BODY
+    PAIRS = TestARevisionAimedAtOnePassage.PAIRS
+
+    def scoped(self):
+        conversation = approved(self.root)
+        interview.write(conversation,
+                        offer(body=self.BODY, anchors=self.PAIRS), now=LATER)
+        block = passages.passages_of(conversation.draft.body)[1]
+        interview.revise(conversation, "Trop vague, mets le vrai chiffre.",
+                         passage=block.digest, passage_index=1, now=AFTER)
+        return conversation, block
+
+    def test_only_the_named_block_moves(self):
+        conversation, block = self.scoped()
+        interview.write_passage(
+            conversation, {"passage": "Onze conversations en quatre mois."},
+            scope=block, now=LATEST)
+        self.assertEqual(
+            conversation.draft.body,
+            self.BODY.replace(
+                "Onze conversations, deux propositions, rien de signé.",
+                "Onze conversations en quatre mois."))
+
+    def test_the_draft_is_stamped_like_any_other(self):
+        conversation, block = self.scoped()
+        interview.write_passage(conversation, {"passage": "Onze."},
+                                scope=block, now=LATEST)
+        self.assertEqual(conversation.draft.written, "2026-08-28T15:03:47")
+
+    def test_a_rewrite_with_nothing_in_it_is_refused(self):
+        conversation, block = self.scoped()
+        for empty in ("", "   "):
+            with self.assertRaises(interview.InterviewError):
+                interview.write_passage(conversation, {"passage": empty},
+                                        scope=block)
+        self.assertEqual(conversation.draft.body, self.BODY)
+
+    def test_a_second_rewrite_in_the_same_turn_lands_nothing(self):
+        """A model may put two calls in one message, and both wired
+        providers do: `tool_choice` asks for at least one call, never at
+        most one. The second arrives holding the offsets of the body the
+        first one already rewrote. Refused, and the post is what the first
+        call made it."""
+        conversation, block = self.scoped()
+        interview.write_passage(conversation, {"passage": "Court."},
+                                scope=block, now=LATEST)
+        after = conversation.draft.body
+        with self.assertRaises(interview.InterviewError):
+            interview.write_passage(
+                conversation, {"passage": "Un deuxième essai, plus long."},
+                scope=block, now=LATEST)
+        self.assertEqual(conversation.draft.body, after)
+        self.assertIn("J'ai arrêté.", conversation.draft.body)
+
+    def test_an_additive_rewrite_does_not_open_the_span_again(self):
+        """The shape a comparison at the offsets cannot catch: the first
+        call returns the block plus a sentence, so the bytes at the old
+        span are still the old text and a second call would weld itself
+        onto the first call's tail, inside a word."""
+        conversation, block = self.scoped()
+        interview.write_passage(
+            conversation, {"passage": block.text + " Douze en trois semaines."},
+            scope=block, now=LATEST)
+        after = conversation.draft.body
+        with self.assertRaises(interview.InterviewError):
+            interview.write_passage(conversation, {"passage": "Autre chose."},
+                                    scope=block, now=LATEST)
+        self.assertEqual(conversation.draft.body, after)
+
+    def test_a_pair_offered_twice_is_one_pair(self):
+        # The panel counts rows. A model re-offering a pair it was told it
+        # could keep would count one claim twice.
+        conversation, block = self.scoped()
+        interview.write_passage(
+            conversation,
+            {"passage": "Onze.",
+             "anchors": [{"post": "Quatre mois à vendre aux agences.",
+                          "said": "le canal direct est le seul qui paie"}]},
+            scope=block, now=LATEST)
+        fragments = [pair.fragment for pair in conversation.draft.anchors]
+        self.assertEqual(fragments.count("Quatre mois à vendre aux agences."), 1)
+
+    def test_nothing_is_rewritten_before_the_sheet_is_signed(self):
+        # The guard its sibling `write` has. The route makes this
+        # unreachable today, and that is the argument that stops being true
+        # the day somebody calls this from somewhere else.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(body=self.BODY), now=LATER)
+        block = passages.passages_of(conversation.draft.body)[1]
+        conversation.sheet = replace(conversation.sheet, state="proposed")
+        with self.assertRaisesRegex(interview.InterviewError, "approved"):
+            interview.write_passage(conversation, {"passage": "Onze."},
+                                    scope=block)
+
+    def test_a_rewrite_with_no_scope_is_refused(self):
+        # Nothing said which block. Rewriting the post from a tool meant for
+        # a passage would be the whole post silently replaced by a fragment.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(body=self.BODY), now=LATER)
+        with self.assertRaises(interview.InterviewError):
+            interview.write_passage(conversation, {"passage": "Onze."})
+
+    def test_an_anchor_of_a_block_that_did_not_move_is_kept(self):
+        conversation, block = self.scoped()
+        interview.write_passage(conversation, {"passage": "Onze."},
+                                scope=block, now=LATEST)
+        kept = [pair.fragment for pair in conversation.draft.anchors]
+        self.assertIn("Quatre mois à vendre aux agences.", kept)
+
+    def test_an_anchor_of_the_block_that_moved_is_dropped(self):
+        # Its fragment is not in the post any more. Keeping it would show as
+        # dangling on every read, which is a true verdict about a pair that
+        # has no business still being there.
+        conversation, block = self.scoped()
+        interview.write_passage(conversation, {"passage": "Onze."},
+                                scope=block, now=LATEST)
+        kept = [pair.fragment for pair in conversation.draft.anchors]
+        self.assertNotIn("rien de signé", kept)
+
+    def test_a_pair_the_panel_calls_backing_is_not_thrown_away(self):
+        """The engine has one answer to "is this fragment in the draft", and
+        it is `anchors.contains`: typography folded, whitespace collapsed,
+        case ignored. A plain `in` here is a second answer, and the two
+        disagree on the commonest thing there is, a straight apostrophe
+        stored against a curly one in the post. The pair backs its claim on
+        every read; dropping it here would take a real quote off a block
+        nobody asked to change, silently and on disk."""
+        conversation = approved(self.root)
+        body = ("J’ai signé douze clients cette semaine.\n\n"
+                "Onze conversations, deux propositions, rien de signé.")
+        interview.write(conversation, offer(
+            body=body,
+            anchors=[{"post": "J'ai signé douze clients cette semaine.",
+                      "said": "le canal direct est le seul qui paie"}]),
+            now=LATER)
+        block = passages.passages_of(conversation.draft.body)[1]
+        interview.revise(conversation, "Trop vague.", passage=block.digest,
+                         passage_index=1, now=AFTER)
+        interview.write_passage(conversation, {"passage": "Onze."},
+                                scope=block, now=LATEST)
+        self.assertEqual([pair.fragment for pair in conversation.draft.anchors],
+                         ["J'ai signé douze clients cette semaine."])
+
+    def test_the_new_block_brings_its_own_anchors(self):
+        conversation, block = self.scoped()
+        interview.write_passage(
+            conversation,
+            {"passage": "Onze conversations.",
+             "anchors": [{"post": "Onze conversations.",
+                          "said": "le canal direct est le seul qui paie"}]},
+            scope=block, now=LATEST)
+        pairs = {pair.fragment: pair.quote
+                 for pair in conversation.draft.anchors}
+        self.assertIn("Onze conversations.", pairs)
+        self.assertIn("Quatre mois à vendre aux agences.", pairs)
 
 
 PHOTOS = [{"kind": "portrait", "text": "Devant le tableau, marqueur en main."},

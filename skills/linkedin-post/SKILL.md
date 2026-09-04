@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.2.5
+version: 0.3.0
 ---
 
 # Write a post
@@ -225,6 +225,35 @@ for a shorter post.
 
 Wording for all three: `locales/<interface_language>/interview.md`,
 under the connective phrases.
+
+## Rewriting one passage
+
+When the request is about one block rather than about the post, the material
+carries that block under `## Passage`, word for word, and the turn calls
+`rewrite_passage` instead of `propose_draft`.
+
+**Send back that block and nothing else.** Not the post with the block
+changed, not the block with a line of the one above it for context. What you
+send replaces exactly the characters the passage occupies, so a sentence of
+preamble lands inside the post, in that spot, between two paragraphs
+somebody wrote.
+
+The rest of the post is out of reach, and that is the point rather than a
+restriction to work around. Somebody asking for a sharper second paragraph
+is not asking you to improve the first one, and under `propose_draft` they
+had no way to ask for one without risking the other.
+
+What still applies, unchanged:
+
+- **Every fact in the new block comes from the interview.** A rewrite is
+  where an invented detail gets in behind the guard, and a shorter scope
+  does not make that less true.
+- **Refuse rather than invent.** The refusal contract above is the same
+  here, and the exit is the same: the passage comes out.
+- **The block may become two.** Splitting a paragraph is a legitimate
+  rewrite; the span does not care how many blocks land in it.
+- **Anchors are for the new block only.** What backs the rest of the post is
+  kept for you, and repeating those pairs would claim them twice.
 
 ## Graded review, on request
 

@@ -25,6 +25,7 @@ from markupsafe import escape  # noqa: E402
 from test_agent import Replay, asks, says  # noqa: E402
 
 from verbatim_app import interview  # noqa: E402
+from verbatim_app.passages import passages_of, replace_passage
 from verbatim_app.web import create_app  # noqa: E402
 
 CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
@@ -33,7 +34,7 @@ CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
 #: `refused_` one, and TestEveryCodeHasASentence covers them separately.
 FRAME_CODES = {"turn-running", "closed", "gone", "engine-failed",
                "bundle-broken", "sheet-approved", "sheet-not-approved",
-               "nothing-to-revise"}
+               "nothing-to-revise", "passage-gone"}
 
 
 def frames(text: str) -> list:
@@ -1417,7 +1418,8 @@ class TestEveryCodeHasASentence(WebCase):
 
     CODES = ("turn-running", "closed", "not-configured", "nothing-to-send",
              "gone", "engine-failed", "bundle-broken", "sheet-approved",
-             "sheet-not-approved", "nothing-to-revise", "unknown")
+             "sheet-not-approved", "nothing-to-revise", "passage-gone",
+             "unknown")
     REFUSALS = ("secrets-in-instance", "credential-in-endpoint",
                 "endpoint-in-clear", "endpoint-untrusted", "engine-refused",
                 "interviews-not-a-directory", "env-unreadable")
@@ -1901,6 +1903,146 @@ class TestTheDraftTurn(DraftCase):
         self.assertEqual(reply.status_code, 409)
         self.assertEqual(reply.json()["detail"], "sheet-not-approved")
         self.assertEqual(self.transport.calls, [])
+
+    def aimed(self, interview_id, text, index):
+        """A revision aimed at one block of the draft on disk."""
+        conversation = interview.load(self.root, interview_id)
+        block = passages_of(conversation.draft.body)[index]
+        return self.client.post(
+            f"/interview/{interview_id}/draft",
+            data={"text": text, "passage": block.digest,
+                  "passage_index": str(index)})
+
+    def test_a_scoped_request_requires_the_tool_that_can_only_reach_it(self):
+        # The whole guarantee. `propose_draft` takes a body, so a body is
+        # what it can write; the passage tool cannot reach past its span.
+        self.aimed(self.drafted(), "Trop vague.", 1)
+        self.assertEqual(self.transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "rewrite_passage"})
+
+    def test_an_unscoped_request_still_gets_the_whole_post_tool(self):
+        self.draft(self.drafted(), text="Plus court.")
+        self.assertEqual(self.transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "propose_draft"})
+
+    def test_the_material_of_a_scoped_turn_quotes_the_block(self):
+        interview_id = self.drafted()
+        block = passages_of(
+            interview.load(self.root, interview_id).draft.body)[1]
+        self.aimed(interview_id, "Trop vague.", 1)
+        material = self.transport.calls[0]["payload"]["messages"][0][
+            "content"][0]["text"]
+        self.assertIn("## Passage", material)
+        self.assertIn(block.text, material.split("## Passage")[1])
+
+    def test_a_stale_passage_writes_nothing_and_says_so(self):
+        # A turn behind the page can replace the post while somebody reads
+        # it. The request must not land on whatever is at that index now.
+        interview_id = self.drafted()
+        reply = self.client.post(
+            f"/interview/{interview_id}/draft",
+            data={"text": "Trop vague.", "passage": "0" * 16,
+                  "passage_index": "1"})
+        self.assertIn("passage-gone",
+                      [frame.get("code") for frame in frames(reply.text)])
+        after = interview.load(self.root, interview_id)
+        self.assertEqual(after.revisions, [])
+        self.assertEqual(self.transport.calls, [])
+
+    def test_an_index_that_is_not_a_number_is_refused_at_the_door(self):
+        interview_id = self.drafted()
+        reply = self.client.post(
+            f"/interview/{interview_id}/draft",
+            data={"text": "Trop vague.", "passage": "0" * 16,
+                  "passage_index": "the second one"})
+        self.assertEqual(reply.status_code, 400)
+
+    def test_two_rewrites_in_one_message_do_not_cut_the_post_apart(self):
+        """Both wired providers may put several calls in one message, and
+        `tool_choice` asks for at least one, never at most one. The second
+        call carries the offsets of the body the first one already rewrote:
+        spliced blindly it eats the block after it and cuts the next one
+        mid-word. The engine refuses it and the post is what the first call
+        made it, which is the whole promise of a scoped rewrite."""
+        interview_id = self.drafted()
+        conversation = interview.load(self.root, interview_id)
+        blocks = passages_of(conversation.draft.body)
+        self.transport.scripts = list(
+            (asks(("c1", "rewrite_passage", {"passage": "Court."}),
+                  ("c2", "rewrite_passage",
+                   {"passage": "Un deuxième essai, nettement plus long."})),
+             says("Rewritten.")))
+        self.aimed(interview_id, "Trop vague.", 1)
+        after = interview.load(self.root, interview_id).draft.body
+        self.assertEqual(
+            after, replace_passage(conversation.draft.body, blocks[1],
+                                   "Court."))
+        self.assertEqual(len(passages_of(after)), len(blocks))
+
+    def test_an_additive_first_call_does_not_let_a_second_one_weld_itself(self):
+        """The same message, the same two calls, but the first one returns
+        the block plus a sentence, which is what "put the real number in"
+        comes back as. The bytes at the old span are then still the old
+        text, so a guard comparing content there passes and the second call
+        lands its text welded onto the first call's tail, inside a word."""
+        interview_id = self.drafted()
+        conversation = interview.load(self.root, interview_id)
+        blocks = passages_of(conversation.draft.body)
+        added = blocks[1].text + " Douze clients en trois semaines."
+        self.transport.scripts = list(
+            (asks(("c1", "rewrite_passage", {"passage": added}),
+                  ("c2", "rewrite_passage", {"passage": "SUITEACCOLEE"})),
+             says("Rewritten.")))
+        self.aimed(interview_id, "Mets le vrai chiffre.", 1)
+        after = interview.load(self.root, interview_id).draft.body
+        self.assertEqual(after, replace_passage(conversation.draft.body,
+                                                blocks[1], added))
+        self.assertNotIn("SUITEACCOLEE", after)
+        self.assertEqual(len(passages_of(after)), len(blocks))
+
+    def test_a_first_call_that_splits_the_block_closes_it_too(self):
+        """The variant a proof about the block cannot see: the first call
+        answers with the block, a blank line and the added sentence. The
+        block becomes two and the first half is byte-identical, so its index
+        and its digest both still match while everything after it moved. A
+        second call would splice into that half and orphan the sentence."""
+        interview_id = self.drafted()
+        conversation = interview.load(self.root, interview_id)
+        blocks = passages_of(conversation.draft.body)
+        split = blocks[1].text + "\n\nEt douze clients en trois semaines."
+        self.transport.scripts = list(
+            (asks(("c1", "rewrite_passage", {"passage": split}),
+                  ("c2", "rewrite_passage", {"passage": "ORPHELINE"})),
+             says("Rewritten.")))
+        self.aimed(interview_id, "Mets le vrai chiffre.", 1)
+        after = interview.load(self.root, interview_id).draft.body
+        self.assertEqual(after, replace_passage(conversation.draft.body,
+                                                blocks[1], split))
+        self.assertNotIn("ORPHELINE", after)
+
+    def test_a_scope_nobody_sent_does_not_survive_into_the_next_turn(self):
+        """The screen says what is about to happen and the engine has to do
+        that. A request aimed at a passage that got nothing back stays
+        pending; a later turn whose picker reads "the whole post" must be a
+        whole post turn, not that block again with the scope line hidden."""
+        interview_id = self.drafted()
+        self.aimed(interview_id, "Trop vague.", 1)
+        self.transport.calls.clear()
+        self.client.post(f"/interview/{interview_id}/draft", data={"text": ""})
+        self.assertEqual(self.transport.calls[0]["payload"]["tool_choice"],
+                         {"type": "tool", "name": "propose_draft"})
+
+    def test_the_screen_offers_that_scope_back_instead_of_dropping_it(self):
+        # The other half of the same rule: the engine follows the form, so
+        # the form has to remember. A picker that reset itself would lose
+        # the passage on the reload after a refusal.
+        interview_id = self.drafted()
+        block = passages_of(
+            interview.load(self.root, interview_id).draft.body)[1]
+        self.aimed(interview_id, "Trop vague.", 1)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn(f'value="1" data-digest="{block.digest}"', page.text)
+        self.assertIn("selected", page.text)
 
     def test_the_turn_requires_the_draft_tool(self):
         self.draft(self.signed())

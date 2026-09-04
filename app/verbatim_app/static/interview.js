@@ -252,7 +252,7 @@
     return stream(form.action, text, false, box);
   }
 
-  function stream(url, text, reload, source) {
+  function stream(url, text, reload, source, extra) {
     /* One turn, whichever button started it. The three of them differ by
        where they post and by what the server does with it; a screen that
        carried three copies of this would grow three ways of failing. */
@@ -266,7 +266,8 @@
     return fetch(url, {
       method: "POST",
       headers: {"content-type": "application/x-www-form-urlencoded"},
-      body: new URLSearchParams({text: text}).toString()
+      body: new URLSearchParams(
+        Object.assign({text: text}, extra || {})).toString()
     }).then(function (reply) {
       waiting.remove();
       if (!reply.ok) { return refused(reply); }
@@ -343,7 +344,42 @@
        than being cleared here and forgotten. */
     write.addEventListener("click", function () {
       stream(write.getAttribute("data-url"),
-             revision ? revision.value : "", true, revision);
+             revision ? revision.value : "", true, revision, aimedAt());
+    });
+  }
+
+  /* Which block this request is about, as the two fields the server needs:
+     the index says which, and the digest says this page was not stale. Both
+     are read at the click rather than kept in a variable, so a picker the
+     person moved after typing is the one that counts. */
+  var scope = document.getElementById("revision-scope");
+  var echo = document.getElementById("revision-echo");
+  var scopeLine = document.getElementById("revision-scope-line");
+
+  function chosen() {
+    if (!scope || !scope.value) { return null; }
+    var option = scope.options[scope.selectedIndex];
+    return option ? option : null;
+  }
+
+  function aimedAt() {
+    var option = chosen();
+    return option
+      ? {passage: option.getAttribute("data-digest"),
+         passage_index: scope.value}
+      : {};
+  }
+
+  if (scope) {
+    scope.addEventListener("change", function () {
+      var option = chosen();
+      /* The exact text, through textContent: a post is somebody's prose and
+         it reaches this page as prose, never as markup. */
+      if (echo) {
+        echo.textContent = option ? option.getAttribute("data-text") : "";
+        echo.hidden = !option;
+      }
+      if (scopeLine) { scopeLine.hidden = !option; }
     });
   }
 

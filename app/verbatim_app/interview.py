@@ -38,9 +38,12 @@ from pathlib import Path
 #: file name in this module, and the file is a rendering, never a source.
 from .anchors import (
     Anchor, KEYS, KEY_OF, SHEET as FROM_SHEET, TRANSCRIPT as FROM_TRANSCRIPT,
-    verify,
+    contains, verify,
 )
 from .instance import atomic_write
+from .passages import (
+    PassageGone, passage_at, passages_of, replace_passage,
+)
 from .providers import Usage
 from .shown import shown
 
@@ -94,6 +97,12 @@ DRAFT_SECTIONS = ("Before anything", "Writing", "The deterministic pass",
 #: when a revision is asked for without saying what, which on a first draft is
 #: an instruction to produce a menu instead of a post.
 REVISION_SECTION = "Revisions"
+
+#: The section a rewrite confined to one block is assembled with. It
+#: says what the turn may touch, and the tool behind it can touch
+#: nothing else anyway: the span is the guarantee, this is the
+#: sentence that stops a model wasting a turn rewriting the rest.
+PASSAGE_SECTION = "Rewriting one passage"
 
 #: The contract's name format, and the whole path guard: an id that is not a
 #: timestamp cannot address anything, inside this directory or out of it.
@@ -196,6 +205,17 @@ class Revision:
     """
     text: str
     asked: str = ""
+    #: The block of the post this request is about, when it is about one.
+    #: Two keys because each answers a different question: the index says
+    #: which block, and it is the only thing separating two that read alike;
+    #: the digest says the screen was not stale. Empty and -1 mean the
+    #: request is about the post, which is what every request used to be.
+    passage: str = ""
+    passage_index: int = -1
+
+    @property
+    def scoped(self) -> bool:
+        return bool(self.passage) and self.passage_index >= 0
 
 
 @dataclass(frozen=True)
@@ -601,7 +621,77 @@ def write(conversation: Conversation, arguments: dict, *, problems=(),
     return draft
 
 
-def revise(conversation: Conversation, text: str,
+def write_passage(conversation: Conversation, arguments: dict, *, scope=None,
+                  problems=(), now: datetime | None = None) -> Draft:
+    """The engine's rewrite of one block, spliced into the draft.
+
+    The guarantee this exists for is that every other byte of the post is
+    where it was, and it is a guarantee by construction: the span comes from
+    `passages.py`, the tool hands back that block alone, and nothing here
+    can reach the rest of the body even if the model wrote a whole post into
+    the field.
+
+    Refused when nothing said which block. A tool meant for a passage,
+    landing on a conversation with no scope, would be a post replaced by a
+    fragment of itself, which is the loudest possible way to lose somebody's
+    work.
+
+    Anchors are merged rather than replaced. Every pair whose fragment is
+    still somewhere in the post keeps backing what it backed; the pairs that
+    were quoting the old block are dropped, since their fragment is gone and
+    a stored pair pointing at nothing reads as dangling on every future
+    look. What the model offers for the new block is added to those.
+
+    Still somewhere means `anchors.contains`, which is the engine's one
+    answer to that question and the one the panel paints with: it folds
+    typography, whitespace and case. A plain `in` here would have been a
+    second answer, and the two disagree exactly where it hurts. A fragment
+    stored with a straight apostrophe against a post carrying a curly one
+    is shown as backing its claim on every read, and would have been thrown
+    away here, on a block nobody asked to change, silently and on disk.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            "this interview is closed; nothing about it changes any more")
+    if not sheet_approved(conversation):
+        # Its sibling `write` has this guard and this had none. Unreachable
+        # through the route today, which re-checks under the lock, and that
+        # is exactly the argument that stops being true the day somebody
+        # calls this from somewhere else.
+        raise InterviewError(
+            "the validation sheet of this interview is not approved yet, so "
+            "nothing is drafted; propose a sheet and wait for the person")
+    block = scope
+    if block is None:
+        raise InterviewError(
+            "nothing said which passage this rewrites; a request has to name "
+            "the block it is about before one can be rewritten on its own")
+    written = arguments.get("passage")
+    if not isinstance(written, str) or not written.strip():
+        raise InterviewError(
+            "the rewrite needs 'passage', the block as it should now read")
+    try:
+        body = replace_passage(conversation.draft.body, block, written)
+    except PassageGone as gone:
+        raise InterviewError(str(gone)) from None
+    kept = tuple(pair for pair in conversation.draft.anchors
+                 if contains(body, pair.fragment))
+    # Deduplicated, because the two sides can name the same pair: what the
+    # model offers for the new block is added to what already backed the
+    # rest, and a model re-offering a pair it was told it could keep would
+    # otherwise put two identical rows in the panel and count one claim
+    # twice. Order is kept: `dict.fromkeys` is the cheapest way to say it.
+    merged = tuple(dict.fromkeys(kept + _anchor_pairs(arguments)))
+    conversation.draft = Draft(
+        body=body, anchors=merged,
+        photos=conversation.draft.photos, tips=conversation.draft.tips,
+        problems=tuple(problems),
+        written=(now or datetime.now()).strftime(STAMP))
+    return conversation.draft
+
+
+def revise(conversation: Conversation, text: str, *, passage: str = "",
+           passage_index: int = -1,
            now: datetime | None = None) -> Revision:
     """What the person asks for once a draft exists.
 
@@ -625,12 +715,68 @@ def revise(conversation: Conversation, text: str,
     text = (text or "").strip()
     if not text:
         raise InterviewError("an empty request is not a request")
-    revision = Revision(text=text, asked=(now or datetime.now()).strftime(STAMP))
+    if passage or passage_index >= 0:
+        # Resolved here rather than at the turn. The screen that offered
+        # this block can be older than the disk, and a request aimed at what
+        # used to be the second paragraph must be refused while somebody is
+        # still looking at it, not silently landed on whatever is there now.
+        try:
+            passage_at(conversation.draft.body, passage_index, passage)
+        except PassageGone as gone:
+            raise InterviewError(str(gone)) from None
+    revision = Revision(text=text, asked=(now or datetime.now()).strftime(STAMP),
+                        passage=passage, passage_index=passage_index)
     conversation.revisions.append(revision)
     return revision
 
 
-def drafting_sections(conversation: Conversation) -> tuple:
+def passage_for(conversation: Conversation, passage: str,
+                passage_index: int) -> object | None:
+    """The block a turn is confined to, resolved from what the screen sent.
+
+    From the form and from nothing else, which is the whole of the fix this
+    replaced. A scope derived from the conversation outlives the screen: a
+    request that named a passage and got nothing back stays pending, and the
+    next turn would be confined to that block while the picker in front of
+    the person reads "the whole post" and the sentence promising a scope is
+    hidden. The engine has to do what the screen says it will do.
+
+    What keeps a scope alive across a turn that produced nothing is the
+    screen offering it back, in `pending_scope`, where the person can see it
+    and change it.
+    """
+    if conversation.draft is None or not passage or passage_index < 0:
+        return None
+    try:
+        return passage_at(conversation.draft.body, passage_index, passage)
+    except PassageGone as gone:
+        raise InterviewError(str(gone)) from None
+
+
+def pending_scope(conversation: Conversation) -> object | None:
+    """The block the screen should offer back, pre-selected.
+
+    The last pending request that named one, so a refusal, a failed turn or
+    a reload does not quietly drop the scope somebody chose. It decides what
+    a picker shows, never what a turn does: `passage_for` decides that.
+
+    Nothing is raised on a scope that no longer resolves. A draft written
+    since would have answered it, and a post rewritten under it is exactly
+    the case where offering it back would be wrong.
+    """
+    if conversation.draft is None:
+        return None
+    for revision in reversed(_pending(conversation)):
+        if revision.scoped:
+            try:
+                return passage_at(conversation.draft.body,
+                                  revision.passage_index, revision.passage)
+            except PassageGone:
+                return None
+    return None
+
+
+def drafting_sections(conversation: Conversation, *, scope=None) -> tuple:
     """Which sections of the skill a drafting turn is assembled from.
 
     A rewrite is not a first draft, and the skill has a section about exactly
@@ -640,10 +786,12 @@ def drafting_sections(conversation: Conversation) -> tuple:
     """
     if conversation.draft is None:
         return DRAFT_SECTIONS
+    if scope is not None:
+        return DRAFT_SECTIONS + (REVISION_SECTION, PASSAGE_SECTION)
     return DRAFT_SECTIONS + (REVISION_SECTION,)
 
 
-def material(conversation: Conversation) -> str:
+def material(conversation: Conversation, *, scope=None) -> str:
     """What a drafting turn is handed: the interview as a human reads it,
     then the sheet the person signed.
 
@@ -681,6 +829,12 @@ def material(conversation: Conversation) -> str:
         # the wrong one.
         parts.append("## Revision\n\n" + "\n\n".join(
             _not_a_heading(revision.text) for revision in pending))
+    if scope is not None:
+        # Word for word, and after the request, because it is what the
+        # request is about. A turn handed a paraphrase of the passage would
+        # rewrite the paraphrase, and the span it lands in belongs to the
+        # text that is actually there.
+        parts.append("## Passage\n\n" + _not_a_heading(scope.text))
     return "\n\n".join(parts)
 
 
@@ -944,8 +1098,15 @@ def _as_json(conversation: Conversation) -> str:
         }
     if conversation.revisions:
         # Absent until the first one, exactly like `sheet` and `draft`.
-        data["revisions"] = [{"text": revision.text, "asked": revision.asked}
-                             for revision in conversation.revisions]
+        data["revisions"] = [
+            # The scope keys are written only when there is one, so a
+            # conversation with no scoped request round trips byte for byte
+            # through a version that never had them.
+            {"text": revision.text, "asked": revision.asked,
+             **({"passage": revision.passage,
+                 "passage_index": revision.passage_index}
+                if revision.scoped else {})}
+            for revision in conversation.revisions]
     data["messages"] = conversation.messages
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -1110,7 +1271,13 @@ def _check_revisions(data) -> list:
             raise ValueError("revisions")
         if not isinstance(asked, str):
             raise ValueError("revisions")
-        found.append(Revision(text=text, asked=asked))
+        passage = entry.get("passage", "")
+        index = entry.get("passage_index", -1)
+        if not isinstance(passage, str) or isinstance(index, bool) \
+                or not isinstance(index, int):
+            raise ValueError("revisions")
+        found.append(Revision(text=text, asked=asked, passage=passage,
+                              passage_index=index))
     return found
 
 

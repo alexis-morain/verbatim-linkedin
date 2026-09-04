@@ -131,12 +131,31 @@
     {% endfor %}
   </ul>
   {% endif %}
+  {# What the request is about. A whole post by default, which is what a
+     revision always used to be, or one block of it. The block is echoed
+     under the picker word for word: somebody has to see the text that will
+     be replaced, not a summary of where it is. #}
+  {% if blocks|length > 1 %}
+  <label class="mono" for="revision-scope">{{ t('interview.revision_scope') }}</label>
+  <select id="revision-scope">
+    <option value="">{{ t('interview.revision_scope_all') }}</option>
+    {% for block in blocks %}
+    <option value="{{ block.index }}" data-digest="{{ block.digest }}" data-text="{{ block.text }}"{% if scope and scope.index == block.index %} selected{% endif %}>{{ t('interview.revision_scope_one', number=block.index + 1, opening=block.text[:60]) }}</option>
+    {% endfor %}
+  </select>
+  <blockquote class="passage-echo their-words" id="revision-echo"{% if not scope %} hidden{% endif %}>{{ scope.text if scope }}</blockquote>
+  {% endif %}
   <label class="mono" for="revision">{{ t('interview.revision') }}</label>
   <p class="hint">{{ t('interview.revision_hint') }}</p>
-  <textarea id="revision" rows="3"></textarea>
+  {# A placeholder that teaches by example rather than describing the field.
+     Somebody who reads "your request" writes "make it better". #}
+  <textarea id="revision" rows="3" placeholder="{{ t('interview.revision_placeholder') }}"></textarea>
   {% endif %}
   <button type="button" id="write-draft" data-url="/interview/{{ conversation.id }}/draft">{{ t('interview.draft_rewrite')
     if trace else t('interview.draft_write') }}</button>
+  {# The scope, on the action line rather than in a paragraph above it. It
+     is the sentence somebody reads with their hand already on the button. #}
+  <p class="hint scope-line" id="revision-scope-line"{% if not scope %} hidden{% endif %}>{{ t('interview.revision_scope_line') }}</p>
   {% endif %}
   {% if not trace %}
   <p class="empty">{{ t('interview.draft_none') }}</p>
