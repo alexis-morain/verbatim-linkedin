@@ -1,5 +1,86 @@
 # Journal
 
+## 2026-09-04 (troisième session). La page du paquet avant l'envoi, et sept dépendances avalées par une table
+
+Base `45684fc`, 1142 tests app. Demande : préparer la publication 2.4.0, sans
+lancer l'envoi, qui demande le jeton d'Alexis. Deux sessions poussaient en
+parallèle, donc rebasage en fin de course sur `e080a93` : **+16 tests pour
+cette session, 1163 tests app et 94 JS sur l'arbre rebasé**, `check.sh` vert,
+trois commits et le tag annoté `v2.4.0` sur `main`, l'envoi laissé à Alexis.
+
+### Le nom est libre
+
+`verbatim-linkedin` : 404 sur l'API JSON et sur l'index simple, les deux
+endpoints qui font foi. La page projet répond 200, et ce 200 est un challenge
+anti-bot, pas un paquet : le lire comme une réponse aurait dit occupé sur un
+nom disponible. Les trois orthographes que PyPI normalise ensemble tombent sur
+la même 404.
+
+### Le readme ne peut pas remonter
+
+`readme = "../README.md"` ne construit pas. Hatchling refuse un readme hors du
+répertoire du projet, qui est exactement l'endroit où `force-include` a le
+droit d'aller : le bundle remonte, la métadonnée non. Le fichier arrive donc
+en texte, par un hook de métadonnée, et le fichier projet nomme le hook au
+lieu d'un fichier qu'il n'a pas le droit de nommer.
+
+**Les liens sont rendus absolus au passage.** Ils sont relatifs parce que le
+README se lit sur GitHub. Vérifié plutôt que supposé, avec `readme_renderer`,
+qui est ce avec quoi PyPI rend : quinze cibles relatives gardées telles
+quelles, dont les quatre captures, la première sous le titre. Servies depuis
+un hôte sans `docs/` en dessous, ce sont quatre images cassées et onze liens
+morts. Un fichier est un `blob`, un répertoire un `tree`, une image doit
+atteindre le fichier lui-même sur `raw.githubusercontent.com`. La référence
+est la branche et non le tag qu'on coupe : un lien mort survit à la version
+qui l'a embarqué. Les huit URL réécrites vérifiées à 200 avant de committer.
+
+### Sept dépendances avalées par une table
+
+Le vrai défaut de la session, et je l'ai posé moi-même. `[project.urls]`
+écrite au-dessus du tableau `dependencies` prend tout ce qui suit : une table
+ouverte au milieu de `[project]` possède chaque clé nue posée après elle. Les
+sept exigences d'exécution sont devenues des URL et le wheel sorti n'en
+déclarait aucune. Une installation sans fastapi dedans, depuis une métadonnée
+qu'aucune republication ne rattrape sous le même numéro.
+
+**La suite était verte pendant que c'était vrai.** Le test des URL lisait
+quatre clés nommées et ne regardait pas ce qu'il y avait d'autre dans la
+table. Deux tests le tiennent maintenant : la table ne contient que des URL,
+et les sept dépendances sont encore des dépendances. C'est le seul endroit de
+la session où relire l'artefact a dit quelque chose que les tests ne disaient
+pas.
+
+### Ce que `check.sh` lit maintenant
+
+Le wheel qu'il construit déjà, ouvert une seconde fois : une description
+longue, une URL `Source`, des classifiers, fastapi dans les exigences, et
+aucune cible relative survivante. `app/hatch_build.py` entre dans la liste des
+fichiers qu'il refuse de voir non suivis, la métadonnée du paquet en dépend.
+
+### Ce que ni la suite ni `check.sh` ne regardaient
+
+Le wheel installé dans un venv jetable, hors du dépôt. `verbatim --help`
+répond, les deux noms d'entrée marchent, `bundle_root` trouve le `_bundle`
+dans `site-packages` sans checkout au-dessus, et l'app sert l'écran Overview
+en 200 sur une copie d'`examples/` posée au scratchpad. Un point d'entrée qui
+ne démarre pas est ce que `test_bundle.py` ne peut pas voir : il lit la liste
+du `force-include`, pas un processus.
+
+### Ce qui reste
+
+L'envoi, qui est celui d'Alexis : `uv publish` depuis `app/`, avec son jeton,
+irréversible et public. Publier a été tranché, tenir aurait demandé une ligne
+d'attente ligne 70 du README, et comme ce README est désormais la description
+longue du paquet, cette ligne d'attente serait partie sur la page PyPI
+elle-même : la question se tranchait avant l'envoi, pas après.
+
+**Deux sessions poussaient pendant celle-ci**, et `origin/main` a bougé deux
+fois entre la première vérification et le push : `5f28aae` et `672c57f` sur le
+code, `94e011d` encore en vol sur le README et le bundle. Toutes en 2.4.0. Le
+wheel emporte `skills/`, `references/` et `locales/`, et le README est
+désormais la description longue : reconstruire et relire l'artefact après
+chaque rebasage, sinon ce qui part sur l'index n'est l'arbre de personne.
+
 ## 2026-09-04 (soir). Les huit lignes qui restaient du backlog Alchie, et une revue qui a trouvé un 500
 
 Deuxième session du jour, sur la base `dd84c2a` et 1051 tests app. Demande :
