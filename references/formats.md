@@ -21,6 +21,13 @@ interview answer, because it decides which rungs of the ladder matter.
 A format is a container. It never supplies content: nothing enters a post
 because the format has a slot for it.
 
+Which rungs a format climbs, and in what order, is written once in
+`references/interview-intents.md`, under the break. Two of the five have a row
+there, keyed by the id an archived post already carries: the name above,
+lowercased and hyphenated. The other three are named in that file as not
+written yet, which is a different thing from a format that climbs the default
+order.
+
 ## The objective labels
 
 Three. Every idea in the idea bank carries exactly one.

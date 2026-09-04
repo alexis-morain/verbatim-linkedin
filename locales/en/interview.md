@@ -112,6 +112,22 @@ Affordance: editable propositions.
 > context?
 
 If the answer is a generality, do not advance. Ask for the instance again.
+Unless there is no moment at all: somebody who came in with a thesis and
+nothing behind it is not being evasive. That is the other door. Take it.
+
+### witnessed-instance
+
+Rung 1, the other door. Used instead of `scene` and never after it, when the
+person arrives holding a thesis with no moment behind it.
+
+> You hold that <their thesis, in their own words>. When did you last watch
+> that actually happen? One case: who, when, where.
+
+Those three are the sufficiency test. Push once on whichever is missing. If
+it still does not come, say so out loud and climb on without it:
+
+> Right, so this is something you think rather than something you watched
+> happen. That is worth saying, and the post will not dress it up as a scene.
 
 ### number
 

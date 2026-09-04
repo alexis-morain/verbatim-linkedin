@@ -120,6 +120,22 @@ Affordance : propositions éditables.
 > Raconte-moi le moment. C'était quand, chez qui, dans quel contexte ?
 
 Si la réponse est une généralité, ne pas avancer. Redemander l'instance.
+Sauf s'il n'y a pas de moment du tout : quelqu'un qui arrive avec une thèse
+et rien derrière ne se dérobe pas. C'est l'autre porte, la prendre.
+
+### witnessed-instance
+
+Le premier barreau, l'autre porte. À la place de `scene` et jamais après,
+quand la personne arrive avec une thèse et aucun moment derrière.
+
+> Tu dis que <sa thèse, dans ses mots>. La dernière fois que tu l'as vu se
+> produire pour de vrai, c'était quand ? Un cas : qui, quand, où.
+
+Ces trois-là font la suffisance. Relancer une fois sur celui qui manque. S'il
+ne vient toujours pas, l'acter à voix haute et monter sans :
+
+> D'accord, donc c'est quelque chose que tu penses, pas quelque chose que tu
+> as vu se produire. Ça se dit, et le post ne le déguisera pas en scène vécue.
 
 ### number
 

@@ -55,13 +55,14 @@ their own slot because nothing else in a profile captures them:
 
 ## Set B. Post interview
 
-Six rungs. They run every time, in `linkedin-post`. This is a ladder, not a
-list: each question is built on the previous answer, and the climb stops as
-soon as the material is sufficient.
+Six rungs, and two doors into the first one. They run every time, in
+`linkedin-post`. This is a ladder, not a list: each question is built on the
+previous answer, and the climb stops as soon as the material is sufficient.
 
 | # | id | Seeks | Sufficiency test |
 |---|---|---|---|
 | 1 | `scene` | When, with whom, in what context. One specific moment. | A reader could place it on a calendar. |
+| 1 | `witnessed-instance` | The other door. An occurrence of a thesis they already hold, when no scene has been given. | They can name who, when, and where. |
 | 2 | `number` | What is measured in it. If nothing is, record that and move on. | The number has a source, or it is dropped. |
 | 3 | `friction` | What jammed, surprised, or cost more than planned. | Something went wrong, and it is named. |
 | 4 | `position` | What they conclude that most people do not. | Someone could disagree with it. |
@@ -86,6 +87,12 @@ soon as the material is sufficient.
   replaces a question counter with a sufficiency test.
 - **Six is a ceiling, not a target.** Stop at a scene, a position, and a
   consequence.
+- **Rung 1 has two doors, and taking one closes the other.**
+  `witnessed-instance` replaces `scene`, it never adds a step. It is the way
+  in when the person arrives with a thesis and no moment behind it, which is
+  the case none of the other five cover: they all assume a scene is already
+  on the table. Asking that person for a scene is how an interview talks
+  somebody into inventing one.
 
 ## Where the interview breaks once, on purpose
 
@@ -96,6 +103,34 @@ angle gives every later question a thesis to serve.
 The angle is proposed **two at a time**, never one, and each one carries a
 verbatim quote of something the person actually said. If it cannot be quoted,
 the angle was invented and it gets thrown away. See `references/formats.md`.
+
+### The ladder each format climbs
+
+The six rungs above are listed in the story's order. It is not everybody's,
+and running it on a stance is how an interview asks for a scene the person
+never lived.
+
+| Format | Enters on | Then | Then | Then |
+|---|---|---|---|---|
+| `the-story` | `scene` | `friction` | `number` | `position` |
+| `the-stance` | `position` | `witnessed-instance` | `number` | `friction` |
+
+Two climbs, not one with its steps shuffled:
+
+- **`the-story`** starts at the moment and ends on what is concluded from it.
+  `position` is the arrival, and it is earned by everything asked before it.
+- **`the-stance`** starts at `position`, because a stance arrives with its
+  thesis already said, and that sentence is usually the one the angle was
+  quoted from. `witnessed-instance` is the rung carrying the weight here: a
+  thesis with no occurrence behind it is exactly the hole this format falls
+  into. `number` then goes after the person's own figures rather than the
+  market's, and `friction` is read as **the objection somebody opposed to
+  them**, with how they answered it asked inside that same rung.
+
+`counter-intuitive-number`, `the-breakdown` and `the-post-mortem` have no row
+here, on purpose. Their climb gets written when an interview has been run in
+that format and somebody has an observation to write down. Filling the table
+by symmetry with these two would be inventing an order and then obeying it.
 
 ## Set C. Page interview
 

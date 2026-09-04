@@ -36,11 +36,24 @@ Affordance: <options | memory prompts | editable propositions>
 ## Set B. Post interview
 
 ### scene
+### witnessed-instance
 ### number
 ### friction
 ### position
 ### cost-of-not-knowing
 ### contradiction
+
+<!--
+  scene and witnessed-instance are the two doors into rung 1, not two rungs.
+  Word both: a pack that words only the first sends every person who arrives
+  with a thesis and no scene through a question that assumes one.
+-->
+
+## Set C. Page interview
+
+### reader-next-step
+### buyer-words
+### proof-pick
 
 ## Connective phrases
 

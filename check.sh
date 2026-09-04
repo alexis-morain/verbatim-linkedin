@@ -16,7 +16,7 @@ for t in lib/test_lint.py lib/test_publish.py app/tests/test_instance.py \
          app/tests/test_skills.py app/tests/test_tools.py \
          app/tests/test_anchors.py app/tests/test_interview.py \
          app/tests/test_archive.py app/tests/test_smoke.py \
-         app/tests/test_prose.py; do
+         app/tests/test_prose.py app/tests/test_intents.py; do
   if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
 done
 

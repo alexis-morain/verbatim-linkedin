@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.2.2
+version: 0.2.3
 ---
 
 # Write a post
@@ -45,7 +45,9 @@ The rules that matter most, restated because they are the ones that get
 dropped:
 
 - **If an answer is abstract, do not advance.** Ask for the instance again.
-  A form changes subject when an answer is hollow. This does not.
+  A form changes subject when an answer is hollow. This does not. The one
+  exception is a person who never had a scene and came in with a thesis:
+  that is the `witnessed-instance` door, not evasion.
 - **Quote the previous answer inside the next question.**
 - **Announce what is acquired and what is missing, every turn, in one line.**
 - Six is a ceiling, not a target.
@@ -57,7 +59,11 @@ decides which rungs matter. The angle gives every later question a thesis to
 serve.
 
 Both are covered by `references/formats.md`, including the exact shape of an
-angle proposal.
+angle proposal. **Once the format is settled, the ladder is the one written
+for it**, under the break in `references/interview-intents.md`. A story and a
+stance do not climb in the same order, and only two of the five formats have
+their order written down. The other three climb the default and say nothing
+more than that.
 
 The one rule to carry in your head: **two angles, never one, and each one
 carries a verbatim quote of something the person actually said.** If it cannot
