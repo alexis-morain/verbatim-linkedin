@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 from .shown import shown
 
@@ -144,3 +145,59 @@ def replace_passage(body: str, passage: Passage, text: str) -> str:
             "Ask for the post again rather than sending a second rewrite "
             "into it")
     return body[:passage.start] + written + body[passage.end:]
+
+
+def changed(before: str, after: str) -> set:
+    """The blocks of `after` that are not the blocks of `before`.
+
+    By digest and by position, over the same cut everything else here uses,
+    so what comes back is about the text a reader sees. Offsets cannot
+    answer this: they are true of one body and mean nothing in the other.
+
+    `SequenceMatcher` rather than a set difference, because the question is
+    which block on the screen moved, not which texts are new. A set
+    difference marks both copies of a repeated paragraph when one of them is
+    edited, and it marks nothing at all when a block is only moved, which is
+    the opposite mistake. The matcher answers by position and gets both.
+
+    An empty `before` marks nothing on purpose. A first draft is not a
+    change, and every rule that answers this from the post alone paints the
+    whole of it.
+    """
+    if not before.strip():
+        return set()
+    was = [passage.digest for passage in passages_of(before)]
+    now = [passage.digest for passage in passages_of(after)]
+    moved = set()
+    for kind, _, _, opens, closes in SequenceMatcher(
+            a=was, b=now, autojunk=False).get_opcodes():
+        if kind != "equal":
+            moved.update(range(opens, closes))
+    return moved
+
+
+def line_blocks(body: str) -> list:
+    """Which block each line of the post belongs to, in the order of
+    `splitlines`, with `None` for the blank ones.
+
+    The bridge between the two cuts of one post. A screen paints it line by
+    line, which is what `anchors.lines` hands over, and a version marker is
+    about blocks. Both walk `splitlines`, so an index in this list is an
+    index in that one, and nothing has to be recut to paint a block.
+    """
+    spans = []
+    at = 0
+    for line in body.splitlines(keepends=True):
+        bare = line.rstrip("\r\n")
+        spans.append((at, at + len(bare)))
+        at += len(line)
+    found = passages_of(body)
+    placed = []
+    for opens, closes in spans:
+        if opens == closes:
+            placed.append(None)
+            continue
+        placed.append(next(
+            (passage.index for passage in found
+             if passage.start <= opens and closes <= passage.end), None))
+    return placed

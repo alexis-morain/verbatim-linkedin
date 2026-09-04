@@ -220,5 +220,82 @@ class TestRewritingOne(unittest.TestCase):
                 passages.replace_passage(POST, passage, empty)
 
 
+class TestWhatMovedBetweenTwoVersions(unittest.TestCase):
+    """Which blocks are not the blocks of the version before.
+
+    Read off the same cut the rest of this file is about, and by digest, so
+    the answer is about the text a reader sees rather than about offsets
+    that mean nothing across two bodies.
+    """
+
+    def test_only_the_rewritten_block_is_marked(self):
+        after = passages.replace_passage(
+            POST, passages.passages_of(POST)[1], "Onze conversations. Rien.")
+        self.assertEqual(passages.changed(POST, after), {1})
+
+    def test_a_post_rewritten_whole_marks_every_block(self):
+        after = "Tout autre.\n\nEt encore autre.\n\nFin autre."
+        self.assertEqual(passages.changed(POST, after), {0, 1, 2})
+
+    def test_an_added_block_is_marked_and_its_neighbours_are_not(self):
+        after = POST + "\n\nEt puis j'ai recommence."
+        self.assertEqual(passages.changed(POST, after), {3})
+
+    def test_a_removed_block_marks_nothing_that_stayed(self):
+        # Nothing of what is left changed, so nothing of what is left is
+        # marked. A deletion is visible by the post being shorter, and
+        # painting its neighbours would say they moved when they did not.
+        after = "Quatre mois \u00e0 vendre aux agences.\n\nJ'ai arr\u00eat\u00e9."
+        self.assertEqual(passages.changed(POST, after), set())
+
+    def test_a_reorder_is_a_change_and_something_carries_the_mark(self):
+        # Two blocks swapped: every character of the post is where it was
+        # and the post is not the same post. Which of the two carries the
+        # mark is the matcher's to say; that neither does would be the
+        # screen calling a real edit no edit at all.
+        before = "Quatre mois \u00e0 vendre aux agences.\n\nJ'ai arr\u00eat\u00e9."
+        after = "J'ai arr\u00eat\u00e9.\n\nQuatre mois \u00e0 vendre aux agences."
+        self.assertTrue(passages.changed(before, after))
+
+    def test_nothing_to_compare_against_marks_nothing(self):
+        # A first draft is not news. Every block of it would be marked by any
+        # rule that answers this from the post alone.
+        self.assertEqual(passages.changed("", POST), set())
+
+    def test_two_blocks_that_read_alike_are_told_apart_by_position(self):
+        before = "Pareil.\n\nPareil.\n\nDifferent."
+        after = "Pareil.\n\nPareil.\n\nAutre chose."
+        self.assertEqual(passages.changed(before, after), {2})
+
+
+class TestWhichBlockALineBelongsTo(unittest.TestCase):
+    """The bridge between the two ways this post is cut.
+
+    A screen paints the post line by line, `anchors.lines` does the cutting,
+    and a version marker is about blocks. One list, in the order of
+    `splitlines`, so an index in one is an index in the other.
+    """
+
+    def test_every_line_is_placed_and_the_blank_ones_are_not(self):
+        self.assertEqual(passages.line_blocks(POST),
+                         [0, None, 1, None, 2])
+
+    def test_a_block_of_several_lines_places_all_of_them(self):
+        post = "Une ligne.\nEt sa suite.\n\nUn autre bloc."
+        self.assertEqual(passages.line_blocks(post), [0, 0, None, 1])
+
+    def test_the_list_is_as_long_as_the_post_has_lines(self):
+        for post in (POST, "", "Seul.", "A\n\n\n\nB", "A\r\n\r\nB"):
+            self.assertEqual(len(passages.line_blocks(post)),
+                             len(post.splitlines()), post)
+
+    def test_a_line_placed_in_a_block_is_inside_that_block(self):
+        post = "Une ligne.\nEt sa suite.\n\nUn autre bloc."
+        found = passages.passages_of(post)
+        for line, index in zip(post.splitlines(),
+                               passages.line_blocks(post)):
+            if index is not None:
+                self.assertIn(line.strip(), found[index].text)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

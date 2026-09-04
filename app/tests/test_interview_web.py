@@ -26,6 +26,7 @@ from test_agent import Replay, asks, says  # noqa: E402
 
 from verbatim_app import interview  # noqa: E402
 from verbatim_app.passages import passages_of, replace_passage
+from verbatim_app.shown import shown as digest_of  # noqa: E402
 from verbatim_app.web import create_app  # noqa: E402
 
 CONFIGURED = {"ANTHROPIC_API_KEY": "sk-test"}
@@ -2119,6 +2120,125 @@ class TestTheDraftTurn(DraftCase):
         self.draft(interview_id)
         self.assertEqual(
             interview.load(self.root, interview_id).draft.body, "Autre.")
+
+
+
+class TestTheVersionOnScreen(DraftCase):
+    """The badge, what moved, and the way back.
+
+    A rewrite aimed at one block leaves every other byte where it was. What
+    that guarantee is worth to somebody is seeing which block moved and
+    being able to put it back, and neither is readable off one body.
+    """
+
+    def second(self, interview_id, body="Quatre mois pour rien.\n\nAutre."):
+        conversation = interview.load(self.root, interview_id)
+        interview.write(conversation, dict(DRAFT_ARGS, body=body))
+        interview.save(self.root, conversation)
+        return conversation
+
+    def test_a_first_draft_carries_no_version_and_no_way_back(self):
+        interview_id = self.drafted()
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertNotIn("V2", page.text)
+        self.assertNotIn("draft/revert", page.text)
+        self.assertNotIn(shown(self.app.state.t("interview.moved_legend")),
+                         page.text)
+
+    def test_a_rewrite_puts_the_version_the_legend_and_the_way_back_up(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        page = self.client.get(f"/interview/{interview_id}")
+        self.assertIn("V2", page.text)
+        self.assertIn(f"/interview/{interview_id}/draft/revert", page.text)
+        self.assertIn(shown(self.app.state.t("interview.moved_legend")),
+                      page.text)
+
+    def test_only_the_block_that_moved_carries_the_mark(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        page = self.client.get(f"/interview/{interview_id}")
+        rows = re.findall(r'<p class="moved">(.*?)</p>|<p>(.*?)</p>',
+                          page.text, re.S)
+        moved = [a for a, b in rows if a]
+        self.assertTrue(any("Autre." in row for row in moved), page.text)
+        self.assertFalse(any("Quatre mois pour rien." in row
+                             for row in moved), page.text)
+
+    def test_the_frame_says_which_rows_moved_and_says_it_per_row(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        page = self.client.get(f"/interview/{interview_id}")
+        conversation = interview.load(self.root, interview_id)
+        from verbatim_app.routes.interview import panel
+        trace = panel(conversation)
+        self.assertEqual(len(trace["moved"]), len(trace["lines"]))
+        self.assertEqual(trace["version"], 2)
+
+    def test_going_back_restores_the_body_and_the_anchors(self):
+        interview_id = self.drafted()
+        first = interview.load(self.root, interview_id).draft
+        self.second(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        reply = self.client.post(
+            f"/interview/{interview_id}/draft/revert",
+            data={"body": digest_of(conversation.draft.body)},
+            follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        again = interview.load(self.root, interview_id)
+        self.assertEqual(again.draft.body, first.body)
+        self.assertEqual(again.draft.anchors, first.anchors)
+        self.assertEqual(again.earlier, [])
+
+    def test_going_back_on_a_stale_screen_writes_nothing(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        reply = self.client.post(f"/interview/{interview_id}/draft/revert",
+                                 data={"body": digest_of("un autre post")},
+                                 follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertIn("notice=draft-changed", reply.headers["location"])
+        again = interview.load(self.root, interview_id)
+        self.assertEqual(again.draft.body, "Quatre mois pour rien.\n\nAutre.")
+        self.assertEqual(len(again.earlier), 1)
+
+    def test_a_stale_screen_is_told_so_when_it_comes_back(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        page = self.client.get(
+            f"/interview/{interview_id}?notice=draft-changed")
+        self.assertIn(shown(self.app.state.t("interview.draft_changed")),
+                      page.text)
+
+    def test_going_back_with_nowhere_to_go_writes_nothing(self):
+        interview_id = self.drafted()
+        conversation = interview.load(self.root, interview_id)
+        reply = self.client.post(
+            f"/interview/{interview_id}/draft/revert",
+            data={"body": digest_of(conversation.draft.body)},
+            follow_redirects=False)
+        self.assertEqual(reply.status_code, 303)
+        self.assertEqual(
+            interview.load(self.root, interview_id).draft.body,
+            DRAFT_ARGS["body"])
+
+    def test_going_back_beside_a_running_turn_waits(self):
+        interview_id = self.drafted()
+        self.second(interview_id)
+        conversation = interview.load(self.root, interview_id)
+        digest = digest_of(conversation.draft.body)
+        from verbatim_app.routes.interview import lock_for
+        lock = lock_for(self.client.app, interview_id)
+        lock.acquire()
+        try:
+            reply = self.client.post(
+                f"/interview/{interview_id}/draft/revert",
+                data={"body": digest}, follow_redirects=False)
+        finally:
+            lock.release()
+        self.assertIn("notice=turn-running", reply.headers["location"])
+        self.assertEqual(len(interview.load(self.root, interview_id).earlier),
+                         1)
 
 
 PROSE = ("Quatre mois pour rien.\n\n"

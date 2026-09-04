@@ -538,6 +538,22 @@ mark.claim-fabricated {
   border-bottom: 2px solid var(--alarm);
 }
 
+/* What moved since the previous version: a rule in the margin, not a wash.
+   The wash is spent, it means a claim nothing backs, and two washes on one
+   paragraph is a reader deciding which alarm they are looking at. A change
+   bar is also the one marker that does not tint somebody's prose: it sits
+   beside the block rather than on the words. */
+.post p.moved {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.7rem;
+  margin-left: -1rem;
+}
+
+/* Which version is on screen. Quiet on purpose: it is a fact about the post,
+   not a state to worry about. */
+.badge.version { border-color: var(--muted); color: var(--muted);
+                 margin-right: 0.4rem; }
+
 .counts { color: var(--muted); }
 
 .problems { color: var(--alarm); padding-left: 1.1rem; }

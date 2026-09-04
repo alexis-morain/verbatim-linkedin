@@ -113,6 +113,12 @@
 {% if sheet and sheet.state == 'approved' %}
 <section class="draft" id="draft">
   <h2>{{ t('interview.draft') }}</h2>
+  {# A click that arrived from a screen older than the disk. It belongs here
+     rather than beside the sheet: it is about the post, and the sentence is
+     the only thing telling somebody their post was not the one they read. #}
+  {% if notice == 'draft-changed' %}
+  <p class="callout" id="draft-changed">{{ t('interview.draft_changed') }}</p>
+  {% endif %}
   <p class="hint">{{ t('interview.draft_hint') }}</p>
   {% if conversation.state == 'open' %}
   {% if trace %}
@@ -160,7 +166,25 @@
   {% if not trace %}
   <p class="empty">{{ t('interview.draft_none') }}</p>
   {% else %}
-  <p class="hint mono">{{ t('interview.draft_written', stamp=trace.written) }}</p>
+  <p class="hint mono"><span class="badge version">{{ t('interview.draft_version', number=trace.version) }}</span>
+    {{ t('interview.draft_written', stamp=trace.written) }}{% if trace.restored %},
+    {{ t('interview.draft_restored', stamp=trace.restored) }}{% endif %}</p>
+  {# Both only from the second version on, which is the rule the resume
+     button and the passage picker already follow: an affordance with no
+     history behind it is not on the screen, and a legend about a previous
+     version is a legend about nothing. #}
+  {% if trace.version > 1 %}
+  <p class="hint">{{ t('interview.moved_legend') }}</p>
+  <form method="post" action="/interview/{{ conversation.id }}/draft/revert">
+    {# The identity of the post as this page shows it. A turn can rewrite
+       the draft behind a screen already drawn, and going back from that
+       screen would throw away a version nobody read. #}
+    <input type="hidden" name="body" value="{{ trace.digest }}">
+    <button type="submit">{{ t('interview.draft_revert',
+      number=trace.version - 1) }}</button>
+    <span class="mono hint">{{ t('interview.draft_revert_hint') }}</span>
+  </form>
+  {% endif %}
   <div class="draft-columns">
   <div class="draft-post">
 
@@ -168,7 +192,7 @@
      marked in it. The marking is decided server side, in anchors.lines, so a
      reload and a live frame paint the same verdict. #}
   <article class="post their-words">
-    {% for row in trace.lines %}{% if row %}<p>{% for piece in row %}{% if piece.status == 'anchored' %}{{ piece.text }}{% else %}<mark class="claim-{{ piece.status }}" title="{{ t('interview.claim_' ~ piece.status ~ '_hint') }}">{{ piece.text }}</mark>{% endif %} {% endfor %}</p>{% endif %}{% endfor %}
+    {% for row in trace.lines %}{% if row %}<p{% if trace.moved[loop.index0] %} class="moved"{% endif %}>{% for piece in row %}{% if piece.status == 'anchored' %}{{ piece.text }}{% else %}<mark class="claim-{{ piece.status }}" title="{{ t('interview.claim_' ~ piece.status ~ '_hint') }}">{{ piece.text }}</mark>{% endif %} {% endfor %}</p>{% endif %}{% endfor %}
   </article>
 
   <form method="post" action="/interview/{{ conversation.id }}/draft/lint">

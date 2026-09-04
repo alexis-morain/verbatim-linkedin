@@ -1158,6 +1158,156 @@ class TestTheDraft(InterviewCase):
                 interview.load(self.root, conversation.id)
 
 
+
+EVEN_LATER = datetime(2026, 8, 28, 15, 2, 30)
+LATEST = datetime(2026, 8, 28, 15, 30, 0)
+
+
+class TestTheVersionsOfADraft(InterviewCase):
+    """Every draft this one replaced, oldest first, and the way back.
+
+    A rewrite that aimed at one block leaves every other byte where it was,
+    which is `passages.py`. What that guarantee is worth on a screen is
+    somebody being able to see what moved and put it back, and neither is
+    possible from one body.
+    """
+
+    def test_the_first_draft_replaces_nothing(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        self.assertEqual(conversation.earlier, [])
+        self.assertEqual(interview.version(conversation), 1)
+
+    def test_a_rewrite_keeps_the_draft_it_replaced(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        first = conversation.draft
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        self.assertEqual(conversation.earlier, [first])
+        self.assertEqual(interview.version(conversation), 2)
+
+    def test_a_passage_rewrite_keeps_it_too(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        first = conversation.draft
+        block = passages.passages_of(first.body)[0]
+        interview.write_passage(conversation, {"passage": "Quatre mois."},
+                                scope=block, now=EVEN_LATER)
+        self.assertEqual(conversation.earlier, [first])
+        self.assertEqual(interview.version(conversation), 2)
+
+    def test_going_back_puts_the_previous_draft_in_front_again(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        first = conversation.draft
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        interview.revert(conversation, shown(conversation.draft.body),
+                         now=LATEST)
+        self.assertEqual(conversation.draft.body, first.body)
+        self.assertEqual(conversation.draft.anchors, first.anchors)
+        self.assertEqual(conversation.earlier, [])
+        self.assertEqual(interview.version(conversation), 1)
+
+    def test_going_back_is_refused_on_a_body_that_is_not_on_the_screen(self):
+        # The fourth signer of `shown`. A turn can replace the draft behind
+        # a page already drawn, and the click that arrives from that page
+        # would throw away a version its owner never saw.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        with self.assertRaises(interview.DraftChanged):
+            interview.revert(conversation, shown("un autre post"), now=LATEST)
+        self.assertEqual(conversation.draft.body, "Autre chose.")
+        self.assertEqual(len(conversation.earlier), 1)
+
+    def test_there_is_nothing_to_go_back_to_on_a_first_draft(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        with self.assertRaises(interview.InterviewError):
+            interview.revert(conversation, shown(conversation.draft.body),
+                             now=LATEST)
+
+    def test_a_closed_interview_goes_nowhere(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        conversation.state = interview.CLOSED
+        with self.assertRaises(interview.InterviewError):
+            interview.revert(conversation, shown(conversation.draft.body),
+                             now=LATEST)
+
+    def test_going_back_stamps_the_moment_of_the_click(self):
+        # `written` says when the engine wrote this body, because it did.
+        # `restored` says when it became the draft again, and `since` is
+        # what anything asking "what was asked after this draft" compares to.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        interview.revert(conversation, shown(conversation.draft.body),
+                         now=LATEST)
+        self.assertEqual(conversation.draft.written,
+                         LATER.strftime(interview.STAMP))
+        self.assertEqual(conversation.draft.restored,
+                         LATEST.strftime(interview.STAMP))
+        self.assertEqual(conversation.draft.since,
+                         LATEST.strftime(interview.STAMP))
+
+    def test_a_request_from_before_is_not_bundled_with_one_from_after(self):
+        # The whole of what `restored` buys. Going back moves the draft's
+        # stamp backwards in time, and the request whose answer was just
+        # thrown away would come back as an unanswered one, riding along
+        # with whatever is typed next. `_pending` reads `since` for this.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.revise(conversation, "plus court", now=EVEN_LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        interview.revert(conversation, shown(conversation.draft.body),
+                         now=LATEST)
+        interview.revise(conversation, "garde celui-la mais plus court",
+                         now=datetime(2026, 8, 28, 16, 0, 0))
+        asked = interview.material(conversation).split("## Revision")[1]
+        self.assertIn("garde celui-la mais plus court", asked)
+        self.assertNotIn("plus court\n\ngarde", asked)
+
+    def test_the_versions_round_trip_through_the_disk(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.write(conversation, offer(body="Autre chose."),
+                        now=EVEN_LATER)
+        interview.save(self.root, conversation, now=LATEST)
+        again = interview.load(self.root, conversation.id)
+        self.assertEqual(again.earlier, conversation.earlier)
+        self.assertEqual(again.draft, conversation.draft)
+
+    def test_one_version_means_no_key_on_disk(self):
+        # A conversation this engine never rewrote reads back byte for byte
+        # through a version that never had the key.
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        raw = json.loads((self.directory(conversation)
+                          / interview.CONVERSATION).read_text(encoding="utf-8"))
+        self.assertNotIn("earlier", raw)
+        self.assertNotIn("restored", raw["draft"])
+
+    def test_an_earlier_draft_of_the_wrong_shape_is_refused_whole(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        interview.save(self.root, conversation, now=LATER)
+        path = self.directory(conversation) / interview.CONVERSATION
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["earlier"] = [{"body": 42}]
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        with self.assertRaises(interview.InterviewError):
+            interview.load(self.root, conversation.id)
+
+
 class TestTheDraftingStep(InterviewCase):
     """What a drafting turn is handed. Not the interview's own message list:
     a fresh request built from the material, which is what the skill asks

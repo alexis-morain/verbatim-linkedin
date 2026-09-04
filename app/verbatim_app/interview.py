@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -123,6 +123,12 @@ MOST_PENDING = 4
 
 class InterviewError(Exception):
     pass
+
+
+class DraftChanged(InterviewError):
+    """The draft on disk is not the draft the screen was showing. Its own
+    class rather than a message, for the same reason `SheetChanged` is one:
+    the screen answering it has a sentence to say and a page to redraw."""
 
 
 class SheetChanged(InterviewError):
@@ -238,6 +244,23 @@ class Draft:
     #: came through the tool; a runtime that answered in prose fills it.
     problems: tuple = ()
     written: str = ""
+    #: When this body was put back in front, on a version somebody went back
+    #: to. `written` still says when the engine wrote it, because it did, and
+    #: this says when it became the draft again. Both, because `_pending`
+    #: reads one of them and the screen reads the other: going back moves the
+    #: draft's stamp backwards in time, and a single stamp would hand the
+    #: next turn the very request whose answer was just thrown away.
+    restored: str = ""
+
+    @property
+    def since(self) -> str:
+        """The stamp anything asking what came after this draft compares to.
+
+        The later of the two, and a plain `max` over strings works because
+        `STAMP` is fixed width and orders lexically, which is the property
+        `_pending` already relies on.
+        """
+        return max(self.written, self.restored)
 
 
 @dataclass
@@ -261,6 +284,11 @@ class Conversation:
     spent: float | None = 0.0
     sheet: Sheet | None = None
     draft: Draft | None = None
+    #: The drafts this one replaced, oldest first. Not a log: it is what
+    #: `revert` walks back through, and what says which version is on screen.
+    #: The engine's words rather than the person's, so nothing here is an
+    #: anchoring source and `said` does not read it.
+    earlier: list = field(default_factory=list)
     #: Append only, and written by a person's click alone. Part of what they
     #: said, which is why `said` reads it and the transcript renders it.
     revisions: list = field(default_factory=list)
@@ -617,6 +645,7 @@ def write(conversation: Conversation, arguments: dict, *, problems=(),
                   tips=_notes(arguments, "tips", TIP_KINDS),
                   problems=tuple(problems),
                   written=(now or datetime.now()).strftime(STAMP))
+    _keep_version(conversation)
     conversation.draft = draft
     return draft
 
@@ -682,11 +711,76 @@ def write_passage(conversation: Conversation, arguments: dict, *, scope=None,
     # otherwise put two identical rows in the panel and count one claim
     # twice. Order is kept: `dict.fromkeys` is the cheapest way to say it.
     merged = tuple(dict.fromkeys(kept + _anchor_pairs(arguments)))
+    _keep_version(conversation)
     conversation.draft = Draft(
         body=body, anchors=merged,
         photos=conversation.draft.photos, tips=conversation.draft.tips,
         problems=tuple(problems),
         written=(now or datetime.now()).strftime(STAMP))
+    return conversation.draft
+
+
+def _keep_version(conversation: Conversation) -> None:
+    """Put the draft about to be replaced on the pile of earlier ones.
+
+    Called by both writers, because a rewrite is a rewrite whether it aimed
+    at the whole post or at one block. A first draft replaces nothing and
+    pushes nothing: the pile holds versions, not a slot for the absence of
+    one.
+    """
+    if conversation.draft is not None:
+        conversation.earlier.append(conversation.draft)
+
+
+def version(conversation: Conversation) -> int:
+    """Which version of the post is in front of somebody, counting from one.
+
+    Derived, never stored, for the reason no verdict is stored either: a
+    number written down beside the thing it counts goes wrong the first time
+    anything else moves, and it goes wrong quietly.
+    """
+    return len(conversation.earlier) + 1 if conversation.draft else 0
+
+
+def revert(conversation: Conversation, body: str,
+           now: datetime | None = None) -> Draft:
+    """Put the previous version back in front.
+
+    `body` is the digest of the post as the person read it, positional for
+    the reason `approve` takes one that way: a turn can replace the draft
+    behind a screen already drawn, and a click that arrived from that screen
+    would throw away a version whose owner never saw it. The fourth signer
+    of `shown`, and the same digest, so the four cannot drift apart.
+
+    The pile shrinks rather than growing. Going back and going back again
+    walks the versions in order, which is what the button on the screen says
+    it does; a revert that appended the old body as a new version would show
+    V3 to somebody who asked for V1 and would never reach V1 at all.
+
+    What is lost is one body the engine wrote. Nothing anchors on it:
+    `said` is the person's turns and their requests, and this list is the
+    engine's words, which is exactly why they can be dropped and those
+    cannot.
+    """
+    if conversation.state != OPEN:
+        raise InterviewError(
+            f"interview {conversation.id} is closed; its post is settled")
+    if conversation.draft is None or not conversation.earlier:
+        raise InterviewError(
+            f"interview {conversation.id} has one version of its post and "
+            "no earlier one to go back to")
+    if body != shown(conversation.draft.body):
+        raise DraftChanged(
+            f"the post of {conversation.id} is not the one this was read "
+            "from; it has been rewritten since the screen was drawn")
+    # The stamp is the moment of the click, not the moment the engine wrote
+    # this body, and it is why `restored` exists: `_pending` asks what was
+    # asked after the current draft, and going back moves that backwards.
+    # Without it, the request whose answer was just taken back would be
+    # handed to the next turn as an unanswered one.
+    conversation.draft = replace(
+        conversation.earlier.pop(),
+        restored=(now or datetime.now()).strftime(STAMP))
     return conversation.draft
 
 
@@ -871,7 +965,7 @@ def _pending(conversation: Conversation) -> list:
     """
     if not conversation.revisions:
         return []
-    written = conversation.draft.written if conversation.draft else ""
+    written = conversation.draft.since if conversation.draft else ""
     if written:
         pending = [revision for revision in conversation.revisions
                    if revision.asked > written]
@@ -1046,6 +1140,29 @@ def discard(instance_root, interview_id: str) -> None:
 
 # ----------------------------------------------------------------- the format
 
+def _draft_json(draft: Draft) -> dict:
+    """One draft on disk. Written by `_as_json` for the current one and for
+    every earlier one, so the pile and the post in front of it are the same
+    shape and `_check_draft` reads both."""
+    return {
+        "body": draft.body,
+        # The key of the quote is its provenance, `said` or `sheet`, the
+        # same spelling the tool call travels under.
+        "anchors": [{"post": anchor.fragment,
+                     KEY_OF[anchor.provenance]: anchor.quote}
+                    for anchor in draft.anchors],
+        "photos": [{"kind": note.kind, "text": note.text}
+                   for note in draft.photos],
+        "tips": [{"kind": note.kind, "text": note.text}
+                 for note in draft.tips],
+        "problems": list(draft.problems),
+        "written": draft.written,
+        # Written only when there is one, so a conversation nobody ever took
+        # back reads byte for byte through a version that never had the key.
+        **({"restored": draft.restored} if draft.restored else {}),
+    }
+
+
 def _as_json(conversation: Conversation) -> str:
     data = {
         "version": VERSION,
@@ -1081,21 +1198,13 @@ def _as_json(conversation: Conversation) -> str:
         }
     if conversation.draft is not None:
         # Absent until there is one, exactly like `sheet` above.
-        draft = conversation.draft
-        data["draft"] = {
-            "body": draft.body,
-            # The key of the quote is its provenance, `said` or `sheet`,
-            # the same spelling the tool call travels under.
-            "anchors": [{"post": anchor.fragment,
-                         KEY_OF[anchor.provenance]: anchor.quote}
-                        for anchor in draft.anchors],
-            "photos": [{"kind": note.kind, "text": note.text}
-                       for note in draft.photos],
-            "tips": [{"kind": note.kind, "text": note.text}
-                     for note in draft.tips],
-            "problems": list(draft.problems),
-            "written": draft.written,
-        }
+        data["draft"] = _draft_json(conversation.draft)
+    if conversation.earlier:
+        # Absent until the first rewrite, exactly like `sheet` and `draft`.
+        # The same writer as the draft above and read back by the same
+        # reader: two spellings of one object is how the pile and the post
+        # in front of it start meaning different things.
+        data["earlier"] = [_draft_json(draft) for draft in conversation.earlier]
     if conversation.revisions:
         # Absent until the first one, exactly like `sheet` and `draft`.
         data["revisions"] = [
@@ -1178,6 +1287,7 @@ def _build(data: dict, interview_id: str) -> Conversation:
         spent=spent,
         sheet=_check_sheet(data.get("sheet")),
         draft=_check_draft(data.get("draft")),
+        earlier=_check_earlier(data.get("earlier")),
         revisions=_check_revisions(data.get("revisions")),
         messages=data["messages"])
 
@@ -1245,9 +1355,33 @@ def _check_draft(data) -> Draft | None:
         tips = _notes(data, "tips", TIP_KINDS)
     except InterviewError:
         raise ValueError("draft") from None
+    if not isinstance(data.get("restored", ""), str):
+        raise ValueError("draft")
     return Draft(body=data["body"], anchors=anchors, photos=photos, tips=tips,
                  problems=tuple(problems),
-                 written=str(data.get("written", "")))
+                 written=str(data.get("written", "")),
+                 restored=str(data.get("restored", "")))
+
+
+def _check_earlier(data) -> list:
+    """The versions this draft replaced, refused whole rather than half read.
+
+    Same strictness as the draft in front of them, and read by the same
+    function: one of these is the post the moment somebody goes back, and a
+    body silently dropped for being the wrong shape is a version that
+    disappears from the count and from the way back.
+    """
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        raise ValueError("earlier")
+    found = []
+    for entry in data:
+        draft = _check_draft(entry)
+        if draft is None:
+            raise ValueError("earlier")
+        found.append(draft)
+    return found
 
 
 def _check_revisions(data) -> list:

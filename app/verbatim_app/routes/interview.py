@@ -47,10 +47,11 @@ from . import render as _render
 from .. import anchors, archive, interview, prose
 from ..agent import Agent, AgentError, http_transport
 from ..instance import InstanceError, UnreadableError
-from ..passages import passages_of
+from ..passages import changed, line_blocks, passages_of
 from ..providers import (
     PRICES, ProviderError, Settings, Usage, price, problems, resolve,
 )
+from ..shown import shown
 from ..skills import SkillError, system_block
 from ..tools import (
     DRAFT_TOOL, PASSAGE_TOOL, SHEET_TOOL, ToolRefused, draft_tool,
@@ -231,7 +232,8 @@ def begin(request: Request, seed: str = Form("")):
 #: Notices a redirect may carry back to the screen. A whitelist, because the
 #: query string is anybody's to write and an unknown value must render as
 #: nothing rather than reach the string table.
-NOTICES = ("sheet-changed", "turn-running", "idea-not-moved")
+NOTICES = ("sheet-changed", "draft-changed", "turn-running",
+           "idea-not-moved")
 
 
 def panel(conversation) -> dict:
@@ -264,9 +266,27 @@ def panel(conversation) -> dict:
               for state in ("anchored", "fabricated", "dangling")}
     counts["unanchored"] = sum(1 for row in painted for piece in row
                                if not piece.covered)
+    # What moved since the version before, by block and then by row. The
+    # blocks are `passages.py`'s cut and the rows are `anchors.lines`'s, and
+    # both walk `splitlines`, so an index in one is an index in the other:
+    # nothing is recut here to paint a block. Computed rather than stored,
+    # like every other verdict on this panel.
+    before = conversation.earlier[-1].body if conversation.earlier else ""
+    moved = changed(before, draft.body)
     return {
         "body": draft.body,
         "written": draft.written,
+        # When this body was put back in front, empty on one the engine
+        # wrote where it sits. Both, because they answer different questions.
+        "restored": draft.restored,
+        # Counting from one, and derived: see `interview.version`.
+        "version": interview.version(conversation),
+        # The identity of the post as this screen shows it, and what the way
+        # back signs. The same digest the sheet approval and the section
+        # editor sign, so this is not a fourth implementation of it.
+        "digest": shown(draft.body),
+        "moved": [index is not None and index in moved
+                  for index in line_blocks(draft.body)],
         "problems": list(draft.problems),
         # Not the post, and never rendered inside it. The skill asks the
         # writing step for both; what did not arrive is shown as missing,
@@ -502,6 +522,47 @@ def draft(request: Request, interview_id: str, text: str = Form(""),
         raise HTTPException(status_code=400, detail="bad-passage")
     return _start(request, interview_id, require=DRAFT_TOOL, drafting=True,
                   text=text, passage=passage, passage_index=index)
+
+
+@router.post("/interview/{interview_id}/draft/revert")
+def revert_draft(request: Request, interview_id: str, body: str = Form("")):
+    """Put the previous version of the post back in front.
+
+    A plain form POST, and nothing here costs anything: it is the person's
+    own decision about their own material, on disk. `body` is the digest of
+    the post as the screen showed it, and a mismatch writes nothing: a turn
+    can rewrite the draft behind a page already drawn, and a click arriving
+    from that page would throw away a version whose owner never saw it.
+
+    Under the turn lock, for the reason approving a sheet is under it: a
+    revert written beside a running turn is a revert that turn's next save
+    writes over, and the version that came back would be gone again with no
+    trace of either.
+    """
+    conversation = _conversation(request, interview_id)
+    lock = lock_for(request.app, interview_id)
+    if not lock.acquire(blocking=False):
+        return RedirectResponse(f"/interview/{interview_id}?notice=turn-running",
+                                status_code=303)
+    notice = ""
+    try:
+        # Reloaded under the lock, like every other writer here: the copy
+        # the handler read is only as fresh as the moment it took the lock.
+        conversation = interview.load(request.app.state.instance.root,
+                                      interview_id)
+        interview.revert(conversation, body)
+        interview.save(request.app.state.instance.root, conversation)
+    except interview.DraftChanged:
+        notice = "?notice=draft-changed"
+    except interview.InterviewError:
+        # Nowhere to go back to, or an interview that closed underneath
+        # this. Both are the screen being older than the disk, and both are
+        # answered by drawing it again rather than by a page of their own.
+        pass
+    finally:
+        lock.release()
+    return RedirectResponse(f"/interview/{interview_id}{notice}",
+                            status_code=303)
 
 
 @router.post("/interview/{interview_id}/archive")
