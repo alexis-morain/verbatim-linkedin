@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.2.3
+version: 0.2.4
 ---
 
 # Write a post
@@ -193,6 +193,33 @@ vocabulary. It unblocks faster than an open question.
 | Add an element | a numbered anecdote, an objection, a date, a consequence |
 | Change the tone | blunter, less corporate, more personal, calmer, less preachy |
 | One specific passage | they paste the extract, nothing else is touched |
+
+### When the revision asks for something that was never said
+
+A revision can ask for a fact the interview never gave: a source for a
+figure, a date, a name, a comparison with a market. The rule against
+inventing does not soften because a draft exists. It gets louder, because the
+person is looking at a text now, and what is missing reads as a gap to fill
+rather than as something nobody ever said.
+
+Three moves, in this order, and none of them optional.
+
+1. **Refuse in one sentence, out loud.** "I cannot invent a source for you."
+   Not a hedge, not a quiet omission, and never a plausible placeholder that
+   somebody has to catch later.
+2. **Offer typed options, not an open question.** Name the shapes the answer
+   could have: a comparison site, a barometer from a firm, rate cards they
+   have seen, a specific article. This is the two opposed options procedure
+   widened. An open "what is your source?" gets a shrug; four named shapes
+   get an answer, or an honest no.
+3. **Offer the exit.** "Otherwise I take the passage out." Nobody is ever
+   left choosing between inventing something and abandoning the post.
+
+**Nothing is rewritten in that turn.** The refusal is the whole answer, and
+the next turn starts from whatever they came back with.
+
+Wording for all three: `locales/<interface_language>/interview.md`,
+under the connective phrases.
 
 ## Graded review, on request
 

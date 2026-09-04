@@ -232,6 +232,14 @@ post français.
 
 > Je pars là-dessus, ou il manque quelque chose ?
 
+**Refuser d'inventer, sur une révision**, d'un seul tenant : le refus, les
+formes que la réponse peut prendre, et la sortie.
+
+> Je ne peux pas inventer une source à ta place. D'où sortent ces chiffres :
+> un comparateur en ligne, un baromètre de cabinet, des grilles tarifaires que
+> tu as vues, un article précis ? Donne-moi le nom exact et l'année, je
+> l'intègre. Sinon je supprime le passage.
+
 **Formulation générée**, quand le pack n'a pas la question :
 
 > Question formulée à la volée, elle n'a pas été relue par un locuteur natif.

@@ -222,6 +222,14 @@ into a post.
 
 > I go with this, or is something missing?
 
+**Refusing to invent, on a revision**, in one breath: the refusal, the
+shapes an answer could take, and the way out.
+
+> I cannot invent a source for you. Where do these figures come from: a
+> comparison site, a barometer from a firm, rate cards you have seen, a
+> specific article? Give me the exact name and the year and I will put it in.
+> Otherwise I take the passage out.
+
 **Generated wording**, when the pack has no question for an intent:
 
 > Wording generated on the fly, not reviewed by a native speaker.
