@@ -105,6 +105,12 @@ SKILL_NAME = re.compile(r"\A[a-z0-9][a-z0-9-]{0,63}\Z")
 ID_STAMP = "%Y-%m-%d-%H%M"
 STAMP = "%Y-%m-%dT%H:%M:%S"
 
+#: How many unanswered revision requests a writing turn is handed at once.
+#: One is the normal case, two after a refusal. Past that, turns have been
+#: failing and the block would grow without bound inside a context window
+#: this project already has to watch.
+MOST_PENDING = 4
+
 
 class InterviewError(Exception):
     pass
@@ -666,15 +672,58 @@ def material(conversation: Conversation) -> str:
          "moment": sheet.moment, "conviction": sheet.conviction,
          "first_lines": list(sheet.first_lines), "state": sheet.state},
         ensure_ascii=False, indent=2))
-    if conversation.revisions:
-        # Last, and said twice on purpose. The sides above are the record and
-        # the anchoring source, where every request belongs in order; this one
-        # is the request being answered now, and a reader that had to work out
-        # which of five `Said` sections was the instruction would sometimes
-        # answer the wrong one.
-        parts.append("## Revision\n\n"
-                     + _not_a_heading(conversation.revisions[-1].text))
+    pending = _pending(conversation)
+    if pending:
+        # Said twice on purpose. The sides above are the record and the
+        # anchoring source, where every request belongs in order; this one is
+        # what is being answered now, and a reader that had to work out which
+        # of five `Said` sections was the instruction would sometimes answer
+        # the wrong one.
+        parts.append("## Revision\n\n" + "\n\n".join(
+            _not_a_heading(revision.text) for revision in pending))
     return "\n\n".join(parts)
+
+
+def _pending(conversation: Conversation) -> list:
+    """The requests this drafting turn still owes an answer to.
+
+    Every revision asked since the current draft was written, in order, and
+    usually that is one. It is more than one after a turn where the engine
+    produced nothing: a refusal, above all, which is a turn it is supposed to
+    have. Somebody who answers a refusal with `Malt barometer, 2025` is
+    naming a source, not asking for a shorter post, and a block carrying only
+    their last message would hand the writer the source as the instruction
+    and drop what was actually asked for.
+
+    Told from the two timestamps both objects already carry rather than from
+    a key saying so. A `conversation.json` written before this reads back
+    unchanged and `VERSION` does not move. When either timestamp is missing,
+    nothing can be said about what came after what, and the older rule
+    applies rather than a guess: the last request is the request. Same for
+    the hour a clock goes back: both stamps are local and naive, a genuinely
+    later request can carry the smaller one, and the fallback is the old
+    behaviour rather than a wrong order.
+
+    Equal stamps count as answered, which is why the comparison is strict.
+    The route asks for the revision before the drafting turn fires, so a
+    request answered inside the same second is a request this draft already
+    served.
+
+    Capped, because the signal cannot tell a refusal from a provider that
+    failed and a person who retyped. Two is the normal run: what was asked,
+    and what they came back with. A longer one means turns kept producing
+    nothing, and there the oldest wordings are the ones most likely to have
+    been superseded by the retype that follows them.
+    """
+    if not conversation.revisions:
+        return []
+    written = conversation.draft.written if conversation.draft else ""
+    if written:
+        pending = [revision for revision in conversation.revisions
+                   if revision.asked > written]
+        if pending:
+            return pending[-MOST_PENDING:]
+    return conversation.revisions[-1:]
 
 
 def sources(conversation: Conversation) -> dict:

@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -1532,6 +1533,97 @@ class TestARevisionIsSomethingSaid(InterviewCase):
         self.assertIn("Plus court.", tail)
         self.assertNotIn(REVISION, tail)
         self.assertIn(REVISION, head)
+
+
+AFTER = datetime(2026, 8, 28, 14, 52, 30)
+LATEST = datetime(2026, 8, 28, 15, 3, 47)
+
+
+class TestATurnThatProducedNothing(InterviewCase):
+    """A turn where the engine wrote no draft must not cost the person their
+    instruction.
+
+    This is the refusal turn: they ask for a source, the engine refuses
+    rather than inventing one and rewrites nothing. Their next message is a
+    source, not an instruction, and a block carrying only the last request
+    would hand the writer "Malt barometer, 2025" as the thing to do.
+
+    Told from the timestamps the two objects already carry, not from a new
+    key: a `conversation.json` written before this reads back the same way.
+    """
+
+    def drafted(self):
+        conversation = approved(self.root)
+        interview.write(conversation, offer(), now=LATER)
+        return conversation
+
+    def pending(self, conversation) -> str:
+        _, _, tail = interview.material(conversation).partition("## Revision")
+        return tail
+
+    def test_a_request_nothing_answered_stays_in_front(self):
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        interview.revise(conversation, "Baromètre Malt, 2025.", now=LATEST)
+        tail = self.pending(conversation)
+        self.assertIn(REVISION, tail)
+        self.assertIn("Baromètre Malt, 2025.", tail)
+        self.assertLess(tail.index(REVISION), tail.index("Baromètre Malt"))
+
+    def test_a_request_a_draft_answered_drops_out(self):
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        interview.write(conversation, offer(), now=LATEST)
+        interview.revise(conversation, "Plus court.", now=datetime(
+            2026, 8, 28, 15, 20, 0))
+        tail = self.pending(conversation)
+        self.assertIn("Plus court.", tail)
+        self.assertNotIn(REVISION, tail)
+
+    def test_the_block_still_names_one_when_everything_was_answered(self):
+        # Nothing is pending and a redraft is asked for anyway. The old rule
+        # applies rather than an empty block, which would be a writing turn
+        # with no instruction at all.
+        conversation = self.drafted()
+        interview.revise(conversation, REVISION, now=AFTER)
+        interview.write(conversation, offer(), now=LATEST)
+        self.assertIn(REVISION, self.pending(conversation))
+
+    def test_a_request_answered_in_the_same_second_is_answered(self):
+        # The route asks for the revision, then the turn writes the draft,
+        # and both can land inside one second. Equal stamps mean served:
+        # a boundary nothing else pins, and the difference between one
+        # instruction in front of the writer and two.
+        conversation = self.drafted()          # the draft is written at LATER
+        interview.revise(conversation, REVISION, now=LATER)
+        interview.revise(conversation, "Plus court.", now=AFTER)
+        tail = self.pending(conversation)
+        self.assertIn("Plus court.", tail)
+        self.assertNotIn(REVISION, tail)
+
+    def test_a_run_of_dead_turns_does_not_grow_without_bound(self):
+        # Ten turns that produced nothing is a provider failing, not ten
+        # instructions. The block is capped and keeps the most recent, which
+        # are the wordings the earlier ones were retyped into.
+        conversation = self.drafted()
+        for minute in range(10):
+            interview.revise(conversation, f"Demande {minute}.",
+                             now=datetime(2026, 8, 28, 15, minute, 0))
+        tail = self.pending(conversation)
+        self.assertEqual(tail.count("Demande "), interview.MOST_PENDING)
+        self.assertIn("Demande 9.", tail)
+        self.assertNotIn("Demande 0.", tail)
+
+    def test_a_draft_with_no_timestamp_keeps_the_old_rule(self):
+        # Written by a version that did not stamp its drafts. Nothing can be
+        # said about what came after what, so nothing new is claimed.
+        conversation = self.drafted()
+        conversation.draft = replace(conversation.draft, written="")
+        interview.revise(conversation, REVISION, now=AFTER)
+        interview.revise(conversation, "Plus court.", now=LATEST)
+        tail = self.pending(conversation)
+        self.assertIn("Plus court.", tail)
+        self.assertNotIn(REVISION, tail)
 
 
 PHOTOS = [{"kind": "portrait", "text": "Devant le tableau, marqueur en main."},
