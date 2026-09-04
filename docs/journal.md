@@ -1,5 +1,129 @@
 # Journal
 
+## 2026-09-04 (cinquième session). Le bruit entre la question et la réponse
+
+**Livré**, rien de committé : le trafic d'outils plié sur l'écran d'entretien,
+un onzième écran Réglages, et les deux axes de langue déménagés dessus.
+`check.sh` vert, **1203 tests app, 97 JS**.
+
+Demande d'Alexis, en trois morceaux : comment configurer une IA locale sur
+Ollama, trop de texte à l'écran quand un entretien démarre, et améliorer
+l'UX. Puis, en cours de route : plus de réglages, une meilleure interface
+pour la clé d'API, la licence et l'adresse où signaler un bug.
+
+**Le bruit, mesuré avant d'être traité.** Une instance d'exemple recopiée
+sous un scratchpad, un `conversation.json` fabriqué qui reproduit ce qu'Alexis
+avait collé : quatre lectures d'instance, deux refus hors contrat, une
+liste de posts. Entre la phrase de la personne et la question du moteur,
+quinze blocs, dont deux dépliés d'office parce qu'un outil avait refusé.
+
+**Décision : plier, jamais jeter.** Le brief de cet écran est que le moteur
+allant chercher des fichiers soit visible. Visible n'est pas imprimé ligne à
+ligne. `interview.runs` regroupe toute suite de moments `call` et `result` en
+un `Run`, une ligne dépliable qui contient tout ce qui y était. Quinze blocs
+deviennent « Ce que le moteur a fait de son côté, 7 étapes, 2 refusées ».
+Un refus est nommé sur la ligne et ne l'ouvre pas : le modèle a demandé
+quelque chose hors contrat et a continué, c'est à pouvoir consulter, pas à
+recevoir.
+
+**La frontière est écrite deux fois, et c'est assumé.** `runs()` pour le
+rejeu serveur, `tools()` dans `interview.js` pour le flux. Deux arrivées
+d'une même conversation qui casseraient à des endroits différents feraient
+un rechargement qui réécrit l'écran, donc un test le dit de chaque côté.
+Même raisonnement pour le compte : une étape est un appel et sa réponse,
+`max(appels, réponses)`, parce qu'un tour coupé entre les deux laisse un
+`Run` qui n'en porte qu'un, et zéro affiché au-dessus d'un bloc contredit
+ce bloc.
+
+**Un piège trouvé en écrivant le client** : `function run()` pour le pli
+écrasait le `run(text)` qui envoie le tour, déclaration hoistée, dernière
+gagnante. Les tests ont sorti « Cannot read properties of null (reading
+'ok') », c'est-à-dire `reply.ok` sur une réponse jamais partie. Renommé
+`tools()`. Le shim DOM n'a pas de `classList`, exprès : le fichier écrit
+`className` partout ailleurs, donc `className` ici aussi.
+
+**Réglages, onzième écran.** Trois choses y vivent parce qu'elles parlent de
+l'installation et pas de la personne : les deux axes de langue, le modèle qui
+répondrait, la licence et l'adresse où signaler un bug. Les langues sont
+devenues deux listes construites depuis `locales/`, plus un champ libre qui
+refusait après coup ; un code réglé sans pack installé reste proposé, sinon
+l'écran changerait un choix en se dessinant. Un seul écrivain,
+`/profile/status` ; Profil n'en montre plus que les faits et pointe ici.
+`back` est comparé à `pages.BACK`, jamais suivi, un chemin posté qu'on
+renvoie étant une redirection ouverte.
+
+**La clé n'a pas de champ, et ce n'est pas un oubli.** Une clé tapée dans une
+page est une clé dans un envoi de formulaire et dans l'historique d'un
+navigateur ; la frontière du projet est que le lanceur possède la machine et
+l'app possède l'instance. L'écran dit donc où elle va, dans les mots du
+lanceur qui a démarré l'app : le `start.sh` généré exporte maintenant
+`VERBATIM_LAUNCHER=macos`, et l'écran choisit entre « menu Verbatim, puis
+Settings » et « exportez-la dans le shell ». Un test refuse le champ.
+
+**Ollama a sa section, avec le piège dedans.** Fournisseur `openai`, endpoint
+`http://127.0.0.1:11434/v1`, aucune clé. Et la ligne qui manquait quelque
+part de visible : la fenêtre par défaut de 4096 est sous le bloc que cette
+app envoie, donc le skill arrive coupé et le modèle répond quand même. La
+commande est copiable à côté.
+
+**Une erreur d'unité rattrapée à la relecture** : la première version de la
+phrase disait « un bloc d'environ 32071 jetons ». `block_size` compte des
+signes, pas des jetons, et le panneau juste au-dessus le dit déjà. La phrase
+ne répète plus le chiffre, elle renvoie au bloc annoncé.
+
+**Trois rondes de revue avant le push, et elles ont payé les trois fois.**
+
+Ronde 1. Spec CONFIRMED, Standards cinq constats. Deux étaient la même règle
+du dépôt : ne jamais réécrire une réponse qui existe. `packs()` refaisait la
+marche de `locales/` que `tools.available_langs` faisait déjà, et le gabarit
+de Réglages épelait `anthropic` et `claude-opus-5`, deuxième orthographe d'un
+défaut qui vit dans `providers.py`. Le second est celui qui fait mal plus tard :
+c'est le seul bloc de l'écran qu'on dit à quelqu'un de copier, et le jour où
+`DEFAULT_MODEL` bouge il tend un modèle périmé. Plus `packs()` appelé deux fois
+par rendu, `counted(current)` qui masquait le `current` du module, et `var line`
+déclaré deux fois dans `handle()`.
+
+Spec a trouvé le défaut de fond : **le conseil `OLLAMA_CONTEXT_LENGTH`
+disparaissait sur le chemin de refus.** `engine_for` rend un `Engine(refusal=)`
+avant de mesurer le bloc, ma garde `{% if engine.block_size %}` tombait, et le
+refus le plus bruyant ici est `endpoint-untrusted`, c'est-à-dire quelqu'un qui
+pointe un Ollama qui n'est pas sur sa machine. Le lecteur qui en a le plus
+besoin était le seul à ne pas l'avoir.
+
+**Et une docstring qui nommait un test inexistant.** Je l'avais écrite en
+décrivant la garde que je voulais, pas celle que j'avais. Corrigée dans le bon
+sens : la frontière du pli est devenue une donnée des deux côtés,
+`interview.INSIDE_RUN` et `var INSIDE_RUN`, et `TestTheFoldIsOneRule` lit le
+script pour tenir les deux listes ensemble, même forme que la liste de
+fournisseurs du lanceur dans `check.sh`. Perturbé dans les trois sens avant de
+le garder : client qui oublie `tool_result`, serveur qui plie aussi sur
+`usage`, déclaration qui disparaît. Rouge à chaque fois. `usage` est
+l'asymétrie assumée : le navigateur en reçoit un en cours de tour, rien n'en
+écrit jamais dans une conversation, donc aucun moment de ce genre n'existe
+pour `runs`.
+
+Ronde 2. Les deux axes confirment les correctifs, Spec en perturbant lui-même
+le test de parité. Aucune violation de standard documenté. Trois jugements,
+dont un piquant : **j'avais réintroduit la double lecture deux lignes sous le
+commentaire qui la refusait.** `settings()` appelait `instance.status()` alors
+que `routes.context()` le fait pour chaque rendu, et `status()` ne mémoïse pas.
+Deux réponses à une question, et le fichier peut bouger entre les deux. La
+sentinelle `UNREAD` distingue « aucune route n'a passé de Status » de « une
+route en a lu un et n'a rien trouvé ».
+
+Ronde 3, ciblée sur cette vague seule, parce qu'une correction sur du code
+vert est là où un défaut passe sans témoin, et `context()` est traversé par
+tous les écrans. CONFIRMED, en sondant `context()` avec un compteur de lectures
+disque et en conduisant les sept écrans, dont Réglages sur une instance sans
+bloc Status. Un reste, exactement la classe que je venais de nettoyer : mon
+`var box` masquait le `box` du module, la zone de réponse. Renommé `row`.
+
+**1208 tests app, 97 JS, `check.sh` vert.**
+
+**Reste à faire** : la version du paquet est toujours 2.4.1 au moment d'écrire,
+donc le CSS servi porte `?v=2.4.1` et un navigateur qui a déjà vu cette version
+garde l'ancienne feuille jusqu'à un rechargement dur. Le bump 2.5.0 le règle.
+
 ## 2026-09-04 (quatrième session). Le DMG, et le mur qui n'était pas celui qu'on croyait
 
 **Livré** : `cd03010` l'app macOS distribuable, `a031e68` le correctif OpenAI,
