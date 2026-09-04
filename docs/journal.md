@@ -4,7 +4,10 @@
 
 Session longue, en anglais dans le dépôt et en français ici. Base `4499df2`,
 959 tests app. Fin de session : **1051 tests app, 64 JS**, `check.sh` vert,
-app **2.3.0**, `linkedin-post` 0.3.0. Six commits poussés plus C3.
+app **2.3.0**, `linkedin-post` 0.3.0. Huit commits poussés, `09ef3f4` la carte
+des rungs et `witnessed-instance`, `6d7317a` les captures, `9a280cf` le contrat
+de refus, `fbdd492` le tour qui ne coûte rien, `7c9a596` cmd+Entrée, `ce9ef65`
+la fiche du post, `6fef720` ses deux défauts, `cc55451` la révision par span.
 
 ### B1 et B2, l'échelle d'entretien
 
