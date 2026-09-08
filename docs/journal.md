@@ -1,5 +1,99 @@
 # Journal
 
+## 2026-09-08 (sixième session). Le pivot, et ce que le plancher décide
+
+**Livré**, rien de committé sous `app/` ni `skills/` : `CONTEXT.md`, deux ADR,
+le plan `plans/2026-09-08-pivot-skill-portable.md`. Session d'arbitrage, pas
+d'implémentation. Six rondes de grill, vingt-trois décisions.
+
+**La demande d'Alexis**, en deux morceaux : l'app est trop compliquée, brancher
+une clé d'API tue l'adoption alors que tout le monde a déjà un abonnement LLM ;
+donc maximiser le skill, et le mettre dans une interface type Artifact.
+
+**Le diagnostic tient, les chiffres le disent.** 22 343 lignes de Python et
+1 210 tests sous `app/`, contre 3 302 pour skill, références et packs réunis.
+87 % du code sert la partie que personne n'installera. Et dans le pack `fr`, le
+plus gros fichier n'est pas la matière d'écriture mais `app.yml`, 7 000 tokens
+d'étiquettes d'interface, contre 1 900 pour `interview.md`.
+
+**Le désaccord, et il a tenu.** « Interface type Artifact » recouvrait deux
+choses. Refaire l'entretien dans une page web est faisable, la capacité `sample`
+existe et le lecteur paie avec son abonnement, mais ce serait reconstruire
+l'app avec un moteur plus faible : un entretien est déjà une conversation.
+Ce qui reste à l'Artifact, ce sont les moments où on ne parle pas, et le README
+avait déjà écrit le critère, « screens for the parts that are decisions rather
+than conversation ».
+
+**Le plancher, décidé en Q1, et tout en descend.** Le moteur s'écrit contre une
+conversation qui reçoit une pièce jointe et rend du texte, qui n'écrit aucun
+fichier et n'exécute aucun code. L'ordre compte : concevoir pour le système de
+fichiers et dégrader donne un moteur qui marche à moitié partout ; concevoir
+pour le plancher et augmenter donne un moteur entier partout. `Floor` et `Tier`
+sont entrés dans `CONTEXT.md` pour que la règle ne vive pas que dans nos têtes.
+
+**Trois concepts au lieu d'un dossier.** `material` (la matière, un fichier,
+4 600 tokens mesurés sur l'instance réelle), `ledger` (une entrée par post),
+`corpus` (les textes publiés). Effet de bord non prévu : une fois le relevé
+sorti du fichier de post, **plus rien ne distingue `corpus/` de `posts/`**, le
+seul écart étant que `posts/` portait la mesure. Deux dossiers, un concept. Et
+`instance` perd son référent, donc son fichier de référence change de nom en
+même temps que de métier.
+
+**Le renversement du magasin, et pourquoi il a un ADR.** `measure.md` posait
+« One store, and it is the posts themselves », plus une décision explicitement
+laissée ouverte sur un index dérivé, « regenerated from the posts and never
+edited directly ». Le `ledger` n'est pas cet index, il l'inverse. Défendu avec
+les deux arguments de `measure.md` lui-même : la dérive plaide pour le ledger
+puisqu'au plancher deux magasins seraient tenus à la main ou pas du tout, et
+l'édition à J+7 reste un travail de trente secondes, meilleur même puisqu'on
+remplit plusieurs lignes d'un coup. Treize champs de frontmatter, **neuf lus par
+les boucles** et quatre lus par personne, qui restent en queue de ligne libre.
+`docs/adr/0001-the-ledger-is-the-store.md`.
+
+**La règle de plancher, la plus importante de la session.** Trois gardes
+tenaient la qualité par du code : la jauge comptant chiffres et instances
+nommées depuis `said()` seul, les ancres cherchant chaque citation dans la seule
+source nommée et refusant tout ce qui fait moins de dix caractères pliés, et
+`tool_choice` forçant la fiche à être une fiche contre le penchant documenté du
+modèle à poser une question de plus. Au plancher, les trois redeviennent des
+phrases que le moteur promet de suivre, et une consigne n'attrape pas un modèle
+qui triche puisque c'est le tricheur qui la relit. Donc : **une garde que le
+code ne peut plus vérifier se convertit en quelque chose que la personne voit,
+jamais en une consigne de plus.** La fiche imprime la citation à côté de chaque
+puce, la jauge liste les faits comptés au lieu d'annoncer un nombre, la règle
+des dix caractères s'écrit en toutes lettres.
+`docs/adr/0002-a-guard-becomes-visible-not-verbose.md`.
+
+**Le gain non prévu de cette règle**, et c'est ce qui sauve la maintenabilité :
+une garde rendue visible est une garde redevenue greppable de l'extérieur. Le
+gel fait passer de 1 210 tests à zéro sur le comportement du moteur, et
+`scripts/eval.py` récupère la vérification sur le transcript, sans rien savoir
+du modèle : la fiche est apparue, chaque puce porte une chaîne citée, deux
+angles et chacun cite.
+
+**Ce qui a été décidé sur le reste.** `linkedin-setup` produit un `material`
+dans la conversation au lieu d'un dossier, son étape 0 se réduisant à la langue
+et son étape 4 demandant de coller des posts plutôt que de lire un dossier ; son
+étape 7, « Do not end on a folder », ne bouge pas et devient plus vraie. Une
+session se termine toujours pareil, le moteur émet les lignes qui ont changé.
+Le générateur lit un **manifeste explicite par skill**, jamais une dépendance
+devinée dans la prose, le dépôt ayant déjà payé ça avec les quatre greps du
+parseur markdown. `instance.md` ne part pas dans les moteurs générés, ses
+5 300 tokens valant près de la moitié du budget. L'Artifact est émis à la fiche
+et jetable, et **ne porte jamais de `material`**. Cinq numéros de version se
+replient sur un seul, qui repart à 1.0.0 : reprendre 2.5.0 dirait que la
+nouvelle chose continue l'ancienne, alors qu'elle en est l'inverse.
+
+**Une action du backlog meurt.** Le certificat Developer ID et la notarisation
+servaient à rendre installable le DMG d'un logiciel désormais gelé. Sortie des
+prochaines actions.
+
+**Un poste passe en premier alors qu'il atterrit en dernier** : la relecture du
+pack `en`. C'est le seul travail dont la latence ne nous appartient pas, et il
+bloque l'annonce, l'anglais devenant l'expérience par défaut de la majorité dès
+lors qu'on vise un fichier collable dans n'importe quel LLM.
+
+
 ## 2026-09-04 (cinquième session). Le bruit entre la question et la réponse
 
 **Livré**, rien de committé : le trafic d'outils plié sur l'écran d'entretien,
