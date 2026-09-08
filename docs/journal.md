@@ -6,6 +6,19 @@
 le plan `plans/2026-09-08-pivot-skill-portable.md`. Session d'arbitrage, pas
 d'implémentation. Six rondes de grill, vingt-trois décisions.
 
+**Committé et poussé** en fin de session, `98c6f7a..68f276e` sur `main`.
+`b79e41b` porte `CONTEXT.md` et les deux ADR, `68f276e` cette entrée, séparés
+comme les entrées précédentes. `check.sh` vert avant le commit, y compris les
+gardes que les fichiers neufs traversent : `no em dash in shipped prose`,
+`no emoji`, `every engine file is actually tracked`. Cette exécution a encore
+payé la suite app deux fois plus le wheel et sa métadonnée, ce qui est
+exactement le poste que la phase 0 du plan supprime. `CLAUDE.md` et `plans/`
+restent hors de git.
+
+Ordre volontaire : le dépôt public porte le vocabulaire et les deux décisions
+avant la première ligne de code du pivot, pour qu'un contributeur lise pourquoi
+le ledger renverse `measure.md` avant d'en voir le renversement.
+
 **La demande d'Alexis**, en deux morceaux : l'app est trop compliquée, brancher
 une clé d'API tue l'adoption alors que tout le monde a déjà un abonnement LLM ;
 donc maximiser le skill, et le mettre dans une interface type Artifact.
