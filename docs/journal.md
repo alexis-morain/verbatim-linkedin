@@ -1,5 +1,58 @@
 # Journal
 
+## 2026-09-09 (septième session). La phase 0, moins la publication
+
+**Livré et poussé**, `ded9da5..90b22f8` sur `main`, deux commits séparés comme
+les entrées précédentes. `80607c4` porte le document de relecture du pack `en`,
+`90b22f8` le découpage de `check.sh`. Revue à contexte frais avant commit :
+CONFIRMED sur les six points, dont le déplacement octet pour octet.
+
+**Le poste 0.2, mesuré des deux côtés.** `check.sh` passe de **35,77 s à
+0,99 s**. Les dix étapes de l'app vivent dans `scripts/check-app.sh`, qui prend
+27 à 36 s selon la chaleur du cache `uv`. Le bloc a été déplacé tel quel, lignes
+24 à 353 de l'ancien fichier, même empreinte des deux côtés : c'est ce qui fait
+survivre le `$wheel` partagé entre l'étape du wheel et celle de la page PyPI,
+et les deux heredocs Python qui se seraient cassés à la réécriture.
+
+**La garde de l'ADR 0002, appliquée à la lettre.** `check.sh` ne se tait pas sur
+ce qu'il ne vérifie plus : il imprime qu'il n'a pas regardé `app/`, et il rougit
+franchement quand `app/` ou un `.swift` du lanceur a des changements non
+committés. Portée volontairement étroite, `app/` et `scripts/*.swift` seulement :
+l'élargir à tout `scripts/` ferait crier au loup sur `smoke.py`, et une garde qui
+crie au loup finit ignorée. Perturbée dans les cinq sens avant d'être crue. Le
+filtre sur `app/dist/` est parti, la revue ayant montré qu'il ne filtrait rien,
+`dist/` étant déjà ignoré. `release.yml` lance les deux scripts, sans quoi le
+DMG serait fabriqué sans validation.
+
+**Le poste 0.3, et une trouvaille dedans.** Le plan et le `CLAUDE.md` disaient
+cinq catégories, la taxonomie en compte **dix** et le `_template` qui fait
+contrat aussi : corrigé aux deux endroits. Le document sort les dix catégories,
+chaque regex rendue en ce qu'elle attrape et ce qu'elle rate, plus les quatre
+mécaniques dont dépend le jugement du relecteur, l'appariement au mot entier en
+premier. Il est aussi publié en page, pour qu'Alexis n'ait qu'un lien à envoyer.
+
+En l'écrivant, un trou trouvé et vérifié contre le code qui tourne :
+**`negative-parallelism`, la catégorie de poids 5 que la taxonomie désigne comme
+le tell anglais dominant, attrape `it's not just X, it's Y` et rate la même
+phrase sans contraction.** Le document ne le corrige pas, il le pose : savoir si
+la forme non contractée se rencontre sur LinkedIn est une question d'anglais, et
+c'est exactement ce qu'on demande au relecteur.
+
+**Le poste 0.1 est bloqué côté machine, pas côté travail.** Aucun jeton de
+publication nulle part : pas de `.env` dans le projet, pas de `~/.pypirc`, aucune
+variable d'environnement, pas de keyring, et le coffre Bitwarden est verrouillé.
+L'index public ne porte que 2.4.0 et 2.4.1. Le wheel 2.5.0 est prêt et sa
+métadonnée passe la garde de la page PyPI. Il ne manque que le jeton, et le
+créer demande les identifiants d'Alexis. Même blocage pour le fil `anthropic` de
+`scripts/smoke.py`, sans clé, et pour les posts, sans Postiz.
+
+**Au passage**, le worktree détaché `fervent-wing-7fda3c` retiré, 25 Mo, son
+commit déjà dans `main` et rien de non committé dedans.
+
+**Prochaines étapes.** Publier 2.5.0 puis tagger, dans cet ordre, dès qu'un jeton
+limité au projet existe. Envoyer le document au relecteur. Puis la phase 1, qui
+commence par la liste des champs du `material`, à écrire avant toute migration.
+
 ## 2026-09-08 (sixième session). Le pivot, et ce que le plancher décide
 
 **Livré**, rien de committé sous `app/` ni `skills/` : `CONTEXT.md`, deux ADR,
