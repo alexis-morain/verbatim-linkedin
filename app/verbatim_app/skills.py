@@ -41,8 +41,13 @@ CITED = re.compile(
 
 PLACEHOLDER = re.compile(r"<[a-z_]+>")
 
-#: The one placeholder whose axis is unambiguous: the interview side.
-INTERFACE = "<interface_language>"
+#: The placeholders whose axis is unambiguous: the interview side. Two names
+#: for one axis. The engine renamed the field to `interview_language`, because
+#: the old name said interface while meaning interview, and this app is frozen
+#: on the old format. Both are accepted so a frozen consumer keeps resolving
+#: skills written after it stopped moving. Neither is dropped: a skill still
+#: citing the old spelling has to keep working.
+INTERFACE = ("<interface_language>", "<interview_language>")
 
 
 class SkillError(Exception):
@@ -106,7 +111,7 @@ def citations(bundle_root, text: str, lang: str,
     for cited in CITED.findall(text):
         if PLACEHOLDER.search(cited) is None:
             targets = [cited]
-        elif INTERFACE in cited:
+        elif any(name in cited for name in INTERFACE):
             targets = [_fill(cited, lang)]
         else:
             targets = [_fill(cited, code) for code in both]

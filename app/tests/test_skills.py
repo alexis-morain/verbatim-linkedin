@@ -206,6 +206,20 @@ class TestTwoLanguageAxes(BundleCase):
         self.assertEqual([c.resolved for c in interface],
                          ["locales/fr/inter.md"])
 
+    def test_the_new_spelling_stays_on_the_interview_side_too(self):
+        # The engine renamed this field to interview_language: the old name
+        # said interface while meaning interview. This app is frozen on the
+        # old format and still has to resolve skills written after it stopped
+        # moving, so both spellings pin to the interview language. Without
+        # this, a renamed placeholder falls through to the ambiguous branch
+        # and quietly resolves to both packs.
+        body = "Wording: `locales/<interview_language>/inter.md`.\n"
+        found = citations(self.bundle, body, "fr", "en")
+        renamed = [c for c in found
+                   if c.cited == "locales/<interview_language>/inter.md"]
+        self.assertEqual([c.resolved for c in renamed],
+                         ["locales/fr/inter.md"])
+
     def test_ambiguous_placeholders_resolve_to_both_languages(self):
         found = citations(self.bundle, BODY, "fr", "en")
         lang_cited = [c.resolved for c in found
