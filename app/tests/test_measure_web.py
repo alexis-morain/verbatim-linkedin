@@ -4,7 +4,7 @@ Needs fastapi and httpx, so run through the project environment:
     cd app && uv run --extra test python -m unittest discover -s tests
 
 Everything on that screen is recomputed at read time, so what is asserted
-here is the fixture posts of examples/ read through the routes. The numbers
+here is the fixture posts of tests/fixtures/instance/ read through the routes. The numbers
 themselves are pinned in test_instance.py.
 """
 

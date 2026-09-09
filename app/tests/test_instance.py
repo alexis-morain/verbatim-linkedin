@@ -32,8 +32,8 @@ class InstanceCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-test-")
         self.root = Path(self.tmp) / "instance"
         shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
-        # examples/ is a real instance and people point the app at it, which
-        # leaves an interviews/ directory behind. It is gitignored, so it is
+        # The fixture is a real instance and somebody running the app against
+        # it leaves an interviews/ directory behind. It is gitignored, so it is
         # invisible in a diff and permanent on that machine: without this the
         # fixture inherits somebody's conversation and three tests go red with
         # nothing in the failure naming the cause. Found by a reviewer whose
