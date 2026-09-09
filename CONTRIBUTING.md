@@ -59,7 +59,21 @@ behaviour arrives with a test that failed before it.
 
 It runs the tests, self tests every language pack, and refuses a tree where
 somebody's profile, a `.env`, an em dash or an emoji made it into the shipped
-files. All of those have happened to somebody.
+files. All of those have happened to somebody. It takes about a second.
+
+**If you touched `app/` or a Swift file under `scripts/`, run this one too:**
+
+```bash
+./scripts/check-app.sh
+```
+
+`app/` is frozen at 2.5.0, and its steps live there rather than in `check.sh`:
+the app suite with its dependencies, the wheel and what it carries, the PyPI
+page, the model instruction and markdown parser guards, the screen scripts and
+the launcher. They take about thirty six seconds, which a commit on a skill
+should not have to pay. `check.sh` prints a line saying it did not check `app/`,
+and fails outright when `app/` has uncommitted changes, so the split cannot go
+unnoticed. `release.yml` runs both, because the DMG is built out of `app/`.
 
 **Green is not evidence that any endpoint answers this engine.** The app's
 tests replay recorded streams, written from the published formats, so they
@@ -97,7 +111,8 @@ distribution of this project is the git repository.
 installation has no checkout to fall back on, so a new directory read in
 development and missing from the wheel is a hole nobody sees until somebody
 who is not the maintainer runs it. `app/tests/test_bundle.py` holds the
-manifest to the list, and `check.sh` builds the wheel and looks inside it.
+manifest to the list, and `scripts/check-app.sh` builds the wheel and looks
+inside it.
 
 ## Adding a language pack, in short
 

@@ -40,9 +40,15 @@ jobs:
           node-version: "22"
 
       # A repository that demands the validation block before every commit
-      # does not publish a binary that has not passed it.
+      # does not publish a binary that has not passed it. Two scripts since
+      # app/ was frozen: check.sh is the fast one every commit runs, and
+      # check-app.sh holds the steps that read app/ and the Swift launcher.
+      # This job builds a DMG out of both, so it runs both.
       - name: check.sh
         run: ./check.sh
+
+      - name: check-app.sh
+        run: ./scripts/check-app.sh
 
       - name: Build the DMG
         env:
