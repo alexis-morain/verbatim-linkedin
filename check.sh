@@ -37,7 +37,7 @@ if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "th
 
 step "every engine file is actually tracked"
 missing=""
-for f in $(find references skills locales lib app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
+for f in $(find references skills locales lib engines app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
   git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
 done
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi
@@ -125,6 +125,19 @@ case "$?" in
   0) ok "9 columns, 4 in the tail, 13 fields" ;;
   1) bad "the material format lost something:"; echo "$out" | sed 's/^/     /' ;;
   *) bad "the material check could not run:"; echo "$out" | sed 's/^/     /' ;;
+esac
+
+step "the generated engines are up to date"
+# The engines are what a person actually attaches, so a stale one ships an
+# old skill to somebody who has no way to know. Held by script rather than by
+# remembering to regenerate, like everything else here. Exit 2 is a manifest
+# that does not carry a citation, which is a different repair from a stale
+# file and says so.
+out="$(python3 scripts/build-engines.py --check 2>&1)"
+case "$?" in
+  0) ok "6 engines, fresh" ;;
+  1) bad "an engine is stale:"; echo "$out" | sed 's/^/     /' ;;
+  *) bad "an engine could not be built:"; echo "$out" | sed 's/^/     /' ;;
 esac
 
 step "app/, which this block no longer checks"

@@ -1,0 +1,7 @@
+# What the generated engine carries, one path per line. See the note in
+# skills/linkedin-post/engine.manifest: this list is written, never inferred.
+
+references/interview-intents.md
+references/platform.md
+locales/<lang>/interview.md
+locales/<lang>/style.md

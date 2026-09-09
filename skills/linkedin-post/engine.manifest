@@ -1,0 +1,18 @@
+# What the generated engine carries, one path per line.
+#
+# Explicit on purpose. Guessing a dependency by reading prose is what broke
+# four times on the markdown parser check, and a generator that reads the
+# skill's own sentences would inherit that failure. If a skill starts citing
+# a file, this list is where it gets added; scripts/build-engines.py refuses
+# a citation that is not here.
+#
+# <lang> is filled with the language the engine is built for.
+
+references/interview-intents.md
+references/formats.md
+references/anchoring.md
+references/platform.md
+references/measure.md
+locales/<lang>/interview.md
+locales/<lang>/style.md
+locales/<lang>/market.md
