@@ -1,136 +1,61 @@
-# The instance contract
+# What a consumer can rely on
 
-An instance is one directory, one person. Everything the engine knows about
-somebody lives there, in plain markdown, on their machine. This file is the
-contract: every file an instance holds, its format, and the rules a consumer
-can rely on.
+A maintainer document, not a shipped one. The format of the material is
+[`references/material.md`](../references/material.md), which the engine is
+generated from; this file holds what is left once the format moved out: the
+rules a tool reading or writing somebody's material has to respect, and the
+machinery the frozen app grew around it.
 
-Today the consumers are the skills in this bundle. The contract exists so that
-the next consumer, a script, a dashboard, a local UI, can read and write the
-same files instead of growing its own database. **If a tool needs state this
-contract does not carry, the contract is extended here first.** A side store is
-how two versions of the truth start.
+**The word `instance` is gone.** It named a directory, and the engine no longer
+has one: the floor is a conversation that receives one attached file and
+returns text. What used to be an instance is a `material` file plus a corpus
+the person pastes. A tier may still keep those in a directory, and the frozen
+app does, but that is a tier's business and not a promise the engine makes.
 
-It is also what a migration is checked against. This project has already lived
-the failure: an instance migrated by hand lost its signature block, silently,
-because there was no list to diff against. This is the list.
+**If a tool needs state this contract does not carry, the contract is extended
+here first.** A side store is how two versions of the truth start.
 
-## The directory
+The word survives below, in the sections describing the frozen app, because
+that app still ships a module called `instance.py` and calling it something
+else here would misdescribe running code. Everywhere the engine speaks, the
+word is `material`.
 
-```
-<chosen-path>/            wherever the person pointed linkedin-setup
-  profile.md              who they are, what they can prove, what they never say
-  voice.md                style traits, each one backed by a quote
-  pillars.md              three pillars and their ratio
-  ideas.md                the angle bank
-  corpus/                 published posts, as reference material
-  posts/                  one file per post produced here, with its measurement
-  interviews/             conversations in progress, one directory each, optional
-  linkedin-page.md        the public LinkedIn page as applied, optional
-  .env                    engine configuration for this instance, optional
-```
+For the same reason, roughly twenty files under `app/` cite this document at
+its old path, `references/instance.md`. They are frozen and were left alone:
+editing them to fix a link would change an application nobody is developing,
+and the clauses they cite are the ones kept below. This paragraph is the
+forwarding address.
 
-File names are fixed and English: they are the machine seam, and the engine
-finds its way by them. The prose inside is in whatever language the person is
-interviewed in. Front matter keys and section headings stay English for the
-same reason the file names do.
+## What moved
 
-None of this is ever committed to the engine repository. `.gitignore` enforces
-the names above, and `check.sh` refuses a tree where one slipped through.
-
-## profile.md
-
-Template: `references/profile.template.md`, which documents every section. The
-parts a consumer relies on:
-
-- **The `## Status` block, at the top of the file.** Five keys: `filled`,
-  `source`, `updated`, `interface_language`, `output_language_default`. While
-  `filled: no`, no consumer pretends to know the person. This block is the
-  whole seam between engine and profile.
-- **The `## Signature block` section.** Appended verbatim to every post, after
-  a blank line, never shown to a model. An empty section means no signature.
-  Its absence means the migration was incomplete, not that there is none.
-- **The guardrail sections are load bearing**: out of scope segments, names
-  never to cite, the "what I never say" list. Skills refuse material on their
-  authority, so an instance without them is not conservative, it is unguarded.
-
-## voice.md
-
-Style traits observed in the person's own published posts, each trait followed
-by the quote it was read from. A trait without a quote is a guess and does not
-belong in the file.
-
-Built on fewer than five posts, the file opens with a provisional banner and
-every consumer defers to the hard rules in `locales/<lang>/style.md` when the
-two disagree. The banner comes off after a rewrite on a real corpus, five to
-ten posts, not before.
-
-## pillars.md
-
-Three pillars, written as postures. Each carries a definition, an effect label
-(authority, trust, or connection), and optionally a verifiability requirement.
-The ratio is stated against the monthly cadence and derived from the business
-objective, out loud, so it can be argued with.
-
-The pillar counter is not stored here. It is computed from `posts/` front
-matter at read time, over `state: published` only.
-
-## ideas.md
-
-The angle bank. The contract points:
-
-- **The first line under the title names the next session**: a date and an
-  already-chosen idea. This is the line that decides whether there is a next
-  post, and consumers surface it.
-- One line per angle: pillar tag, funnel label (`VISIBILITY`, `TRUST`,
-  `ACTION`), the angle stated as a position, and the material that already
-  exists for it, named.
-- A `## Used` section, append only: date, pillar, angle, file. An idea that
-  became a post moves here instead of being deleted.
-
-A session never closes leaving the bank poorer than it found it.
-
-A consumer may add, edit and remove angles. **An angle is addressed by its
-text**, never by its position: the screen offering the edit was drawn before
-the click, and a line number would move an angle nobody looked at. The used
-side stays append only, and nothing but archiving writes there.
-
-## corpus/
-
-The posts the person had published before this engine existed, one file each,
-raw text. Read as reference material for `voice.md` and as a source of
-provable facts. Nothing here is generated and nothing here is rewritten.
+| Was a section here | Is now |
+|---|---|
+| `profile.md`, `voice.md`, `pillars.md`, `ideas.md` | Four sections of the material, in `references/material.md` |
+| `posts/` front matter | The ledger, one table in the material, per ADR 0001 |
+| `corpus/` | Pasted into the conversation at setup, out of the material |
+| The directory listing | Nothing. There is no directory at the floor. |
 
 ## posts/
-
-One file per post produced by the engine, named `YYYY-MM-DD-slug.md`. The
-front matter block is specified in `references/measure.md` and is the
-measurement store: `state` says whether the post is a draft, scheduled or
-published, and every count anywhere in the system runs over `state: published`
-only. The body is the post exactly as published, followed by session notes
-that are not part of the post.
+The post body and the session notes below it, which the frozen app writes as
+one file each and a tier may write any way it likes.
 
 **The seam between the two is the line `Session notes, not published:`**, and
 it is machine readable on purpose. What a consumer hands to a publishing tier
 is the body cut at that marker, never the body whole: below it sit the
-validation sheet, every anchor the engine claimed and the line behind each
-one, said or approved, which is the rawest material an instance holds. A post is
-allowed to contain a line of dashes, so the marker is the seam and the
-horizontal rule above it is decoration.
+validation sheet, every anchor the engine claimed and the line behind each one,
+said or approved, which is the rawest material there is. A post is allowed to
+contain a line of dashes, so the marker is the seam and the horizontal rule
+above it is decoration.
 
-**`state` and `published_ref` are moved by the publishing step, and only ever
-on a person's statement.** A tier accepting a post is not the same fact as a
-post being live: the copy tier prints something nobody has pasted yet, and a
-scheduling payload still has to be sent by whatever holds the account. So no
-consumer writes `published` because a send returned zero. It writes what the
-person said happened, exactly as it writes the pillar and the format they
-chose rather than ones it inferred.
-
-Aggregates, trends and counters are recomputed from these files at read time,
-never written back. If a cache ever exists it is regenerated, and when it
-disagrees with `posts/`, `posts/` is right.
+The measurement fields that used to live in this file's front matter are the
+ledger now, specified in `references/material.md`, including the rule that
+`state` and `published_ref` move on a person's statement and never on a return
+code.
 
 ## interviews/
+
+Machinery of the frozen app, kept here so freezing it did not delete its specification. The floor has no interview state: the conversation is the transcript.
+
 
 One directory per interview in progress, named `YYYY-MM-DD-HHMM`, suffixed
 `-2`, `-3` when two start in the same minute. This is the one piece of
@@ -345,6 +270,7 @@ out of one is how a discard leaves the instance.
 
 ## linkedin-page.md
 
+
 Written by `linkedin-profile` and only by it: the person's public LinkedIn
 page as actually applied, one heading per section, with an `updated` date in
 front matter. Optional; an instance that has never run `linkedin-profile`
@@ -352,6 +278,7 @@ does not have it. It exists so the next run can diff against what is really
 on the page instead of asking the person to paste everything again.
 
 ## Configuration
+
 
 Two kinds, and the line between them is what a secret is.
 
@@ -398,12 +325,17 @@ it gains it here first.
 
 ## Conformance
 
-What a consumer checks before trusting an instance, in order:
+What a consumer checks before trusting a material file, in order:
 
-1. `profile.md` exists and its `## Status` block parses.
-2. `filled: yes`, otherwise stop and offer `linkedin-setup`.
-3. The signature block section exists, even if empty.
-4. `voice.md`, `pillars.md`, `ideas.md` exist. A missing one is a migration
+1. The `## Status` block exists and parses.
+2. `filled: yes`, otherwise stop and offer setup.
+3. The signature block section exists, even if empty. Its absence means the
+   migration was incomplete, not that there is no signature.
+4. The Voice, Pillars and Ideas sections exist. A missing one is a migration
    gap to report, not to silently tolerate.
-5. Front matter in `posts/` carries the keys `measure.md` specifies. Files
-   that predate a key get it added empty, never guessed.
+5. Ledger entries carry the nine parsed columns. An entry that predates a
+   column gets it empty, never guessed.
+
+`check.sh` counts the fields of the format itself, which is a different
+question from whether one person's file is well formed.
+

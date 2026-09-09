@@ -18,7 +18,7 @@ carry the same argument as the posts, under the same constraint: **it cannot
 claim anything the person cannot prove.**
 
 Two different things share the word "profile" and this skill touches only one
-of them. The editorial profile, `profile.md`, is the instance file that feeds
+of them. The editorial profile is the Profile section of the material, which feeds
 every skill; `linkedin-setup` owns it. The **public page** is what LinkedIn
 shows the world; this skill owns that.
 
@@ -33,7 +33,7 @@ shows the world; this skill owns that.
 4. Ask the person to paste their current page, section by section, or export
    it (LinkedIn offers a PDF of the full profile). **The engine never scrapes
    and never touches the platform.** The person pastes, the person applies.
-5. If the instance has a `linkedin-page.md` from a previous run, read it and
+5. If a page from a previous run was kept, read it and
    diff: what was adopted, what drifted since.
 
 ## The audit
@@ -104,10 +104,10 @@ stay out.
 
 ## Archive
 
-Write the adopted result to `linkedin-page.md` at the instance root: a front
-matter block with `updated: YYYY-MM-DD`, then one heading per section holding
-the text as applied. The instance contract in `references/instance.md`
-documents the file. Next run starts by diffing against it.
+Emit the adopted result for the person to keep: an `updated: YYYY-MM-DD` line,
+then one heading per section holding the text as applied. Nothing is written
+here; a tier that holds files may store it, and the next run starts by diffing
+against whatever the person brings back.
 
 The person applies the changes on LinkedIn by hand. When they say it is done,
 update `updated`. If they adopted a variant of a proposal, archive what they

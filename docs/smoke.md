@@ -44,7 +44,7 @@ the exact failure this file exists against.
   answers 400 to the whole request. This engine cannot drive it, since both
   the validation sheet and the draft happen through tools.
 - It is ignored and the model answers in prose: `DEGRADED`. That is the path
-  `references/instance.md` documents, where the engine reads the `ANCHORS`
+  `consumer-contract.md` documents, where the engine reads the `ANCHORS`
   block out of the answer instead.
 
 **And `DEGRADED` is not a stable property of an endpoint.** Measured on Ollama

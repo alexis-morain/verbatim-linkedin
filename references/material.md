@@ -8,6 +8,14 @@ files and two directories an earlier version spread across a folder.
 corpus the person pasted, or in the transcript of the interview happening right
 now, it does not exist and it is not invented.
 
+**Section headings and field names are English, the prose is not.** The
+headings are the machine seam and the engine finds its way by them; what the
+person writes underneath is in whatever language they are interviewed in.
+
+**It is never committed to the engine repository.** `.gitignore` holds the
+names and `check.sh` refuses a tree where one slipped through. This file is
+the rawest thing a person hands the engine.
+
 ## Read this before migrating anything
 
 This document is a checklist before it is a format. The list below exists so a
@@ -117,7 +125,13 @@ Three pillars, each with the same shape, plus two blocks around them.
 |---|---|---|---|
 | Next session | no | The angle already chosen for next time. | A session opens on a blank page. |
 | Angles, by pillar | yes | `[pillar] LABEL angle, and the material that already exists`. **An angle contains a position; a subject does not.** | The bank fills with topics, and a topic cannot be written from. |
-| Used | yes | date, pillar, angle, where the post went. | The same angle gets written twice. |
+| Used | yes | date, pillar, angle, where the post went. Append only. | The same angle gets written twice. |
+
+**An angle is addressed by its text, never by its position.** A screen offering
+an edit was drawn before the click, so a line number moves an angle nobody
+looked at. Only archiving writes to Used.
+
+**A session never closes leaving the bank poorer than it found it.**
 
 ## 6. Ledger
 
@@ -145,6 +159,14 @@ descriptive and go in a free text tail nothing parses.**
 None of the three numbers is a like. Impressions, likes and comments are never
 the decision variable, and a post can do all three of these on two hundred
 impressions and none of them on twenty thousand.
+
+**`state` and `published_ref` move on a person's statement, never on a return
+code.** A tier accepting a post is not the same fact as a post being live: the
+copy tier prints something nobody has pasted yet, and a scheduling payload
+still has to be sent by whatever holds the account. So nothing writes
+`published` because a send returned zero. It writes what the person said
+happened, exactly as it writes the pillar and the format they chose rather than
+ones it inferred.
 
 ### The four in the free text tail
 

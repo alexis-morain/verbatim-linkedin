@@ -118,7 +118,7 @@ sentence, which would be a lie that reads well.
 |---|---|---|---|
 | **Transcript** | `said()`, every word the person typed, revision requests included | yes | `SAID:` |
 | **Sheet** | `conversation.sheet`, once approved, its five fields whole | yes | `SHEET:` |
-| **Profile** | the instance on disk | no | none, and never |
+| **Profile** | the material the person attached | no | none, and never |
 | **Engine speech** | `engine_turns()`, tool results | no | none, and never |
 
 The last two rows are the load bearing ones.

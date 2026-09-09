@@ -22,7 +22,7 @@ service in the middle.
 *Every claim of a draft against what backs it, and where that backing lives:
 a sentence you said, or a line of the sheet you approved. Highlighted means no
 quote backs it, which is honest and is yours to check; red means the engine
-named a source that does not hold the quote. The example instance in
+named a source that does not hold the quote. The example material in
 [`examples/`](examples/) is a fictional persona; nothing here is anybody's real
 material.*
 

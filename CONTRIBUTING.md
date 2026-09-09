@@ -75,6 +75,14 @@ should not have to pay. `check.sh` prints a line saying it did not check `app/`,
 and fails outright when `app/` has uncommitted changes, so the split cannot go
 unnoticed. `release.yml` runs both, because the DMG is built out of `app/`.
 
+It fails the same way when a file the wheel bundles has been **renamed or
+deleted**, which is the other way to break the frozen app without touching it:
+the wheel carries `SKILL.md`, `lib/`, `locales/`, `references/` and `skills/`,
+so a path that stops resolving leaves the bundle short. Plain edits are not
+flagged, since an edit cannot make a path disappear. Both failures clear once
+the change is committed, which is the point: run `check-app.sh` first, then
+commit.
+
 **Green is not evidence that any endpoint answers this engine.** The app's
 tests replay recorded streams, written from the published formats, so they
 prove the parser and stop there. Touching `app/verbatim_app/providers.py` or

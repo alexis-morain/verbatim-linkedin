@@ -140,12 +140,26 @@ step "app/, which this block no longer checks"
 # No filter on app/dist/: it is gitignored, so the built wheels never reach
 # this list in the first place.
 touched="$(git status --porcelain -- app/ 'scripts/*.swift' 2>/dev/null || true)"
-if [ -z "$touched" ]; then
-  printf '   note app/ was not checked. ./scripts/check-app.sh does that.\n'
-else
+
+# The other way to break the frozen app without touching app/: the wheel
+# carries SKILL.md, lib/, locales/, references/ and skills/, so a file
+# deleted or renamed in one of those leaves the bundle short. Only deletions
+# and renames, never plain edits: an edit cannot make a path stop resolving,
+# and flagging every edit would put this guard back on the commit path it
+# was just taken off.
+moved="$(git status --porcelain -- SKILL.md lib locales references skills 2>/dev/null \
+         | grep -E '^(R|.?D)' || true)"
+
+if [ -n "$touched" ]; then
   bad "app/ or a launcher Swift file changed, and this block did not check it."
   echo "$touched" | sed 's/^/     /'
   printf '     run ./scripts/check-app.sh\n'
+elif [ -n "$moved" ]; then
+  bad "a file the wheel bundles was renamed or deleted, and the wheel was not rebuilt."
+  echo "$moved" | sed 's/^/     /'
+  printf '     run ./scripts/check-app.sh\n'
+else
+  printf '   note app/ was not checked. ./scripts/check-app.sh does that.\n'
 fi
 
 printf '\n'
