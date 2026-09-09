@@ -1,5 +1,31 @@
 # Journal
 
+## 2026-09-09 (huitième session, coda). Le trou fermé, et ce qu'il a attrapé
+
+**`negative-parallelism` lit maintenant `it's` et `it is` comme une seule
+forme**, aux deux extrémités des deux motifs. Mesuré au lieu d'être supposé :
+**quatre des huit façons d'écrire cette forme passaient à travers**, toutes
+celles contenant `it is`, sur la catégorie de poids 5 que la taxonomie désigne
+comme le tell anglais dominant.
+
+Ce n'était pas seulement un trou, c'était une **asymétrie** : la même phrase
+était jugée différemment selon son orthographe, ce qui est pire que n'importe
+laquelle des deux réponses appliquée uniformément.
+
+**Test écrit d'abord**, rouge sur exactement ces quatre formes. L'autre moitié
+du test est ce que l'élargissement ne doit pas faire : quatre phrases ordinaires
+qui portent `is not` et `it is` sans être une parallélisme restent propres, la
+virgule ou le point avant la seconde proposition étant ce qui fait la forme
+plutôt que la coïncidence.
+
+**Le correctif a attrapé la prose de ce dépôt en premier.** Une ligne de
+`skills/linkedin-post/SKILL.md` disait « A bullet with no quote under it is not
+an incomplete bullet, it is an invented one » : le tell dominant, écrit dans le
+fichier qui apprend à l'éviter, par la passe même qui rendait les gardes
+visibles. Réécrite. Tout le reste de la prose anglaise livrée est propre sur
+cette catégorie ; les seuls fichiers qui la déclenchent encore sont les quatre
+qui citent la forme pour l'enseigner.
+
 ## 2026-09-09 (huitième session, fin). Le pack anglais signé
 
 **Alexis a relu le pack `en` lui-même et l'a signé.** Le document de relecture
