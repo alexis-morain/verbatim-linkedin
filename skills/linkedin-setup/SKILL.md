@@ -1,7 +1,7 @@
 ---
 name: linkedin-setup
 description: "Onboards a person: builds their editorial profile, their pillars and their idea bank from a short interview, then hands over to the first post. Triggers: set up my LinkedIn profile, define my pillars, I want to start posting. Not for writing a post (use linkedin-post)."
-version: 0.1.2
+version: 1.0.0
 ---
 
 # Setup

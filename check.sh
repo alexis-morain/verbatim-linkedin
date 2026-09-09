@@ -53,6 +53,18 @@ secrets="$(git ls-files | grep -E '(^|/)\.env($|\.)|\.pem$|_rsa$' | grep -v '\.e
 if [ -z "$secrets" ]; then ok "clean"; else bad "$secrets"; fi
 
 step "skill front matter"
+# One version across the bundle, not one per skill. Per skill numbers said
+# three things moved independently, and nothing did: they ship together, they
+# are generated into one engine each, and a reader comparing 0.4.1 against
+# 0.1.1 learned nothing true. The key stays because the frozen app requires
+# it and reads it.
+versions="$(grep -h '^version:' SKILL.md skills/*/SKILL.md | sort -u | wc -l | tr -d ' ')"
+if [ "$versions" = "1" ]; then
+  ok "one version: $(grep -h '^version:' SKILL.md | head -1 | cut -d' ' -f2)"
+else
+  bad "the bundle carries $versions different versions:"
+  grep -H '^version:' SKILL.md skills/*/SKILL.md | sed 's/^/     /'
+fi
 for f in SKILL.md skills/*/SKILL.md; do
   miss=""
   for key in name description version; do

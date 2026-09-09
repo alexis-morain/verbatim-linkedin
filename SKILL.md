@@ -1,7 +1,7 @@
 ---
 name: verbatim
 description: "Router for Verbatim, the LinkedIn post bundle. Interviews a person to extract real material, then writes, checks and publishes a post in their own voice. Triggers: write a LinkedIn post, I have an idea for a post, set up my LinkedIn profile, rework my LinkedIn page. Not for advertising campaigns (use an ads skill), not for outbound messaging (use an outreach tool)."
-version: 0.2.0
+version: 1.0.0
 ---
 
 # Verbatim

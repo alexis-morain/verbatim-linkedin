@@ -19,7 +19,7 @@ file, and the style rules that apply are the ones written here.
 ---
 name: verbatim
 description: "Router for Verbatim, the LinkedIn post bundle. Interviews a person to extract real material, then writes, checks and publishes a post in their own voice. Triggers: write a LinkedIn post, I have an idea for a post, set up my LinkedIn profile, rework my LinkedIn page. Not for advertising campaigns (use an ads skill), not for outbound messaging (use an outreach tool)."
-version: 0.2.0
+version: 1.0.0
 ---
 
 # Verbatim
@@ -133,7 +133,7 @@ examples/                   a fictional persona, to read before running this
 ---
 name: linkedin-profile
 description: "Audits and rewrites the nine sections of a person's public LinkedIn page from material they can prove, headline and About first. Triggers: optimize my LinkedIn profile page, rewrite my headline, my About section reads flat. Not for building the editorial profile file (use linkedin-setup), not for writing a post (use linkedin-post)."
-version: 0.1.1
+version: 1.0.0
 ---
 
 # The public page

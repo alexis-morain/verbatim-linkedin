@@ -1,7 +1,7 @@
 ---
 name: linkedin-profile
 description: "Audits and rewrites the nine sections of a person's public LinkedIn page from material they can prove, headline and About first. Triggers: optimize my LinkedIn profile page, rewrite my headline, my About section reads flat. Not for building the editorial profile file (use linkedin-setup), not for writing a post (use linkedin-post)."
-version: 0.1.1
+version: 1.0.0
 ---
 
 # The public page

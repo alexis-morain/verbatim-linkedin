@@ -1,7 +1,7 @@
 ---
 name: linkedin-post
 description: "Interviews a person to extract one idea, then writes a LinkedIn post in their voice, checks it, archives it and publishes it. Triggers: write a LinkedIn post, I have an idea for a post, turn this into a post. Not for setting up pillars or a voice profile (use linkedin-setup)."
-version: 0.4.1
+version: 1.0.0
 ---
 
 # Write a post
@@ -143,6 +143,13 @@ A bullet with no quote under it is not an incomplete bullet, it is an
 invented one, and it comes out. This is the whole guard: a model that knows
 how something usually works will write the usual thing as a fact, and the
 quote is what makes that visible to the person rather than to nobody.
+
+**Where the host can publish a web page, offer the sheet as one**, per
+`references/sheet-artifact.md`. It puts each quote beside its bullet and
+counts the characters in the browser rather than estimating them. It is a
+convenience: the person still approves in the conversation, and a host that
+cannot do it says so in one line and carries on. It never carries the
+material.
 
 Three hard rules on this sheet:
 

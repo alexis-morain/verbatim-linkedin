@@ -2,9 +2,10 @@
 
 **The LinkedIn post skill that interviews you first.**
 
-A Claude skill bundle that interviews you before it writes anything, then
-drafts a LinkedIn post in your voice, checks it against a language specific
-style pass, archives it, and publishes it.
+One markdown file you attach to a conversation. It interviews you before it
+writes anything, then drafts a LinkedIn post in your voice and checks it
+against a language specific style pass. No install, no account, no service in
+the middle, and nothing about you leaves the file you keep.
 
 The name is the mechanism: no angle is proposed unless it can be traced to a
 verbatim quote of something you said in the interview that produced it.
@@ -51,49 +52,28 @@ Then, before a single line is drafted, it hands you a validation sheet where
 every bullet has to trace to something you said. You approve it or you correct
 it. Nothing is written until you do.
 
-## Two ways to run it
+## How to run it
 
-**As a skill bundle**, inside Claude Code or any agent that reads skills. You
-talk, it interviews you, it writes the files. This is the original shape and
-it needs no Python at all.
+Download one file and attach it to a conversation. That is the whole
+installation.
 
-**As a local web app**, `verbatim`, which drives the same skills against the
-same directory and gives you screens for the parts that are decisions rather
-than conversation: the validation sheet you approve, the traceability panel
-above, the archive form, the publish plan. It also edits the files one
-section at a time, keeps the idea bank, and reads the measurement store
-across posts: what is due at J+7, sums per pillar, format and objective,
-and the status of every pattern at the thresholds of
-[`references/measure.md`](references/measure.md), with nothing averaged. It
-binds to 127.0.0.1 and nothing about it is hosted.
+| You want to | Attach |
+|---|---|
+| Write a post | [`linkedin-post.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-post.en.md) |
+| Set yourself up, first time | [`linkedin-setup.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-setup.en.md) |
+| Rework your public page | [`linkedin-profile.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-profile.en.md) |
 
-```bash
-uvx verbatim-linkedin ~/my-profile     # or: pipx install verbatim-linkedin
-```
+French versions sit beside them in [`engines/`](engines/), one file per skill
+and language. Each one carries its skill, the router, and every reference and
+pack file it needs, because the weakest host this is written for cannot fetch
+a second file.
 
-From a clone, which is also how you get the skills, it is one command and no
-install:
+**That host is the contract.** A conversation that receives an attachment and
+returns text, writes no file and runs no code. Anything a better host adds is
+convenience: it never adds a promise, and the engine says so where it matters.
 
-```bash
-uv run --project app verbatim ~/my-profile
-```
-
-Either way it opens on the conformance report if that directory is not a
-profile yet, and tells you to run `linkedin-setup` first.
-
-The two are the same engine over the same files. Use whichever you are in
-front of; a directory written by one is read by the other.
-
-**On macOS there is also a window**, `Verbatim.dmg` on the
-[releases page](https://github.com/alexis-morain/verbatim-linkedin/releases):
-the same app, Apple Silicon, needing neither Python nor `uv` on your machine
-because it carries [uv](https://github.com/astral-sh/uv) (Apache-2.0 OR MIT)
-and installs the engine from PyPI the first time you open it. It is not
-signed, so macOS will call it damaged and the release notes carry the one line
-that clears it. If that trade is not for you, the command above is the same
-app with no warning, and it is the one this page recommends.
-
-![The overview: status, next session, posts per pillar, latest posts](docs/screenshots/overview.png)
+Your material is a second file you attach, and it stays yours. The engine
+prints the lines that changed at the end of a session and you paste them back.
 
 ## Engine and profile
 
@@ -122,40 +102,18 @@ offers to set you up. No skill pretends to know you.
 
 ## Getting started
 
-```bash
-git clone https://github.com/alexis-morain/verbatim-linkedin.git ~/verbatim-linkedin
-ln -s ~/verbatim-linkedin ~/.claude/skills/verbatim
-```
+Attach `linkedin-setup.en.md` and say you want to set up your LinkedIn
+profile. It runs about twenty minutes and ends on a written post, not on a
+file.
 
-**The bundle installs as one unit.** The router at the root dispatches to the
-skills inside it, and that is what lets every skill resolve `references/`,
-`locales/` and `lib/` by the same relative path. Symlinking a single skill
-directory on its own will break those paths.
+Read [`examples/material.md`](examples/material.md) first if you want to see
+the shape of a filled one before you fill your own. The persona in there is
+fictional and is deliberately not in the maintainer's field.
 
-Then say you want to set up your LinkedIn profile.
-`linkedin-setup` runs about twenty minutes and ends on a written post, not on a
-folder.
-
-The app runs from the clone you just made:
-
-```bash
-uv run --project app verbatim ~/my-profile
-```
-
-It needs a model to run an interview, and it is told which one by three
-environment variables rather than by an account. Before the first turn it
-shows an order of magnitude spanning the shallowest and the deepest ceiling a
-format allows, at the model's input rate, and says on the same line what that
-figure rests on. `.env.example` documents them.
-Local and hosted are the same code path and neither is the recommended one:
-what decides is whether the model can hold a 6400 token system block, answer a
-forced tool call, and produce a five field validation sheet when asked.
-[`docs/smoke.md`](docs/smoke.md) carries the measurements and says plainly what
-the first release ships untested.
-
-Read [`examples/`](examples/) first if you want to see the shape of a filled
-profile before you fill your own. The persona in there is fictional and is
-deliberately not in the maintainer's field.
+**Working on the engine rather than using it?** Clone it, and read
+[`CONTRIBUTING.md`](CONTRIBUTING.md). The skills live in `skills/`, the
+engines in `engines/` are generated from them by
+`scripts/build-engines.py`, and `check.sh` holds the rules.
 
 ## What ships
 
@@ -164,18 +122,18 @@ deliberately not in the maintainer's field.
 | [`linkedin-setup`](skills/linkedin-setup/) | Builds your profile, your pillars, your voice file and your idea bank from a short interview, then hands over to the first post. |
 | [`linkedin-post`](skills/linkedin-post/) | Interview, validation sheet, draft, style pass, revisions, archive, publish, measure at J+7. |
 | [`linkedin-profile`](skills/linkedin-profile/) | Audits and rewrites the nine sections of your public LinkedIn page, headline and About first, from material you can prove. |
-| [`verbatim`](app/) | The local app: the same skills, driven from screens, over the same directory. |
 
-One more is deliberately held back: a measurement skill that advises on the
-store across posts. The app's Measure screen computes what the files say; the
-skill would say what it means, and it waits for real measured posts to be
-built against, because advice written from imagined data measures the
-imagination.
 
-![The Measure screen: what is due, then sums per pillar, format and objective, with a status per threshold](docs/screenshots/measure.png)
+One more is deliberately held back: a measurement skill that advises across
+posts. It waits for real measured posts to be built against, because advice
+written from imagined data measures the imagination. Nothing concludes under
+two measured posts.
 
-Under two measured posts, that screen concludes nothing and says so on the
-line. Nothing on it is an average.
+**There was also a local Python app**, `verbatim-linkedin`, which drove the
+same skills from screens over a directory. It is frozen at
+[v2.4.1](https://github.com/alexis-morain/verbatim-linkedin/releases) and out
+of the way under [`app/`](app/): plugging an API key in was the step that lost
+people, and everyone already has a conversation to paste a file into.
 
 ## Languages
 
@@ -231,14 +189,11 @@ prints the target channel and stops. That guard exists because the maintainer
 has already published to the wrong channel: a personal profile and a company
 page are two lines in a config file and two very different things in a feed.
 
-In the app the same guard is two clicks with a reading between them. You draw
-a plan, which is `lib/publish.py` printing what would happen, and the confirm
-button carries a digest of exactly that plan: if the channel, the time or the
-post moved since it was drawn, the click sends nothing and shows you what
-moved. A plan is confirmed once, so a reload or a double click cannot make two
-posts out of one.
-
 ![The publish plan: tier, target channel by name, when, length, first line](docs/screenshots/publish-plan.png)
+
+*The plan, as the frozen app drew it. `lib/publish.py --plan` prints the same
+thing at a terminal, and at the floor there is nothing to send: you post it
+yourself.*
 
 A post carrying a link gets one more line, asking whether it needs a
 disclosure. Nothing here decides that for you, because nothing here can know
@@ -248,11 +203,10 @@ your market is in `locales/<lang>/market.md`, and the reason this exists at all
 is that a disclosure once survived a draft here and not the published version.
 
 **Publishing does not set the state of a post.** A tier accepting something is
-not the same fact as a post being live: the copy tier printed a post nobody
-has pasted yet, and a scheduling payload still has to be sent by whatever holds
-the account. `state` and `published_ref` are yours to write, on the same
-screen, exactly like the pillar and the format the archive form asks for rather
-than guesses.
+not the same fact as a post being live: the copy tier prints a post nobody has
+pasted yet, and a scheduling payload still has to be sent by whatever holds the
+account. `state` and `published_ref` are yours to write, exactly like the
+pillar and the format, which the engine asks for rather than guesses.
 
 ## What this will not do
 
