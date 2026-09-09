@@ -1,5 +1,35 @@
 # Journal
 
+## 2026-09-09 (huitième session, suite). La bascule, et la première vraie mesure
+
+**`../linkedin/` est basculé.** Les quatre fichiers sont devenus `material.md`,
+mode 600, les deux corps de posts ont rejoint `corpus/` qui compte six textes,
+le front matter est devenu le Ledger. Vérifié mot à mot contre la sauvegarde :
+les neuf mots absents sont neuf titres passés à l'anglais, ce qui est la
+couture machine et pas une perte. Les cinq points de conformance passent. Son
+`CLAUDE.md` décrivait encore l'ancienne structure, y compris une commande
+d'équilibre des piliers qui lisait un `posts/` disparu.
+
+**L'eval a tourné pour de vrai**, contre `qwen2.5:14b` en local, coût zéro.
+**Zéro garde sur cinq à la fenêtre par défaut**, et le transcript dit pourquoi
+au lieu de le laisser deviner : le modèle avait lu la matière, comptait les
+piliers du ledger correctement, et ouvrait sur « Great! Let's go through the
+process », une fausse accroche que le pack `en` liste nommément. Il n'ignorait
+pas les règles, il ne les a jamais vues : Ollama tronque par l'avant, là où est
+le moteur.
+
+**Le second run n'a pas abouti** : à 24 576 jetons, le 14B rendait la machine
+inutilisable et Alexis l'a coupé. Inscrit comme non mesuré plutôt qu'omis,
+parce que le coût est la trouvaille. La fenêtre par défaut garantit l'échec, et
+celle qui l'évite est assez chère pour être une décision. C'est un argument
+pour des moteurs plus petits, pas pour des fenêtres plus grandes.
+
+**Les moteurs font 18 000 jetons contre les 12 000 que le plan visait.** Devenir
+autonome a triplé ce que la note du `CLAUDE.md` annonçait. Chaque moteur
+imprime maintenant sa propre taille, mesurée sur le corps pour que l'écrire ne
+la change pas, et le README dit de vérifier la fenêtre avant d'utiliser un
+petit modèle.
+
 ## 2026-09-09 (huitième session). Le pivot, exécuté
 
 **Poussé**, `ded9da5..990d13e`, dix-sept commits. Les seize postes du plan
