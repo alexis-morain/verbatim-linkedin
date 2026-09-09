@@ -1,5 +1,32 @@
 # Journal
 
+## 2026-09-09 (huitième session, fin). Le pack anglais signé
+
+**Alexis a relu le pack `en` lui-même et l'a signé.** Le document de relecture
+n'est donc parti nulle part : il devient la trace de ce qui a été mis devant un
+relecteur. `native_reviewed: true` et `reviewed_by` dans `locales/en/lint.yml`
+et `locales/en/app.yml`, bannière retirée de `locales/en/style.md`. La ligne
+« this pack has not been reviewed by a native speaker » ne s'imprime plus au
+-dessus d'aucun résultat, et c'était le seul bloquant d'annonce.
+
+**Demandé avant d'écrire**, parce que le drapeau s'appelle `native_reviewed` et
+que le gabarit dit « true only when a native speaker has signed it » : ce qu'un
+fichier public affirme ne se déduit pas. Réponse : anglophone natif, il signe.
+
+**Le trou reste ouvert et le dit.** `negative-parallelism` rate toujours la
+forme non contractée, sur la catégorie de poids 5. La relecture a signé les
+listes sans trancher ce point ; c'est écrit dans le document, dans la page et
+dans les prochaines actions, plutôt que perdu avec la question. Deux
+alternances le ferment le jour où la réponse est oui.
+
+**Un test a dû bouger.** `test_native_review_flag_is_exposed` affirmait que le
+pack `en` était non signé : il prenait l'état d'un pack livré pour fixture et
+rougissait le jour où quelqu'un le relisait, pour la bonne raison. Un pack non
+signé reste légitime, `CONTRIBUTING.md` le dit. Ce qui est tenu maintenant est
+la paire qui ne doit jamais casser, un pack qui revendique une relecture sans
+personne derrière, plus les deux comportements qui étaient le sujet : un pack
+signé se tait, un pack non signé prévient.
+
 ## 2026-09-09 (huitième session, suite). La bascule, et la première vraie mesure
 
 **`../linkedin/` est basculé.** Les quatre fichiers sont devenus `material.md`,
