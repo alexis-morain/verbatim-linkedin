@@ -72,6 +72,61 @@ if [ -z "$emoji" ]; then ok "clean"; else bad "emoji in: $emoji"; fi
 
 printf '\n'
 
+step "the material format still counts to thirteen"
+# 1.1 of the pivot plan exists because a hand migration already lost a
+# signature block in silence, and nothing could be compared against anything.
+# The list is that comparison, so the list itself is held here rather than by
+# whoever remembers to reread it. Nine parsed columns and four in the free
+# text tail, per ADR 0001, plus the block that actually went missing.
+out="$(python3 - 2>&1 <<'MATERIAL'
+import pathlib
+import re
+import sys
+
+doc = pathlib.Path("references/material.md")
+text = doc.read_text(encoding="utf-8")
+
+def rows(start, end):
+    """Field names in the first column of one table."""
+    body = text.split(start)[1].split(end)[0]
+    return re.findall(r"^\| `(\w+)`", body, re.M)
+
+wrong = []
+try:
+    columns = rows("### The nine parsed columns", "### The four in the free text tail")
+    tail = rows("### The four in the free text tail", "### Confidence thresholds")
+except IndexError:
+    sys.stderr.write("the ledger headings moved, so nothing could be counted\n")
+    sys.exit(2)
+
+if len(columns) != 9:
+    wrong.append("%d parsed columns, not 9: %s" % (len(columns), ", ".join(columns)))
+if len(tail) != 4:
+    wrong.append("%d fields in the tail, not 4: %s" % (len(tail), ", ".join(tail)))
+
+#: Every field the post front matter carried. Losing one is the failure.
+FIELDS = ["date", "pillar", "format", "label", "hook", "chars", "state",
+          "published_ref", "measured", "inbound_connections", "inbound_dms",
+          "meeting_mentions", "note"]
+absent = [f for f in FIELDS if "`%s`" % f not in text]
+if absent:
+    wrong.append("no longer described: %s" % ", ".join(absent))
+
+#: The one that went missing for real, and is prose rather than a field.
+if "Signature block" not in text:
+    wrong.append("the signature block section is gone, which is how this started")
+
+if wrong:
+    print("\n".join(wrong))
+    sys.exit(1)
+MATERIAL
+)"
+case "$?" in
+  0) ok "9 columns, 4 in the tail, 13 fields" ;;
+  1) bad "the material format lost something:"; echo "$out" | sed 's/^/     /' ;;
+  *) bad "the material check could not run:"; echo "$out" | sed 's/^/     /' ;;
+esac
+
 step "app/, which this block no longer checks"
 # app/ is frozen at 2.5.0 and its steps moved to scripts/check-app.sh: they
 # cost about thirty of the thirty six seconds this block used to take, and a
