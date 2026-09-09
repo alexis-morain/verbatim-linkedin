@@ -1,11 +1,11 @@
 # Language pack: English
 # Written against references/style-taxonomy.md, not translated from the French
-# pack. First pass, unsigned by a second native reviewer.
+# pack. Reviewed and signed 2026-09-09.
 
 language: en
-reviewed: "2026-08-27"
-native_reviewed: false
-reviewed_by: ""
+reviewed: "2026-09-09"
+native_reviewed: true
+reviewed_by: "Alexis Morain"
 
 categories:
 

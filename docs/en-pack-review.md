@@ -1,7 +1,17 @@
-# English pack: request for a native review
+# English pack: the review, and what it settled
 
-You do not need the code, the repo, or any tooling to answer this. Everything
-under review is in this document.
+> **Reviewed and signed on 2026-09-09** by Alexis Morain, who maintains this
+> project. `native_reviewed` is `true` in `locales/en/lint.yml` and nothing
+> reading the pack warns about it any more.
+>
+> This file was written as the request. It is kept as the record of what was
+> put in front of a reviewer: every term, every pattern rendered as what it
+> fires on and what it misses, and the four mechanics that decide where a
+> judgment lands. **One question in it was not settled**, and it is marked
+> where it sits, under `negative-parallelism`.
+
+You do not need the code, the repo, or any tooling to read this. Everything
+that was under review is in this document.
 
 ## What this is
 
@@ -158,16 +168,20 @@ Four shapes are matched. Here is what each one does in practice:
 | "Not merely faster. Cleaner. Instead, ..." | |
 | "Stop guessing. Start measuring." | |
 
-**I found a hole here and I want your read on it.** The first two shapes only
+**Still open after the review.** The first two shapes only
 recognise the contracted forms, `it's` and `isn't`. Written out as "It is not
 just a tool, it is a system", the exact same sentence goes through untouched. I
 verified this against the running code.
 
 The question is whether it matters. If nobody writes this shape without
-contractions on LinkedIn, the hole is theoretical and I will leave it. If the
+contractions on LinkedIn, the hole is theoretical and it stays. If the
 uncontracted form is what a careful or non-native writer produces, then the
-heaviest category in the pack is missing its most common case, and I fix it
-before anything ships.
+heaviest category in the pack is missing its most common case.
+
+**The review signed the lists without ruling on this**, so the pack ships with
+the hole and this paragraph is where it is written down. Fixing it is one more
+alternation in two patterns; deciding whether to is a question about English,
+not about code.
 
 ### 9. dramatic-fragmentation, weight 4
 
@@ -205,9 +219,9 @@ a user a post that reads as machine-written.
 If you have five minutes rather than an hour, spend them on that question and
 skip the rest.
 
-## What happens to your answer
+## What happened to the answer
 
-The pack gets your edits, `native_reviewed` flips to true, and your name or
-handle goes in `reviewed_by` unless you would rather it did not. The warning
-line above disappears from every result. The project is MIT licensed and the
-pack is a plain text file anyone can read.
+The pack was signed on 2026-09-09, `native_reviewed` flipped to `true`, and
+the warning line disappeared from every result. The project is MIT licensed
+and the pack is a plain text file anyone can read, so a second reviewer who
+disagrees with any entry can say so and be right.

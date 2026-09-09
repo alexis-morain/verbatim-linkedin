@@ -1606,10 +1606,9 @@ shapes an answer could take, and the way out.
 
 # Style: English
 
-> **Status: first pass.** Written against the shared taxonomy, not translated
-> from the French pack. It has not been signed by a second native reviewer.
-> `native_reviewed` is `false` in `lint.yml` and every skill using this pack
-> says so out loud.
+> **Signed 2026-09-09.** Written against the shared taxonomy, not translated
+> from the French pack, and reviewed since. `native_reviewed` is `true` in
+> `lint.yml`, so nothing reading this pack warns about it any more.
 
 Exact strings live in `lint.yml`. This file says why a category matters and
 what the repair looks like.

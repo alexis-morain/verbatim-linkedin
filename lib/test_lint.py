@@ -1,4 +1,5 @@
 """Tests for lint.py. Run: python3 lib/test_lint.py"""
+import io
 import os
 import sys
 import unittest
@@ -127,9 +128,31 @@ class TestPacks(unittest.TestCase):
         with self.assertRaises(lint.PackError):
             lint.load_pack("zz")
 
-    def test_native_review_flag_is_exposed(self):
-        self.assertTrue(FR["native_reviewed"])
-        self.assertFalse(EN["native_reviewed"])
+    def test_a_signed_pack_names_who_signed_it(self):
+        # This used to assert that en was unsigned, which made one shipped
+        # pack's own state the fixture: it went red the day somebody reviewed
+        # it, for the right reason. An unsigned pack is legitimate, since
+        # CONTRIBUTING tells a contributor to leave the flag false until
+        # somebody has gone over it. What must never happen is a pack
+        # claiming a review with nobody behind it.
+        for code in lint.available_packs():
+            with self.subTest(pack=code):
+                pack = lint.load_pack(code)
+                if pack["native_reviewed"]:
+                    self.assertTrue(pack["reviewed_by"].strip())
+
+    def test_an_unsigned_pack_says_so_above_its_findings(self):
+        # The template is the unsigned one, and it stays unsigned by
+        # definition, so it is the fixture the shipped packs used to be.
+        unsigned = dict(EN, native_reviewed=False)
+        out = io.StringIO()
+        lint._report(lint.run("A robust ecosystem.", unsigned), unsigned, out)
+        self.assertIn("has not been reviewed by a native speaker", out.getvalue())
+
+    def test_a_signed_pack_says_nothing_about_review(self):
+        out = io.StringIO()
+        lint._report(lint.run("A robust ecosystem.", EN), EN, out)
+        self.assertNotIn("native speaker", out.getvalue())
 
 
 class TestFallbackParser(unittest.TestCase):

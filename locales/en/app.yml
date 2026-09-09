@@ -2,7 +2,7 @@
 # The engine templates hold no user-facing text; if a string is missing
 # here the English one shows and the app says the pack is incomplete.
 language: en
-native_reviewed: false
+native_reviewed: true
 
 app:
   title: "Verbatim"
