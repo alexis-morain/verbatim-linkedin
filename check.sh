@@ -158,6 +158,19 @@ case "$?" in
   *) bad "an engine could not be built:"; echo "$out" | sed 's/^/     /' ;;
 esac
 
+step "the eval's assertions still measure something"
+# scripts/eval.py is not in this block: it needs a key, and a check that
+# skips itself into a green tick is what docs/smoke.md exists against. Its
+# self test is here, because it costs nothing and it holds the only part that
+# can rot quietly: an assertion that passes on a broken transcript measures
+# nothing and would report a model as fine forever.
+if python3 scripts/eval.py --self-test >/dev/null 2>&1; then
+  ok "5 checks, and each one fails on the transcript that breaks it"
+else
+  bad "the eval's own assertions do not hold:"
+  python3 scripts/eval.py --self-test 2>&1 | sed 's/^/     /'
+fi
+
 step "app/, which this block no longer checks"
 # app/ is frozen at 2.5.0 and its steps moved to scripts/check-app.sh: they
 # cost about thirty of the thirty six seconds this block used to take, and a
