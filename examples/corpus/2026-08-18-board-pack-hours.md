@@ -1,21 +1,3 @@
----
-date: 2026-08-18
-pillar: 2
-format: the-breakdown
-label: TRUST
-hook: |
-  Eleven hours. That is the median time I spend building a first board pack,
-  and most of it is not spent on the numbers.
-chars: 1487
-state: published
-published_ref: ""
-measured: 2026-08-25
-inbound_connections: 3
-inbound_dms: 1
-meeting_mentions: 1
-note: "The DM came from a seed fund platform lead, not a founder. Second time that has happened on a pillar 2 post. Provisional, two data points."
----
-
 Eleven hours. That is the median time I spend building a first board pack, and
 most of it is not spent on the numbers.
 

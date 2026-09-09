@@ -81,7 +81,7 @@ class WebCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-interview-web-")
         self.root = Path(self.tmp) / "instance"
-        shutil.copytree(REPO / "examples", self.root)
+        shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
         # examples/ is a real instance and people point the app at it, which
         # leaves an interviews/ directory behind. It is gitignored, so it is
         # invisible in a diff and permanent on that machine: without this the

@@ -1,6 +1,6 @@
 """Tests for verbatim_app.instance, the disk-is-the-database layer.
 
-The fixture is examples/, the Nadia Feriel persona, copied to a temp
+The fixture is tests/fixtures/instance/, the Nadia Feriel persona, copied to a temp
 directory so write tests never touch the shipped files. Every behaviour
 asserted here is a clause of references/instance.md; when the two disagree,
 the contract wins and this file is wrong.
@@ -31,7 +31,7 @@ class InstanceCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-test-")
         self.root = Path(self.tmp) / "instance"
-        shutil.copytree(REPO / "examples", self.root)
+        shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
         # examples/ is a real instance and people point the app at it, which
         # leaves an interviews/ directory behind. It is gitignored, so it is
         # invisible in a diff and permanent on that machine: without this the

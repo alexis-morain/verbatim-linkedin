@@ -306,7 +306,7 @@ class TestPlainAndRenderReadTheSameDocument(unittest.TestCase):
         self.assertEqual(plain(source), source)
 
     def test_the_example_profile_survives_both(self):
-        text = (REPO / "examples" / "profile.md").read_text(encoding="utf-8")
+        text = (REPO / "app" / "tests" / "fixtures" / "instance" / "profile.md").read_text(encoding="utf-8")
         self.assertIn("<h2>", render(text))
         self.assertNotIn("##", plain(text))
         # The signature block is fenced in that file, and it is the one piece

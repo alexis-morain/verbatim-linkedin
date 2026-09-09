@@ -1,6 +1,6 @@
 """Tests for verbatim_app.archive, the step where an interview becomes a post.
 
-The fixture is examples/, the Nadia Feriel persona, copied to a temp directory
+The fixture is tests/fixtures/instance/, the Nadia Feriel persona, copied to a temp directory
 so nothing here touches the shipped files. Every behaviour asserted is a clause
 of references/instance.md or of skills/linkedin-post; when they disagree, the
 contract wins and this file is wrong.
@@ -41,7 +41,7 @@ class ArchiveCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-archive-")
         self.root = Path(self.tmp) / "instance"
-        shutil.copytree(REPO / "examples", self.root)
+        shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
         # examples/ is a real instance and people point the app at it, which
         # leaves an interviews/ directory behind. It is gitignored, so it is
         # invisible in a diff and permanent on that machine: without this the

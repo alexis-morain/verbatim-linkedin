@@ -1,20 +1,3 @@
----
-date: 2026-07-13
-pillar: 2
-format: counter-intuitive-number
-label: ACTION
-hook: |
-  Nine engagements, and not one of them started with the model.
-chars: 1509
-state: published
-published_ref: ""
-measured: 2026-07-20
-inbound_connections: 2
-inbound_dms: 1
-meeting_mentions: 0
-note: "The DM asked for the four questions, which is what the post ended on. Sent them. No call yet."
----
-
 Nine engagements, and not one of them started with the model.
 
 That is my whole history of doing this, in my own time tracking, and I checked

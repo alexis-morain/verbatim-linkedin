@@ -1,21 +1,3 @@
----
-date: 2026-07-27
-pillar: 2
-format: the-post-mortem
-label: TRUST
-hook: |
-  I built the same board pack twice in one month, and the second one was not a
-  revision. It was the same work again.
-chars: 1757
-state: published
-published_ref: ""
-measured: 2026-08-03
-inbound_connections: 0
-inbound_dms: 0
-meeting_mentions: 0
-note: "Nothing at all. No connection, no message, nobody brought it up. Recorded as zero rather than left empty: the post produced nothing, and that is a different fact from nobody having looked."
----
-
 I built the same board pack twice in one month, and the second one was not a
 revision. It was the same work again.
 

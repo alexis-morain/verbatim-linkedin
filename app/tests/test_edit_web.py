@@ -38,7 +38,7 @@ class WebCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-edit-web-")
         self.root = Path(self.tmp) / "instance"
-        shutil.copytree(REPO / "examples", self.root)
+        shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
         shutil.rmtree(self.root / "interviews", ignore_errors=True)
         (self.root / "README.md").unlink(missing_ok=True)
         self.instance = Instance(self.root)

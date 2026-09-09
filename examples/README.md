@@ -13,12 +13,23 @@ structure.
 
 | File | Shows |
 |---|---|
-| `profile.md` | A filled `references/profile.template.md`, including the `Status` block set to `filled: yes`. |
-| `voice.md` | A voice file built on three posts, carrying the provisional banner because three is fewer than five, and saying that the seven posts published since have not been folded in yet. |
-| `pillars.md` | Pillars written as postures with effect labels, and a ratio derived from a stated objective. |
-| `ideas.md` | Angles with funnel labels and named material, not subjects. |
-| `corpus/` | One published post, as reference material. |
-| `posts/` | Eight posts: six measured, one published and not measured yet, one still a draft with its session notes under it. |
+| `material.md` | The whole thing, one file, the shape `references/material.md` specifies. |
+| `corpus/` | Nine published posts, as reference material. |
+
+Inside `material.md`, in order:
+
+| Section | Shows |
+|---|---|
+| Status | `filled: yes`, and the two language axes set independently. |
+| Profile | Every section of the format, including a signature block with real text in it. |
+| Voice | Traits built on three posts, each one under the sentence it was read from, carrying the provisional banner because three is fewer than five, and saying the seven posts published since have not been folded in yet. |
+| Pillars | Postures with effect labels, and a ratio derived from a stated objective that sums to the monthly cadence. |
+| Ideas | Angles with funnel labels and named material, not subjects, plus an append only Used list. |
+| Ledger | Eight rows: six measured, one published and not measured yet, one still a draft. Nine parsed columns, four descriptive fields underneath. |
+
+It used to be four files and two directories. The post bodies moved into
+`corpus/`, where by ADR 0001 losing one costs a voice reference rather than a
+measurement.
 
 ## What to notice
 

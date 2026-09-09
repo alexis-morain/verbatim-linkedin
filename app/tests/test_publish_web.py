@@ -1,6 +1,6 @@
 """Tests for the publishing screen, the one cold screen that can leave.
 
-The fixture is examples/, the Nadia Feriel persona, copied to a temp
+The fixture is tests/fixtures/instance/, the Nadia Feriel persona, copied to a temp
 directory. The environment the tier is read from is injected, so a
 maintainer's own LINKEDIN_PUBLISH cannot decide what these prove, and the
 only tier that opens anything here is `command`, pointed at a shell builtin.
@@ -72,7 +72,7 @@ class PublishCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="verbatim-publish-web-")
         self.addCleanup(shutil.rmtree, self.tmp)
         self.root = Path(self.tmp) / "instance"
-        shutil.copytree(REPO / "examples", self.root)
+        shutil.copytree(REPO / "app" / "tests" / "fixtures" / "instance", self.root)
         # examples/ is a real instance and people point the app at it, which
         # leaves an interviews/ directory behind. It is gitignored, so it is
         # invisible in a diff and permanent on that machine: without this the

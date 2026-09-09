@@ -1,21 +1,3 @@
----
-date: 2026-06-30
-pillar: 1
-format: the-stance
-label: VISIBILITY
-hook: |
-  Finance is not a reporting function. You find that out the week somebody
-  with money asks a question your file cannot answer.
-chars: 1505
-state: published
-published_ref: ""
-measured: 2026-07-07
-inbound_connections: 4
-inbound_dms: 2
-meeting_mentions: 1
-note: "Best week so far. Two DMs, both founders mid raise, both mentioned a specific diligence question. One came up again in a call with a fund platform lead."
----
-
 Finance is not a reporting function. You find that out the week somebody with
 money asks a question your file cannot answer.
 

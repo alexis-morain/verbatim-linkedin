@@ -1,21 +1,3 @@
----
-date: 2026-06-16
-pillar: 3
-format: the-story
-label: TRUST
-hook: |
-  He said yes in eleven seconds, and that was the part that should have
-  worried me.
-chars: 1545
-state: published
-published_ref: ""
-measured: 2026-06-23
-inbound_connections: 1
-inbound_dms: 0
-meeting_mentions: 0
-note: "One connection, from a founder who had read the rate card page afterwards. Nothing else moved."
----
-
 He said yes in eleven seconds, and that was the part that should have worried
 me.
 

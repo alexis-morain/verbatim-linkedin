@@ -1,20 +1,3 @@
----
-date: 2026-08-29
-pillar: 1
-format: counter-intuitive-number
-label: VISIBILITY
-hook: |
-  Thirty-one percent to six percent, on the same model.
-chars: 1263
-state: draft
-published_ref: ""
-measured:
-inbound_connections:
-inbound_dms:
-meeting_mentions:
-note: ""
----
-
 Thirty-one percent to six percent, on the same model.
 
 Nobody rebuilt it. The formulas that produced a 31 percent error on net burn

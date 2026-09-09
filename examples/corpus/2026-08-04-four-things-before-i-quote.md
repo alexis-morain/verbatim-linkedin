@@ -1,21 +1,3 @@
----
-date: 2026-08-04
-pillar: 2
-format: the-breakdown
-label: ACTION
-hook: |
-  Four things, and I will not put a number on a mandate before I have all
-  four.
-chars: 1792
-state: published
-published_ref: ""
-measured: 2026-08-14
-inbound_connections: 3
-inbound_dms: 1
-meeting_mentions: 0
-note: "Measured on the 14th, not at J+7. I was away the week of the 10th and the real date is what is recorded here rather than the one the rule wanted."
----
-
 Four things, and I will not put a number on a mandate before I have all four.
 
 This is not a qualification ritual. Each one of them has, at least once,
