@@ -127,10 +127,23 @@ first.
 
 Ask for three published posts, up to six. Their own, not ones they admire.
 
-Read them and write `voice.md`: the traits actually present, quoted. Form of
-address, hook shape, paragraph rhythm, how they close, real length. Quote the
-evidence for every trait. **A trait without a quote is a guess and does not go
-in the file.**
+Read them and write the Voice section: the traits actually present, quoted.
+Form of address, hook shape, paragraph rhythm, how they close, real length.
+
+**Every trait prints the sentence it was read from, directly under it.** No
+code checks this any more, so the quote is what makes a guess visible to the
+person instead of to nobody:
+
+```
+**Opens on a number that sounds wrong.** Not on a claim, on a figure the
+reader has to reconcile.
+
+> "Eleven hours. That is the median time I spend building a first board
+> pack, and most of it is not spent on the numbers."
+```
+
+**A trait without a quote under it is a guess and does not go in.** Trimming
+those quotes as redundant removes the enforcement rather than tidying it.
 
 If there are fewer than five posts, put a banner at the top of `voice.md`
 saying the file is provisional and built on N posts, and instruct every skill

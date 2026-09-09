@@ -29,6 +29,33 @@ engine, a model will echo it inside a French post. If a pack has no wording for
 an intent, the model generates one and says it did: degradation is visible,
 never silent.
 
+### A guard the code cannot check becomes visible, never another instruction
+
+The second half of the same rule, and the one that decides how the engine is
+written now. The engine is written against the floor: a conversation that
+receives an attachment and returns text, writes no file and runs no code.
+Three guards used to be enforced by code, and the floor runs none of it.
+
+**A guard restated as an instruction is read by the same model it is meant to
+catch.** So each one is converted into something the person can see instead:
+
+| Was enforced by | Is now |
+|---|---|
+| A gauge counting figures and named occurrences | The gauge lists the facts it counted, so the person reads their own words back instead of a number |
+| Anchors checked against the source each names, under ten folded characters refused | The ten character rule is written out in words, next to where anchors are produced |
+| A forced tool call making the sheet be a sheet | The sheet prints the quote beside every bullet, with its source named |
+
+**The output is more verbose on purpose.** A contributor who trims the repeated
+quotes as redundant removes the enforcement rather than tidying it, which is
+why this is written down here and in
+[`docs/adr/0002-a-guard-becomes-visible-not-verbose.md`](docs/adr/0002-a-guard-becomes-visible-not-verbose.md).
+
+The payoff was not planned and is worth naming: **a guard made visible is a
+guard made greppable from outside.** A transcript can be checked for a sheet
+that appeared, bullets that each carry a quoted string, and two angles that
+each quote, by somebody who knows nothing about the model that produced it.
+That is what makes an eval possible at all.
+
 ## Conventions
 
 **English, engine wide.** File names, headings, `SKILL.md` bodies, code,

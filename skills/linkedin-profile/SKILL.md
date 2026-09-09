@@ -87,7 +87,11 @@ Then, per section worked:
 
 1. **Headline: three proposals, three different leads.** Each anchored to a
    fact, with the fact named underneath. Not three phrasings of one idea.
-2. **About: one draft**, structured as above, every factual sentence traceable.
+2. **About: one draft**, structured as above. **Every factual sentence prints
+   its source beside it**, in a list under the draft: the sentence, then the
+   line of the material or of this conversation it came from, quoted. A
+   sentence with nothing under it is one nobody can check, and it comes out
+   of the draft rather than into the page.
    Run the deterministic pass on it, it is prose:
 
    ```bash
@@ -116,8 +120,10 @@ actually applied, not what was proposed.
 ## Hard rules
 
 - **No invented number, no borrowed client, no inherited superlative.** Every
-  claim traces to `profile.md` or to this conversation, and what traces only
-  to this conversation gets written into `profile.md` with its source.
+  claim traces to the material or to this conversation, **and the trace is
+  printed, not asserted**: name the source next to the claim so the person can
+  check it. What traces only to this conversation goes back into the material
+  with its source.
 - **Names that are not public stay off the page.** Same list as everywhere
   else.
 - **The page never contradicts the posts.** If the headline promises what the

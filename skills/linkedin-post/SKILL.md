@@ -51,7 +51,24 @@ dropped:
   exception is a person who never had a scene and came in with a thesis:
   that is the `witnessed-instance` door, not evasion.
 - **Quote the previous answer inside the next question.**
-- **Announce what is acquired and what is missing, every turn, in one line.**
+- **Every turn, list what has been acquired, fact by fact, then what is
+  missing.** Not a count. A number is a claim about the material and nobody
+  can check it; the list is the material, and the person reads their own words
+  back. Code used to count this and the floor runs no code, so the counting
+  moved into the open:
+
+  ```
+  Acquired
+    31 percent error on net burn        "we were off by thirty one percent"
+    the meeting ran 40 minutes          "the next meeting ran forty minutes"
+  Missing
+    when this happened
+  ```
+
+  Distinct facts only, figures and proper nouns, never turns taken. Two
+  answers repeating one fact are one fact. Undercount on purpose: the cost of
+  one question too many is a question, and the cost of one too few is an
+  invented detail.
 - Six is the ceiling until the format sets its own, and neither is a target.
 
 ## The break: format and angle
@@ -99,18 +116,35 @@ more interview question, and the person then gets no sheet at all.
 
 ```
 ANGLE               one line, restated with the material collected
-CONCRETE ELEMENTS   one bullet per fact from the interview, nothing else
+CONCRETE ELEMENTS   one bullet per fact, and under each bullet the words it
+                    came from, labelled SAID: or CORPUS:
 THE STRONG MOMENT   the anecdote or reported sentence that carries the post
 CENTRAL CONVICTION  in quotes, what they conclude
 FIRST LINE          two proposals, or theirs
 ```
 
+**Every bullet carries its quote underneath, with the source named.** Like
+this, and the shape matters more than the wording:
+
+```
+CONCRETE ELEMENTS
+  - Forecast error went from 31 percent to 6 percent on the same model
+    SAID: "we were off by thirty one percent on net burn, same model"
+  - The rebuild took eleven hours
+    CORPUS: "Eleven hours. That is the median time I spend building a
+    first board pack"
+```
+
+A bullet with no quote under it is not an incomplete bullet, it is an
+invented one, and it comes out. This is the whole guard: a model that knows
+how something usually works will write the usual thing as a fact, and the
+quote is what makes that visible to the person rather than to nobody.
+
 Three hard rules on this sheet:
 
-- **Every bullet under CONCRETE ELEMENTS must trace to an interview answer, to
-  `profile.md`, or to `corpus/`.** A bullet that does not trace comes out. No
-  "plausible", no inference. A model that knows how an infrastructure usually
-  works will write the usual one as a fact. That is the failure this prevents.
+- **A bullet traces to an interview answer or to the corpus, never to the
+  profile.** The profile is input to a question, never evidence. No
+  "plausible", no inference.
 - The first line is the only thing most readers will see. If a proposal is
   chosen, **the post is written for it**, to the character. The person is
   asked which one, and taking neither is one of the answers: a sheet whose
@@ -153,6 +187,13 @@ Then produce, in this order:
    and a plausible quote invented to dress it is the failure the block exists
    to catch. The profile backs nothing: it is input to a question, never
    evidence.
+
+   **An anchor shorter than ten characters, typography folded, counts as
+   absent.** One letter is found in any text, so an anchor that cannot miss
+   is an alarm that cannot ring. Code used to refuse those and the floor runs
+   no code, so the rule is written out here: quote enough of the sentence to
+   be findable in it, and a reader who cannot find the anchor in the source
+   it names is looking at a fabricated one.
 
 **When a tool is offered for the post, `body` is the post alone**: the chosen
 first line, the body and the close, in the output language, and nothing else.
