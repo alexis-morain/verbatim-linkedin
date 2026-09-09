@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+# Validation block for app/, which is frozen at 2.5.0.
+#   ./scripts/check-app.sh
+#
+# These steps used to live in check.sh and ran on every commit. They cost
+# around thirty seconds of the thirty six that block spent, almost all of it
+# in uv resolving an environment and building a wheel, plus node and swiftc.
+# The engine is markdown now: a commit that touches a skill should not pay to
+# rebuild a Python application nobody is developing any more.
+#
+# Frozen is not deleted. Everything below still has to pass, and two callers
+# still run it: whoever touches app/ or scripts/*.swift, and release.yml,
+# which builds a DMG out of this tree and does not ship a binary that has not
+# passed its own validation.
+#
+# The split is announced rather than silent: check.sh prints the line that
+# sends you here, and says it loudly when app/ has uncommitted changes.
+set -uo pipefail
+cd "$(dirname "$0")/.."
+
+fail=0
+step() { printf '\n== %s\n' "$1"; }
+bad()  { printf '   FAIL %s\n' "$1"; fail=1; }
+ok()   { printf '   ok   %s\n' "$1"; }
+
+step "tests, on a bare interpreter"
+# The stdlib only claim: these run with no dependencies installed at all.
+for t in app/tests/test_instance.py app/tests/test_providers.py \
+         app/tests/test_agent.py app/tests/test_skills.py \
+         app/tests/test_tools.py app/tests/test_anchors.py \
+         app/tests/test_interview.py app/tests/test_archive.py \
+         app/tests/test_smoke.py app/tests/test_prose.py \
+         app/tests/test_intents.py app/tests/test_sufficiency.py; do
+  if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
+done
+
+step "app suite, with its dependencies"
+# The block above runs on a bare interpreter and proves the stdlib only claim.
+# This one installs the app and runs everything, screens and transport included.
+if command -v uv >/dev/null 2>&1; then
+  if (cd app && uv run --quiet python -m unittest discover -s tests -p 'test_*.py') >/dev/null 2>&1; then
+    ok "app/tests"
+  else
+    bad "app/tests"
+    (cd app && uv run --quiet python -m unittest discover -s tests -p 'test_*.py') 2>&1 | tail -20
+  fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip uv not installed, the app suite did not run\n'
+fi
+
+step "the wheel carries the whole bundle"
+# An installation has no checkout to fall back on, so anything the engine
+# reads at run time and the wheel does not carry is a hole nobody sees until
+# somebody who is not the maintainer runs it. The manifest is checked by
+# app/tests/test_bundle.py; this builds the thing and looks inside it.
+# Wheel only, on purpose: see the note in app/pyproject.toml.
+if command -v uv >/dev/null 2>&1; then
+  if (cd app && uv build --wheel --quiet) >/dev/null 2>&1; then
+    wheel="$(ls -t app/dist/*.whl 2>/dev/null | head -1)"
+    # Listed once, then matched without a pipe: under pipefail a `grep -q`
+    # that finds its match early closes the pipe, unzip takes the SIGPIPE,
+    # and the pipeline reports a failure that is really a success. Every
+    # entry but the last one in the archive would read as absent.
+    listing="$(unzip -l "$wheel" 2>/dev/null)"
+    absent=""
+    for path in SKILL.md locales/en/app.yml skills/linkedin-post/SKILL.md \
+                references/anchoring.md lib/lint.py lib/publish.py; do
+      case "$listing" in
+        *"verbatim_app/_bundle/$path"*) ;;
+        *) absent="$absent $path" ;;
+      esac
+    done
+    if [ -z "$absent" ]; then ok "$(basename "$wheel")"; else bad "not in the wheel:$absent"; fi
+  else
+    bad "the wheel does not build"
+    (cd app && uv build --wheel) 2>&1 | tail -10 | sed 's/^/     /'
+  fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip uv not installed, the wheel was not built\n'
+fi
+
+step "the project page is more than one line"
+# That wheel is also the PyPI page, and a version there cannot be reused: a
+# page that ships wrong is fixed by publishing the next number. Nothing in a
+# checkout reads these fields, so an empty one stays invisible right up to
+# the moment it is permanent. Built by the step above, read here.
+# app/tests/test_packaging.py holds what goes in; this reads what came out.
+if [ -n "${wheel:-}" ] && [ -f "${wheel:-}" ]; then
+  meta="$(unzip -p "$wheel" '*.dist-info/METADATA' 2>/dev/null)"
+  thin=""
+  case "$meta" in *"Description-Content-Type: text/markdown"*) ;;
+                  *) thin="$thin long-description" ;; esac
+  case "$meta" in *"Project-URL: Source"*) ;; *) thin="$thin project-urls" ;; esac
+  case "$meta" in *"Classifier: "*) ;; *) thin="$thin classifiers" ;; esac
+  case "$meta" in *"Requires-Dist: fastapi"*) ;;
+                  # A table opened above the dependencies array takes it.
+                  # The wheel builds, installs, and imports nothing.
+                  *) thin="$thin requires-dist" ;; esac
+  # The README is written to be read on GitHub, where a relative target
+  # resolves. PyPI keeps it verbatim and serves it from a host with no
+  # docs/ under it, so one that survives the build is a broken image
+  # under the title. app/hatch_build.py makes them absolute.
+  case "$meta" in *"](docs/"*|*"](references/"*|*"](skills/"*|*"](examples/"*)
+                    thin="$thin relative-links" ;; *) ;; esac
+  if [ -z "$thin" ]; then ok "$(basename "$wheel") metadata"
+  else bad "the project page is missing:$thin"; fi
+else
+  # announced degradation, not a silent pass
+  printf '   skip no wheel was built, the project page was not read\n'
+fi
+
+step "no model instruction lives under app/"
+# Prompts stay in skills/ and locales/. The app carries mechanics only.
+prompts="$(grep -rniE 'you are (a|an|the) |system prompt|act as (a|an) |as an ai|respond only with|never reveal' \
+           app/verbatim_app 2>/dev/null || true)"
+if [ -z "$prompts" ]; then ok "clean"; else bad "instruction strings:"; echo "$prompts" | sed 's/^/     /'; fi
+
+step "one markdown parser, in one file"
+# Rendering a file into a page is where an export from another tool becomes
+# markup in somebody's browser, and markup.py is where that boundary is set:
+# html=False, images turned into links, links given a rel, no anchor inside an
+# anchor. A second parser imported somewhere else would be a second boundary,
+# drawn by whoever was in a hurry. The rule is held here rather than by
+# discipline, like the grep above about model instructions.
+#
+# **This one reads the syntax tree, not the lines.** Four greps in a row got
+# it wrong, and each failed from a different side: a comment naming a library
+# is prose, an import inside a `try:` is code, a vendored parser arrives as
+# `from .vendor import mistune`, and no regular expression tells those apart
+# in a repository whose docstrings discuss markdown parsers on every other
+# page. `ast` already knows which is which.
+#
+# One warning for whoever edits the block below: it lives inside a command
+# substitution, so a bare apostrophe anywhere in it, in a comment included,
+# opens a quote bash never closes and the whole script stops parsing. Write
+# `does not` rather than `doesn't`. Learned by breaking it.
+#
+# Two things it still cannot see, and neither is a regular expression away:
+# a library nobody has put on the list, and a module named at run time out of
+# a string, which is `importlib.import_module` and `__import__`. Written here
+# rather than papered over.
+out="$(python3 - 2>&1 <<'PARSERS'
+import ast
+import pathlib
+import sys
+
+#: The second parser somebody might reach for. A list, because nothing here
+#: can know what that will be.
+BANNED = {"markdown_it", "markdown", "markdown2", "mistune", "mistletoe",
+          "marko", "commonmark", "cmarkgfm"}
+#: The one file allowed to hold the boundary.
+BOUNDARY = pathlib.Path("app/verbatim_app/markup.py")
+#: The name of this package, which is the third way to spell a path inside
+#: it, and the one app/tests/ is written in.
+PACKAGE = "verbatim_app"
+
+
+def inside(parts, level=0):
+    """Which components of a module path to weigh.
+
+    A path that leads outside this package names a distribution by its first
+    component, and only that one counts: `from typing import Mapping` must
+    not match on something buried further in. A path that leads inside it can
+    hold a vendored copy at any depth, so every component counts.
+
+    Inside is three spellings of one thing, and all three have to fail
+    together or the guard only teaches which one to use: `from .mistune`,
+    `from verbatim_app.mistune`, and `import verbatim_app.vendor.mistune`.
+    The absolute one matters most, because `app/tests/` is written that way
+    and it is the line somebody copies out of a test.
+    """
+    return parts if (level or parts[:1] == [PACKAGE]) else parts[:1]
+
+
+def hits(source, name="<fixture>"):
+    """Every import of a banned parser in one file, as (line, what)."""
+    found = []
+    for node in ast.walk(ast.parse(source, filename=name)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                for part in inside(alias.name.split(".")):
+                    if part in BANNED:
+                        found.append((node.lineno, alias.name))
+                        break
+        elif isinstance(node, ast.ImportFrom):
+            parts = (node.module or "").split(".")
+            for part in inside(parts, node.level):
+                if part in BANNED:
+                    found.append((node.lineno, node.module))
+                    break
+            for alias in node.names:
+                # `from . import mistune`, `from .vendor import mistune`: the
+                # vendored copy, which is how a second parser arrives with no
+                # line in pyproject.toml to notice it. This branch reads the
+                # imported name, not its alias, so it also fails on a local
+                # symbol that happens to be called `markdown`, and this app
+                # has one: `web.py` gives the templates a global by that
+                # name. A known trade, not a bug. It fails loudly and an
+                # `as` alias settles it, where dropping the branch would
+                # reopen the vendoring hole in silence.
+                if alias.name in BANNED:
+                    found.append((node.lineno, alias.name))
+    return found
+
+
+# The check gets its own fixtures. It has been wrong before, and the next
+# edit to it needs holding. Above the divider: what it must see. Below: what
+# it must leave alone, which is where every earlier version failed.
+FIXTURES = [
+    ("import markdown_it", True),
+    ("import os, markdown", True),
+    ("import os as o, markdown_it as md", True),
+    ("import markdown_it.common", True),
+    ("try:\n    import markdown_it\nexcept ImportError:\n    pass", True),
+    ("if True:\n    from markdown_it import MarkdownIt", True),
+    ("from markdown_it.common.utils import escapeHtml", True),
+    ("from . import markdown_it", True),
+    ("from .vendor import mistune", True),
+    ("from .mistune import Markdown", True),
+    ("from .vendor.mistune import Markdown", True),
+    ("from ..vendor.marko import Parser", True),
+    ("import verbatim_app.mistune", True),
+    ("import verbatim_app.vendor.marko", True),
+    ("from verbatim_app.mistune import Markdown", True),
+    ("from verbatim_app.vendor.mistune import Markdown", True),
+    ("import os, \\\n    marko", True),
+
+    ("from .markup import render  # the only markdown_it entry point", False),
+    ('"""One rule: import markdown_it only in markup.py."""', False),
+    ("# Note: from markdown_it we take only MarkdownIt.", False),
+    ("import markdownify", False),
+    ("from .archive import notes_only, post_only", False),
+    ("from .markup import render", False),
+    ("from .markup import render as markdown", False),
+    ("from typing import Mapping", False),
+    ("from verbatim_app.markup import render", False),
+    ("import verbatim_app.instance", False),
+]
+for source, wanted in FIXTURES:
+    if bool(hits(source)) != wanted:
+        sys.stderr.write("the check itself does not hold on: %r\n" % source)
+        sys.exit(2)
+
+bad = []
+for path in sorted(pathlib.Path("app/verbatim_app").rglob("*.py")):
+    if path == BOUNDARY:
+        continue
+    try:
+        found = hits(path.read_text(encoding="utf-8"), str(path))
+    except (SyntaxError, UnicodeDecodeError, OSError) as broken:
+        sys.stderr.write("%s does not read: %s\n" % (path, broken))
+        sys.exit(2)
+    bad += ["%s:%d: %s" % (path, line, what) for line, what in found]
+if bad:
+    sys.stdout.write("\n".join(bad))
+    sys.exit(1)
+PARSERS
+)"
+# Two exits, two sentences. A file that will not parse is a file to repair,
+# and reporting it as a parser import would send somebody to the wrong place.
+case "$?" in
+  0) ok "clean" ;;
+  1) bad "markdown parser imported outside markup.py:"; echo "$out" | sed 's/^/     /' ;;
+  *) bad "the parser check could not run:"; echo "$out" | sed 's/^/     /' ;;
+esac
+
+step "no sentence reaches a browser from under app/"
+# An HTTPException detail is rendered as the whole page body on a plain form
+# navigation, so a sentence written here is a sentence in the wrong language on
+# a French screen. Machine codes only; the sentence lives in locales/<lang>/app.yml.
+# Scoped to routes/, which is where an HTTPException can be raised at all.
+# Anything that is not a bare double quoted kebab literal fails, so a single
+# quoted string, an f-string and a call all fail: none of them is a fixed code.
+# An SSE frame's technical text uses another keyword for the same reason.
+prose="$(grep -rnoE '(^|[^_[:alnum:]])detail=[^,)]*' app/verbatim_app/routes --include='*.py' 2>/dev/null \
+         | grep -vE 'detail="[a-z0-9-]+"$' || true)"
+if [ -z "$prose" ]; then ok "clean"; else bad "prose in an error detail:"; echo "$prose" | sed 's/^/     /'; fi
+
+step "the screen scripts"
+# They carry security: the lines that move a sheet digest into the approval
+# form, the ones that decide a turn is over, and the one that decides which
+# bytes reach a clipboard. Node's own test runner over a hand written DOM, no
+# npm and no node_modules in a Python repository.
+if command -v node >/dev/null 2>&1; then
+  for t in app/tests/interview.test.js app/tests/copy.test.js; do
+    if node --test "$t" >/dev/null 2>&1; then
+      ok "$t"
+    else
+      bad "$t"
+      node --test "$t" 2>&1 | tail -20 | sed 's/^/     /'
+    fi
+  done
+else
+  # announced degradation, not a silent pass
+  printf '   skip node not installed, the screen script was not tested\n'
+fi
+
+step "the launcher's provider list matches the engine's"
+# The settings sheet offers a menu of providers, and providers.py rejects any
+# name absent from its own table. Swift cannot import Python, so the list is
+# written twice; what stops it diverging in silence is this check rather than
+# somebody remembering. Same shape as the bundle list held by test_bundle.py.
+if python3 - <<'PROVIDERS'
+import ast, re, sys
+
+py = ast.parse(open("app/verbatim_app/providers.py", encoding="utf-8").read())
+engine = {}
+for node in py.body:
+    if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+        name = node.targets[0].id
+        if name in ("DEFAULT_BASE_URL", "DEFAULT_MODEL"):
+            engine[name] = ast.literal_eval(node.value)
+
+swift = open("scripts/VerbatimConfig.swift", encoding="utf-8").read()
+
+def table(name):
+    match = re.search(r"let %s = \[(.*?)\]" % name, swift, re.S)
+    if match is None:
+        return None
+    return dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]*)"', match.group(1)))
+
+def names(name):
+    match = re.search(r"let %s = \[(.*?)\]" % name, swift, re.S)
+    return re.findall(r'"([^"]+)"', match.group(1)) if match else None
+
+bad = []
+if names("PROVIDERS") != sorted(engine["DEFAULT_BASE_URL"]):
+    bad.append("PROVIDERS %s vs providers.py %s"
+               % (names("PROVIDERS"), sorted(engine["DEFAULT_BASE_URL"])))
+for name in ("DEFAULT_BASE_URL", "DEFAULT_MODEL"):
+    if table(name) != engine[name]:
+        bad.append("%s %s vs providers.py %s" % (name, table(name), engine[name]))
+
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+PROVIDERS
+then
+  ok "scripts/VerbatimConfig.swift agrees with providers.py"
+else
+  bad "the launcher offers providers the engine does not know, or the reverse"
+fi
+
+step "the macOS launcher's config file"
+# The only part of the app shell that is logic rather than lifecycle, and it
+# edits a file holding somebody's API key: it must change the four lines it
+# owns and no others. Compiled against the very source the app ships.
+if command -v swiftc >/dev/null 2>&1; then
+  probe="$(mktemp -d)"
+  if swiftc -o "$probe/config-test" \
+       scripts/VerbatimConfig.swift scripts/config-test.swift >/dev/null 2>&1 \
+     && "$probe/config-test" >/dev/null 2>&1; then
+    ok "scripts/VerbatimConfig.swift"
+  else
+    bad "scripts/VerbatimConfig.swift"
+    swiftc -o "$probe/config-test" \
+      scripts/VerbatimConfig.swift scripts/config-test.swift 2>&1 | tail -20 | sed 's/^/     /'
+    "$probe/config-test" 2>&1 | tail -20 | sed 's/^/     /'
+  fi
+  rm -rf "$probe"
+else
+  # announced degradation, not a silent pass
+  printf '   skip swiftc not installed, the macOS launcher was not tested\n'
+fi
+
+printf '\n'
+if [ "$fail" -eq 0 ]; then echo "app checks passed."; else echo "app checks failed."; fi
+exit "$fail"
