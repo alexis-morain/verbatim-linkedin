@@ -42,10 +42,14 @@ $(git ls-files | grep -E '(^|/)interviews/' || true)"
 if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "these are somebody's profile:"; echo "$leaked" | sed 's/^/     /'; fi
 
 step "every engine file is actually tracked"
-missing=""
-for f in $(find references skills locales lib engines examples app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
-  git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
-done
+# One `git ls-files`, not one per file. This ran 143 of them and cost 4.3 of
+# the 5 seconds this block took, which is most of what the app split was
+# supposed to have bought back.
+tracked="$(git ls-files)"
+missing="$(find references skills locales lib engines examples app/verbatim_app app/tests scripts \
+             -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null \
+           | cat - <(printf 'app/pyproject.toml\napp/hatch_build.py\n') \
+           | sort -u | comm -23 - <(printf '%s\n' "$tracked" | sort) | tr '\n' ' ')"
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi
 
 step "no .env and no key material is tracked"
