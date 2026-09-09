@@ -723,10 +723,10 @@ French who publishes in English is the normal case, not an edge case.
 
 ## 2. Profile
 
-**Eleven rows below, and the signature block is one of them**: ten prose
-sections and one verbatim block. Counting the block as a twelfth thing is how
-somebody loses a section and still finds the total right. None of the ten is a
-field with a value: each is a heading with prose under it.
+**Twelve rows below, and the signature block is one of them**: eleven prose
+sections and one verbatim block. Counting the block as a thirteenth thing is
+how somebody loses a section and still finds the total right. None of the
+eleven is a field with a value: each is a heading with prose under it.
 
 | Section | Required | Holds | If it goes missing |
 |---|---|---|---|
@@ -740,7 +740,14 @@ field with a value: each is a heading with prose under it.
 | True, but needs a call | no | Rates, margins, anything under NDA. | It leaks into a draft by accident. |
 | Names I must never cite | no | Clients and partners who have not agreed. | A name reaches a published post. |
 | What I never say | yes | The four defaults plus their own additions. | The engine writes a promise the person does not make. |
+| Deliberate channel choices | no | Decisions taken on purpose about how the channel is run, each with the condition that would reopen it. The comment gate is the usual one: skills leave it off unless this section turns it on. | A skill re-litigates a decision already made, or turns on a mechanic the person deliberately rejected. |
 | Signature block | no | Verbatim text, appended after a blank line. | **The failure this document was written after.** It is concatenated, never shown to the model and never regenerated: a generated signature drifts on every post until it belongs to someone else. Empty is a valid answer; absent is a loss. |
+
+The **Deliberate channel choices** row was added after migrating a real
+person's material into this format: their pillars carried a written decision
+not to run a comment gate, with the reason and the post count that would
+reopen it, and nothing here had a place for it. The format was wrong, not the
+material.
 
 ## 3. Voice
 
@@ -842,7 +849,7 @@ Count these before declaring a migration done. The numbers are the point of
 this document.
 
 - **5** status fields, none dropped, `output_language_default` included.
-- **11** rows in the profile table, the signature block included, present even when empty.
+- **12** rows in the profile table, the signature block included, present even when empty.
 - **5** voice parts, and **every trait carries its quote**.
 - **3** pillars, each with title, ratio, effect, description and material. The
   ratios sum to the cadence in Objective and cadence.

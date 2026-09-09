@@ -101,6 +101,11 @@ case studies page is already public and free to use.
 - A promise about a fundraise outcome, which I do not control.
 - Anything that implies I am providing regulated financial advice.
 
+### Deliberate channel choices
+
+Nothing yet. Kept as a heading rather than dropped, so a reader can tell
+"no decision taken" from "nobody wrote this".
+
 ### Signature block
 
 ```
