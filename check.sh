@@ -26,9 +26,15 @@ for dir in locales/*/; do
   fi
 done
 
-step "no profile file is tracked outside examples/"
+step "no profile file is tracked outside the fictional ones"
+# Three exceptions, each one engine owned and each one fictional or empty:
+# examples/ is the Nadia Feriel persona, references/ holds the template, and
+# app/tests/fixtures/ is that same persona in the old shape, frozen beside the
+# frozen app that still reads it. Everything else carrying these names is
+# somebody's real material and must never be tracked.
 leaked="$(git ls-files | grep -E '(^|/)(profile|profil|voice|voix|pillars|piliers|ideas|idees|measure|mesure|linkedin-page)\.md$' \
-          | grep -v '^examples/' | grep -v '^references/' | grep -v '\.template\.md$' || true)"
+          | grep -v '^examples/' | grep -v '^references/' \
+          | grep -v '^app/tests/fixtures/' | grep -v '\.template\.md$' || true)"
 # An interview transcript is the rawest thing a person ever says to this
 # engine. It has no fixed file name to grep for, so the directory is the rule.
 leaked="$leaked

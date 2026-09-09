@@ -30,6 +30,13 @@ mesure.md
 !references/
 !references/**
 !examples/**
+# The frozen app's own fixture: the same fictional persona in the old four
+# file shape, which examples/ stopped being when it became one material file.
+# It carries the profile file names by definition, so it needs the same
+# exception examples/ has. Left ignored, a clone builds an app whose suite
+# cannot find its fixture, which is how this rule was found: 242 tests green
+# here and red anywhere else.
+!app/tests/fixtures/**
 
 # The maintainer's own project state file, not a deliverable.
 # Contributor-facing conventions live in CONTRIBUTING.md instead.
