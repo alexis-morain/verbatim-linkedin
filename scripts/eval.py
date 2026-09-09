@@ -107,12 +107,29 @@ def gauge_listed_facts(transcript: str) -> tuple[bool, str]:
     return True, "%d fact(s) listed" % len(facts)
 
 
+#: The shape references/formats.md fixes for an angle proposal. The line is
+#: the traceability mechanism, not decoration, so it is what identifies an
+#: angle. English on purpose: the shape lives in the engine, which is English,
+#: while the quote inside it is in whatever language the interview ran in.
+ANGLE_LINE = re.compile(r'[Bb]ecause you said:\s*"([^"\n]*)"')
+
+
 def two_angles_each_quoting(transcript: str) -> tuple[bool, str]:
-    """Two angles were offered and each one carries a verbatim quote."""
-    quoted = re.findall(r'"[^"\n]{10,}"', transcript)
-    if len(quoted) < 2:
-        return False, "fewer than two quotes of ten or more characters"
-    return True, "%d quote(s) of ten or more characters" % len(quoted)
+    """Two angles were offered, each resting on a quote.
+
+    Counting quoted strings anywhere would pass on a transcript with no angles
+    in it at all, which is what an earlier version of this did. An angle is
+    identified by the line that makes it traceable.
+    """
+    quotes = [q.strip() for q in ANGLE_LINE.findall(transcript)]
+    if len(quotes) < 2:
+        return False, ("%d angle(s) resting on a quote, fewer than two"
+                       % len(quotes))
+    short = [q for q in quotes if len(q) < 10]
+    if short:
+        return False, "%d angle(s) resting on an unfindable quote: %s" % (
+            len(short), ", ".join(repr(q) for q in short))
+    return True, "%d angles, each resting on a quote" % len(quotes)
 
 
 def anchors_are_long_enough(transcript: str) -> tuple[bool, str]:
@@ -121,12 +138,16 @@ def anchors_are_long_enough(transcript: str) -> tuple[bool, str]:
     One letter is found in any text, so an anchor that cannot miss is an alarm
     that cannot ring. Code used to refuse these; here it is measured instead.
     """
-    short = [q for q in re.findall(r'(?:SAID|CORPUS|SHEET):\s*"([^"\n]*)"',
-                                   transcript) if len(q.strip()) < 10]
+    found = re.findall(r'(?:SAID|CORPUS|SHEET):\s*"([^"\n]*)"', transcript)
+    if not found:
+        # A check with no counterexample and no existence test scores an empty
+        # transcript as holding. It held on "" until a review said so.
+        return False, "no anchor at all, so nothing was measured"
+    short = [q for q in found if len(q.strip()) < 10]
     if short:
         return False, "%d anchor(s) under ten characters: %s" % (
             len(short), ", ".join(repr(s) for s in short))
-    return True, "every anchor is ten characters or more"
+    return True, "%d anchors, every one ten characters or more" % len(found)
 
 
 CHECKS = (
@@ -169,6 +190,16 @@ Acquired
 Missing
   when this happened
 
+THE COMMENTARY, NOT THE MODEL
+The numbers were fine and the story around them was not.
+Because you said: "we were off by thirty one percent on net burn, same model"
+We would dig into: what changed between the two versions of the deck.
+
+ELEVEN SLIDES DELETED
+What a board pack looks like once you cut what nobody reads.
+Because you said: "we deleted eleven slides and kept the cash chart"
+We would dig into: how the next meeting actually ran.
+
 ANGLE               Your model is not wrong, your commentary is
 CONCRETE ELEMENTS
   - Forecast error went from 31 percent to 6 percent
@@ -180,33 +211,60 @@ CENTRAL CONVICTION  "the numbers were fine, the argument was not"
 FIRST LINE          Thirty-one percent to six percent, on the same model.
 '''
 
+#: One broken transcript per check, keyed by the check it must break. The
+#: keys are not decoration: self_test asserts that *this* check fails on
+#: *this* fixture, not merely that something failed. Four fixtures for five
+#: checks passed for a while, and the missing one was the check that turned
+#: out to measure nothing.
 BAD = {
-    "no sheet": GOOD.replace("CENTRAL CONVICTION", "SOMETHING ELSE"),
-    "a bare bullet": GOOD.replace(
-        '    CORPUS: "Eleven hours. That is the median time I spend"\n', ""),
-    "a counted gauge": re.sub(r"Acquired\n(  .*\n)+", "Acquired\n  2 facts\n", GOOD),
-    "a short anchor": GOOD.replace(
-        '"we were off by thirty one percent on net burn, same model"', '"we"'),
+    "the sheet appeared":
+        GOOD.replace("CENTRAL CONVICTION", "SOMETHING ELSE"),
+    "every bullet carries a quote":
+        GOOD.replace('    CORPUS: "Eleven hours. That is the median time I spend"\n', ""),
+    "the gauge listed facts":
+        re.sub(r"Acquired\n(  .*\n)+", "Acquired\n  2 facts\n", GOOD),
+    "two angles, each quoting":
+        GOOD.replace("ELEVEN SLIDES DELETED", "").replace(
+            'Because you said: "we deleted eleven slides and kept the cash chart"\n', ""),
+    "anchors are findable":
+        GOOD.replace('"we were off by thirty one percent on net burn, same model"', '"we"'),
 }
+
+#: The empty transcript. Every check has to fail on it: a check that passes
+#: on nothing at all scores a model that produced nothing as holding.
+EMPTY = ""
 
 
 def self_test() -> int:
-    """Every check holds on GOOD, and the named one fails on each BAD."""
-    import io
+    """Every check holds on GOOD, each one fails on its own fixture, and none
+    of them passes on an empty transcript."""
     problems = []
     for label, check in CHECKS:
         held, detail = check(GOOD)
         if not held:
             problems.append("%s failed on the good transcript: %s" % (label, detail))
-    for name, transcript in BAD.items():
-        if report(transcript, "fixture", stream=io.StringIO()) == 0:
-            problems.append("%r passed, and it must not" % name)
+
+    for label, check in CHECKS:
+        if label not in BAD:
+            problems.append("%s has no fixture, so nothing proves it can fail" % label)
+            continue
+        held, _ = check(BAD[label])
+        if held:
+            problems.append("%s passed on the transcript written to break it" % label)
+
+    for label, check in CHECKS:
+        held, _ = check(EMPTY)
+        if held:
+            problems.append("%s passed on an empty transcript, so it measures nothing"
+                            % label)
+
     if problems:
-        for p in problems:
-            print("  " + p, file=sys.stderr)
+        for problem in problems:
+            print("  " + problem, file=sys.stderr)
         return 1
-    print("self test: %d checks hold on a good transcript and fail on %d "
-          "broken ones." % (len(CHECKS), len(BAD)))
+    print("self test: %d checks hold on a good transcript, each fails on its own\n"
+          "broken one, and none of them passes on an empty transcript."
+          % len(CHECKS))
     return 0
 
 

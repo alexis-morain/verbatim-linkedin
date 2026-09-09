@@ -2,7 +2,10 @@
 # skills/linkedin-post/engine.manifest: this list is written, never inferred.
 
 references/interview-intents.md
+references/style-taxonomy.md
 references/formats.md
 references/material.md
 locales/<lang>/interview.md
 locales/<lang>/style.md
+references/platform.md
+references/measure.md

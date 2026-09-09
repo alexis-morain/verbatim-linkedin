@@ -546,6 +546,68 @@ from, `buyer-words` is memory prompts (heard sentences, not invented ones),
 
 ---
 
+## references/style-taxonomy.md
+
+# Style taxonomy
+
+Ten categories of AI tell. The categories are universal. The word lists that
+fill them are not, and they are never translated.
+
+Every language pack carries a `style.md` (prose rules, for the model) and a
+`lint.yml` (exact strings, for `lib/lint.py`). Both are organised by the ten
+ids below. A pack that skips a category declares it empty rather than dropping
+the key, so a reader can tell "nothing to flag here" from "nobody wrote this
+yet".
+
+| id | What it catches |
+|---|---|
+| `grandiose-verbs` | Verbs that inflate an ordinary action into an event. |
+| `hollow-jargon` | Nouns that sound like expertise and carry no claim. |
+| `filler-crutches` | Phrases that buy time before the sentence starts. |
+| `fake-hooks` | Openers that announce a subject instead of stating it. |
+| `schoolbook-transitions` | Connectives from a graded essay, not from speech. |
+| `summarizing-closers` | Endings that repeat the post instead of ending it. |
+| `forced-empathy` | Validation addressed to nobody. |
+| `negative-parallelism` | "Not X, it's Y." A shape, not a word list. |
+| `dramatic-fragmentation` | One-word lines, "read that again", rhetorical beats. |
+| `typography` | Em dashes, emoji, spacing and quote conventions. |
+
+## Why the lists are not translations of each other
+
+Three asymmetries, each one enough on its own to kill the idea of translating
+a single list:
+
+1. **A word can be a cliche in one language and neutral in another.**
+   `scalable` and `mindset` are borrowed marketing tells in French. In English
+   they are ordinary words that a technical post may need.
+2. **Some tells have no counterpart.** French "force est de constater" has no
+   English equivalent worth listing. English "in today's fast-paced world" has
+   no French twin.
+3. **The same category can rank differently.** Negative parallelism is the
+   dominant English tell of 2026 and merely common in French. Weighting has to
+   follow the language, not the category.
+
+## What belongs where
+
+- The **category** is engine-side. It goes in this file and nowhere else.
+- The **list** is pack-side. It goes in `locales/<lang>/lint.yml`.
+- The **explanation of why a category matters to a reader** is pack-side too,
+  in `locales/<lang>/style.md`, because the example has to be in the language.
+
+## Two rules for the lint pass
+
+**Never rewrite by substitution.** `negative-parallelism` in particular has no
+mechanical fix: the repair is two separate statements, and only the author
+knows which two. The lint reports, the human decides.
+
+**A hit is a question, not a verdict.** A post that quotes a client saying
+"game-changer" should keep the word. The pass flags, it does not block. The
+only entries that block are the ones a pack marks `hard: true`, and a pack
+should keep that set very small.
+
+
+---
+
 ## references/formats.md
 
 # Formats and objective labels
@@ -717,8 +779,10 @@ French who publishes in English is the normal case, not an edge case.
 > `interface_language` while describing it as "the language you are
 > interviewed in": the name and the meaning disagreed, and the name was the
 > half that was wrong. It is `interview_language` here and in every skill.
-> `interface_language` survives in `references/profile.template.md` and in the
-> frozen app, which read the old format and are not migrating. Both names are
+> `interface_language` survives in the old profile template under `references/`
+> and in the frozen app, which read the old format and are not migrating. It is
+> named here without a path on purpose: a generated engine carries every file
+> it cites, and that template describes the shape this format replaced. Both names are
 > written down so a reader of either format knows which one they are holding.
 
 ## 2. Profile
@@ -1238,3 +1302,169 @@ Comment le lire sur un corpus :
   trait, pas une faute.
 
 En l'absence de corpus, demander. Ne jamais choisir par défaut.
+
+
+---
+
+## references/platform.md
+
+# Platform mechanics
+
+Last reviewed: 2026-08-27.
+
+Everything below carries a status. Nothing here is stated as fact unless the
+status says it was measured, and nothing that was measured on one account is
+presented as a law.
+
+**This file rots.** LinkedIn changes its ranking and its limits without
+announcing either. A claim older than six months should be re-checked before a
+skill leans on it. If you are reading this a year from now, treat the folklore
+rows as expired.
+
+## Status vocabulary
+
+| Status | Means |
+|---|---|
+| `mechanical` | A property of the interface itself. Anyone can verify it in a browser in under a minute. |
+| `observed` | Seen on real accounts, by the maintainers or by users. True there. Not proven to generalise. |
+| `folklore` | Widely repeated, no source anyone can check. Listed so you stop wondering, not so you act on it. |
+
+## What the interface does
+
+| Claim | Status | What to do with it |
+|---|---|---|
+| A feed post is truncated after a short prefix, and a reader must click to see the rest. | `mechanical` | Write the first lines to survive alone. The cut lands somewhere near 200 characters, and it moves with device, locale and interface version. Write for the shortest fold you can see on your own phone, not for a number in a document. |
+| The truncation point is the only piece of the post most people will ever read. | `mechanical` | If a hook is chosen, the post is written for that hook, to the character. Not the reverse. |
+| A post can be edited after publishing. | `mechanical` | A typo is not a reason to delete and repost. |
+| Deleting a post in a scheduling tool does not unpublish it from LinkedIn. | `mechanical` | Remove it from LinkedIn itself. This one has bitten this project. |
+| Invitation volume is capped per week, and past the cap failures are silent. | `observed` | Measure your own ceiling before you plan around one. It varies with account age. |
+
+## What people say about reach
+
+| Claim | Status | Position taken here |
+|---|---|---|
+| Outbound links in the post body suppress reach. | `folklore` | Unverifiable from outside. The usual workaround, link in the first comment, costs a click and buys an unproven gain. Decide per post, do not encode a rule. |
+| There are good and bad hours to publish. | `folklore` | The bundle proposes weekday slots as a default because a default is needed, not because the hour is known to matter. If you have your own numbers, they beat this. |
+| Long posts are punished, or rewarded. | `folklore` | Both are claimed, by the same people, in the same year. Write until the idea is finished. Length is an outcome, not a setting. |
+| Hashtags change distribution. | `folklore` | No position. If you use them, use few, and never as a substitute for saying what the post is about. |
+| Early comments matter more than late ones. | `folklore` | Plausible and unproven. It is also the argument used to justify engagement pods, which is why it gets repeated. |
+
+## What this bundle refuses to do
+
+**No engagement pods, no reciprocal comment rings.** They buy a metric this
+bundle does not measure, and they cost the credibility that is the whole point.
+
+**No comment-gating by default** ("comment WORD and I will send it to you"). It
+works on an audience that lives on the platform and accepts the game. On senior
+buyers it reads cheap and it damages the pillar it is attached to. A profile can
+turn it on deliberately, once there are enough published posts to know whether
+the audience plays that game. It is off until then.
+
+**No calibration on a scraped viral corpus.** Copying what performs produces the
+average of a niche, which is precisely what a distinctive voice is not. Studying
+five people you actually respect, by hand, for their structures and never their
+turns of phrase, is a different activity and is allowed.
+
+## The measurement position
+
+Reach numbers, impressions and likes are not the metrics this bundle optimises,
+because they are not the metrics that pay. See `references/measure.md` for what
+gets recorded instead, and for the confidence thresholds that keep three data
+points from becoming a theory.
+
+
+---
+
+## references/measure.md
+
+# Measurement
+
+## The store
+
+**One store, and it is the ledger inside the material.** One row per post,
+carrying the nine columns the loops read, plus four descriptive fields nothing
+parses. The format is [`material.md`](material.md), section 6, and
+[`../docs/adr/0001-the-ledger-is-the-store.md`](../docs/adr/0001-the-ledger-is-the-store.md)
+records why.
+
+This file used to say the opposite: that the store was a front matter block on
+top of each post file, and that any table was derived from those at read time.
+That rule assumed a consumer with a filesystem. The engine is written against
+a floor that cannot write a file, so the person carries one attachable
+`material` and the ledger inside it is the record.
+
+Two reasons it is one store and not two.
+
+**Drift.** A single store cannot disagree with itself. At the floor a second
+store would be kept in step by hand, or not at all, which is the drift the old
+rule was written to prevent and would now cause.
+
+**Editing.** Filling a row at J+7 is a thirty second job in a file already
+open, and several posts get filled in one pass instead of one file at a time.
+
+What is genuinely lost is per post provenance of the measurement: a ledger row
+can be edited without touching the text it describes, where a front matter
+block sat next to its own. The thresholds below are unchanged and still refuse
+to conclude under two measured posts.
+
+**Post bodies live in the corpus**, not here. Losing one costs a voice
+reference rather than a measurement.
+
+## What gets counted
+
+Three numbers. None of them is a like.
+
+| Field | Counts | Does not count |
+|---|---|---|
+| `inbound_connections` | Connection requests from profiles that match the target defined in the profile. | Everyone else. A recruiter, a student and a competitor are not signal. |
+| `inbound_dms` | Messages that mention a project, a budget, a mandate, or a specific problem. | "Great post", "let's connect", automated pitches. |
+| `meeting_mentions` | Times a post came up unprompted in a call or a meeting. | Times you brought it up yourself. |
+
+Impressions, likes and comments can be recorded in `note` if they are
+interesting. They are never the decision variable. A post can do all three of
+the above with two hundred impressions, and none of them with twenty thousand.
+
+**`state` is not decoration.** A row exists as soon as a post is drafted, and
+without this field a list of drafts is indistinguishable from a list of
+published posts. Every count in this document is over `state: published`
+only. `published_ref` is what lets you find the thing again in the tool that
+holds it, and it is the difference between "I scheduled that" and "did I?".
+
+**Seven days.** Fill the line at J+7. Earlier and the number is still moving,
+later and nobody remembers. If a post is measured late, record the real date in
+`measured` rather than pretending.
+
+## Confidence thresholds
+
+The point of this section is to stop three data points from becoming a theory.
+When a pattern is claimed across posts, it carries a status, and the status is
+determined by how many measured posts support it:
+
+| Measured posts supporting it | Status | What it authorises |
+|---|---|---|
+| 2 to 3 | **provisional** | A hypothesis, stated as one. Worth one deliberate test. Never a rule in the profile. |
+| 4 to 6 | **emerging** | Worth acting on, worth writing down, still worth contradicting. |
+| 7 or more | **confirmed** | Goes into the profile as a rule. |
+
+Two guards on top:
+
+- **A pattern from a single pillar does not generalise to the others.** Six
+  post-mortems that outperform say something about post-mortems, not about the
+  author's voice.
+- **A pattern that only ever appears with one format is a format effect until
+  proven otherwise.**
+
+A Voice section built from a single published post says so, in a banner at
+the top of it, and every skill that reads it defers to the hard style rules
+instead of to the observed traits. The banner comes off when the corpus
+is real, not when it feels awkward.
+
+## The platform export
+
+LinkedIn exports a spreadsheet of post performance over the trailing 365 days,
+from the analytics section of the profile. It is the only place where
+impressions per post are available without a third party.
+
+Use it for one thing: filling in `note` in bulk after the fact, and spotting
+posts you forgot to measure. It does not contain any of the three fields that
+matter, because none of them are visible to the platform.

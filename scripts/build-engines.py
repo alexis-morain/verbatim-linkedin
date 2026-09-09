@@ -60,19 +60,28 @@ def manifest(skill: Path) -> list[str]:
     return [l.strip() for l in lines if l.strip() and not l.startswith("#")]
 
 
-def undeclared(skill: Path, declared: list[str]) -> list[str]:
-    """Citations in the skill's prose that the manifest does not carry.
+def dangling(engine: str, lang: str) -> list[str]:
+    """Citations in the finished engine whose content is not in the engine.
 
-    Compared with placeholders folded to a single token, since the manifest
-    writes `<lang>` where a skill may write `<interview_language>` for the
-    same file.
+    **This reads the product, not the intention.** An earlier version compared
+    the manifest against the skill's own prose, which missed two whole
+    surfaces: the root router, embedded in every engine, and the reference
+    files themselves, which cite each other. Four of six engines shipped
+    pointing at files nobody attached, and a citation of a file that did not
+    exist anywhere passed every guard. Whatever the manifest says, what
+    matters is whether a person holding this one file can follow every path it
+    names, so that is what is checked.
+
+    A path counts as carried when the engine holds a `## <path>` heading for
+    it, which is how `one()` writes every embedded file.
     """
-    def key(path: str) -> str:
-        return fill(path, "*")
-
-    have = {key(d) for d in declared}
-    body = (skill / "SKILL.md").read_text(encoding="utf-8")
-    return sorted({c for c in CITED.findall(body) if key(c) not in have})
+    carried = {line[3:].strip() for line in engine.splitlines()
+               if line.startswith("## ")}
+    missing = set()
+    for cited in CITED.findall(engine):
+        if fill(cited, lang) not in carried:
+            missing.add(cited)
+    return sorted(missing)
 
 
 def one(skill: Path, lang: str) -> str:
@@ -117,13 +126,15 @@ def build(check: bool) -> int:
                     if (p / "engine.manifest").is_file())
     stale, wrote = [], 0
     for skill in skills:
-        missing = undeclared(skill, manifest(skill))
-        if missing:
-            print("%s cites what its manifest does not carry: %s"
-                  % (skill.name, ", ".join(missing)), file=sys.stderr)
-            return 2
         for lang in languages():
             text = one(skill, lang)
+            missing = dangling(text, lang)
+            if missing:
+                print("%s.%s points at what it does not carry: %s"
+                      % (skill.name, lang, ", ".join(missing)), file=sys.stderr)
+                print("  add it to skills/%s/engine.manifest, or stop citing "
+                      "it as a path." % skill.name, file=sys.stderr)
+                return 2
             path = OUT / ("%s.%s.md" % (skill.name, lang))
             if check:
                 if not path.is_file() or path.read_text(encoding="utf-8") != text:

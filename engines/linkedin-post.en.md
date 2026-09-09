@@ -752,6 +752,68 @@ from, `buyer-words` is memory prompts (heard sentences, not invented ones),
 
 ---
 
+## references/style-taxonomy.md
+
+# Style taxonomy
+
+Ten categories of AI tell. The categories are universal. The word lists that
+fill them are not, and they are never translated.
+
+Every language pack carries a `style.md` (prose rules, for the model) and a
+`lint.yml` (exact strings, for `lib/lint.py`). Both are organised by the ten
+ids below. A pack that skips a category declares it empty rather than dropping
+the key, so a reader can tell "nothing to flag here" from "nobody wrote this
+yet".
+
+| id | What it catches |
+|---|---|
+| `grandiose-verbs` | Verbs that inflate an ordinary action into an event. |
+| `hollow-jargon` | Nouns that sound like expertise and carry no claim. |
+| `filler-crutches` | Phrases that buy time before the sentence starts. |
+| `fake-hooks` | Openers that announce a subject instead of stating it. |
+| `schoolbook-transitions` | Connectives from a graded essay, not from speech. |
+| `summarizing-closers` | Endings that repeat the post instead of ending it. |
+| `forced-empathy` | Validation addressed to nobody. |
+| `negative-parallelism` | "Not X, it's Y." A shape, not a word list. |
+| `dramatic-fragmentation` | One-word lines, "read that again", rhetorical beats. |
+| `typography` | Em dashes, emoji, spacing and quote conventions. |
+
+## Why the lists are not translations of each other
+
+Three asymmetries, each one enough on its own to kill the idea of translating
+a single list:
+
+1. **A word can be a cliche in one language and neutral in another.**
+   `scalable` and `mindset` are borrowed marketing tells in French. In English
+   they are ordinary words that a technical post may need.
+2. **Some tells have no counterpart.** French "force est de constater" has no
+   English equivalent worth listing. English "in today's fast-paced world" has
+   no French twin.
+3. **The same category can rank differently.** Negative parallelism is the
+   dominant English tell of 2026 and merely common in French. Weighting has to
+   follow the language, not the category.
+
+## What belongs where
+
+- The **category** is engine-side. It goes in this file and nowhere else.
+- The **list** is pack-side. It goes in `locales/<lang>/lint.yml`.
+- The **explanation of why a category matters to a reader** is pack-side too,
+  in `locales/<lang>/style.md`, because the example has to be in the language.
+
+## Two rules for the lint pass
+
+**Never rewrite by substitution.** `negative-parallelism` in particular has no
+mechanical fix: the repair is two separate statements, and only the author
+knows which two. The lint reports, the human decides.
+
+**A hit is a question, not a verdict.** A post that quotes a client saying
+"game-changer" should keep the word. The pass flags, it does not block. The
+only entries that block are the ones a pack marks `hard: true`, and a pack
+should keep that set very small.
+
+
+---
+
 ## references/formats.md
 
 # Formats and objective labels
@@ -1127,48 +1189,34 @@ points from becoming a theory.
 
 ## The store
 
-**One store, and it is the posts themselves.**
+**One store, and it is the ledger inside the material.** One row per post,
+carrying the nine columns the loops read, plus four descriptive fields nothing
+parses. The format is [`material.md`](material.md), section 6, and
+[`../docs/adr/0001-the-ledger-is-the-store.md`](../docs/adr/0001-the-ledger-is-the-store.md)
+records why.
 
-Every post file in the profile's `posts/` directory carries a front matter
-block. That block is the source of truth. Any table, count or trend is derived
-from it at read time and never written back anywhere.
+This file used to say the opposite: that the store was a front matter block on
+top of each post file, and that any table was derived from those at read time.
+That rule assumed a consumer with a filesystem. The engine is written against
+a floor that cannot write a file, so the person carries one attachable
+`material` and the ledger inside it is the record.
 
-```yaml
----
-date: 2026-08-29          # publication date, not drafting date
-pillar: 1                 # index into the profile's pillars
-format: post-mortem       # one of references/formats.md
-label: TRUST              # VISIBILITY | TRUST | ACTION
-hook: |
-  The first line, verbatim, as published.
-chars: 2214
-state: published          # draft | scheduled | published
-published_ref: ""         # id in whatever tool scheduled it, empty for tier 0
-measured: 2026-09-05      # date the line below was filled, empty until then
-inbound_connections: 0    # from target profiles only
-inbound_dms: 0            # messages that mention a project or a mandate
-meeting_mentions: 0       # times the post came up in a call
-note: ""                  # one line, free text, what happened
----
-```
+Two reasons it is one store and not two.
 
-Two reasons for keeping it here rather than in a separate spreadsheet.
+**Drift.** A single store cannot disagree with itself. At the floor a second
+store would be kept in step by hand, or not at all, which is the drift the old
+rule was written to prevent and would now cause.
 
-**Drift.** A second file has to be kept in sync with the first, and it never is.
-The moment the aggregate disagrees with the posts, the aggregate wins by being
-easier to read, and the record is quietly wrong.
+**Editing.** Filling a row at J+7 is a thirty second job in a file already
+open, and several posts get filled in one pass instead of one file at a time.
 
-**Editing.** The person filling this in is the author, seven days after
-publishing, in thirty seconds. They are already in the post file, or they can be.
-Nothing to open, nothing to import.
+What is genuinely lost is per post provenance of the measurement: a ledger row
+can be edited without touching the text it describes, where a front matter
+block sat next to its own. The thresholds below are unchanged and still refuse
+to conclude under two measured posts.
 
-The cost is real and worth naming: computing a trend means reading every post
-file. At the scale this operates on, a hundred posts a year, that is free.
-
-> **Open decision.** If a future version needs a queryable store (a dashboard,
-> a UI, cross-account comparison), this is the point where a derived index gets
-> written. The rule to keep is that the index is regenerated from the posts and
-> never edited directly.
+**Post bodies live in the corpus**, not here. Losing one costs a voice
+reference rather than a measurement.
 
 ## What gets counted
 
@@ -1184,9 +1232,9 @@ Impressions, likes and comments can be recorded in `note` if they are
 interesting. They are never the decision variable. A post can do all three of
 the above with two hundred impressions, and none of them with twenty thousand.
 
-**`state` is not decoration.** A file exists as soon as a post is drafted, and
-without this field a directory of drafts is indistinguishable from a directory
-of published posts. Every count in this document is over `state: published`
+**`state` is not decoration.** A row exists as soon as a post is drafted, and
+without this field a list of drafts is indistinguishable from a list of
+published posts. Every count in this document is over `state: published`
 only. `published_ref` is what lets you find the thing again in the tool that
 holds it, and it is the difference between "I scheduled that" and "did I?".
 
@@ -1214,9 +1262,9 @@ Two guards on top:
 - **A pattern that only ever appears with one format is a format effect until
   proven otherwise.**
 
-A profile whose `voice.md` was built from a single published post says so, at
-the top of the file, and every skill that reads it defers to the hard style
-rules instead of to the observed traits. The banner comes off when the corpus
+A Voice section built from a single published post says so, in a banner at
+the top of it, and every skill that reads it defers to the hard style rules
+instead of to the observed traits. The banner comes off when the corpus
 is real, not when it feels awkward.
 
 ## The platform export

@@ -11,7 +11,7 @@ The name is the mechanism: no angle is proposed unless it can be traced to a
 verbatim quote of something you said in the interview that produced it.
 
 **It cannot write anything you did not say.** Every fact in a generated post
-traces back to your profile, to your published corpus, or to a sentence you
+traces back to your material, to your published corpus, or to a sentence you
 spoke in the interview that produced it. When nothing traces, nothing gets
 written. That constraint is the product; the writing is a consequence of it.
 
@@ -31,7 +31,7 @@ A backing also says where it lives: a sentence you said, or a line of the
 validation sheet you approved. The panel words the two differently, because
 an approval is consent rather than speech, and a quote is checked against the
 one source it names: a line of the sheet offered as something you said comes
-back fabricated, and so does anything lifted from your profile.
+back fabricated, and so does anything lifted from your material.
 
 ## Why an interview
 
@@ -66,7 +66,9 @@ installation.
 French versions sit beside them in [`engines/`](engines/), one file per skill
 and language. Each one carries its skill, the router, and every reference and
 pack file it needs, because the weakest host this is written for cannot fetch
-a second file.
+a second file. `scripts/build-engines.py` holds that by reading the finished
+engine and refusing any path it names but does not carry, which is a stronger
+question than whether a manifest was filled in.
 
 **That host is the contract.** A conversation that receives an attachment and
 returns text, writes no file and runs no code. Anything a better host adds is
@@ -75,7 +77,7 @@ convenience: it never adds a promise, and the engine says so where it matters.
 Your material is a second file you attach, and it stays yours. The engine
 prints the lines that changed at the end of a session and you paste them back.
 
-## Engine and profile
+## Engine and material
 
 Two things, kept apart on purpose.
 
@@ -83,19 +85,24 @@ Two things, kept apart on purpose.
 the formats, the validation sheet, the measurement schema, the deterministic
 style pass. It contains nothing about any particular person.
 
-**The profile** is yours. Your positioning, your pillars, your provable facts,
-the names you cannot cite, your signature. It lives in a directory you choose,
-on your machine, and `.gitignore` here is written to make sure it never ends up
-in this repository by accident.
+**The material** is yours. Your positioning, your pillars, your provable
+facts, the names you cannot cite, your signature. It is one file you keep and
+attach, and `.gitignore` here is written to make sure it never ends up in this
+repository by accident.
 
-The seam between them is three lines at the top of your profile:
+The seam between them is the Status block at the top of it:
 
 ```
 ## Status
 - filled: no
 - source: template
 - updated: --
+- interview_language: --
+- output_language_default: --
 ```
+
+The last two are independent on purpose: plenty of people want to be
+interviewed in one language and publish in another.
 
 While `filled: no`, every skill falls back to generic rules, says so, and
 offers to set you up. No skill pretends to know you.
@@ -119,7 +126,7 @@ engines in `engines/` are generated from them by
 
 | Skill | Does |
 |---|---|
-| [`linkedin-setup`](skills/linkedin-setup/) | Builds your profile, your pillars, your voice file and your idea bank from a short interview, then hands over to the first post. |
+| [`linkedin-setup`](skills/linkedin-setup/) | Builds your material, one file, from a short interview: who you write to, your pillars, your voice, your idea bank. Then hands over to the first post. |
 | [`linkedin-post`](skills/linkedin-post/) | Interview, validation sheet, draft, style pass, revisions, archive, publish, measure at J+7. |
 | [`linkedin-profile`](skills/linkedin-profile/) | Audits and rewrites the nine sections of your public LinkedIn page, headline and About first, from material you can prove. |
 

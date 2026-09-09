@@ -127,11 +127,16 @@ class TestTheFiling(ArchiveCase):
         named = re.findall(r"^\| `([A-Z]+)` \|", text, re.M)
         self.assertEqual(sorted(archive.LABELS), sorted(set(named)))
 
-    def test_the_states_are_the_ones_the_measure_contract_names(self):
-        text = (REPO / "references" / "measure.md").read_text(encoding="utf-8")
-        named = re.search(r"^state:\s*\w+\s*#\s*(.+)$", text, re.M).group(1)
-        self.assertEqual(sorted(archive.STATES),
-                         sorted(part.strip() for part in named.split("|")))
+    def test_the_states_are_the_ones_the_material_contract_names(self):
+        # The contract moved. It used to be the front matter block in
+        # measure.md, which ADR 0001 overturned: the ledger is the store, and
+        # the column that carries state is specified in material.md. This
+        # reads the new address for the same reason it read the old one, so
+        # that archive.STATES cannot drift away from what ships.
+        text = (REPO / "references" / "material.md").read_text(encoding="utf-8")
+        row = re.search(r"^\| `state` \| (.+?) \|", text, re.M).group(1)
+        named = re.findall(r"`(\w+)`", row)
+        self.assertEqual(sorted(archive.STATES), sorted(named))
 
     def test_a_fresh_archive_starts_as_a_draft(self):
         self.assertEqual(filing().state, "draft")

@@ -457,6 +457,68 @@ from, `buyer-words` is memory prompts (heard sentences, not invented ones),
 
 ---
 
+## references/style-taxonomy.md
+
+# Style taxonomy
+
+Ten categories of AI tell. The categories are universal. The word lists that
+fill them are not, and they are never translated.
+
+Every language pack carries a `style.md` (prose rules, for the model) and a
+`lint.yml` (exact strings, for `lib/lint.py`). Both are organised by the ten
+ids below. A pack that skips a category declares it empty rather than dropping
+the key, so a reader can tell "nothing to flag here" from "nobody wrote this
+yet".
+
+| id | What it catches |
+|---|---|
+| `grandiose-verbs` | Verbs that inflate an ordinary action into an event. |
+| `hollow-jargon` | Nouns that sound like expertise and carry no claim. |
+| `filler-crutches` | Phrases that buy time before the sentence starts. |
+| `fake-hooks` | Openers that announce a subject instead of stating it. |
+| `schoolbook-transitions` | Connectives from a graded essay, not from speech. |
+| `summarizing-closers` | Endings that repeat the post instead of ending it. |
+| `forced-empathy` | Validation addressed to nobody. |
+| `negative-parallelism` | "Not X, it's Y." A shape, not a word list. |
+| `dramatic-fragmentation` | One-word lines, "read that again", rhetorical beats. |
+| `typography` | Em dashes, emoji, spacing and quote conventions. |
+
+## Why the lists are not translations of each other
+
+Three asymmetries, each one enough on its own to kill the idea of translating
+a single list:
+
+1. **A word can be a cliche in one language and neutral in another.**
+   `scalable` and `mindset` are borrowed marketing tells in French. In English
+   they are ordinary words that a technical post may need.
+2. **Some tells have no counterpart.** French "force est de constater" has no
+   English equivalent worth listing. English "in today's fast-paced world" has
+   no French twin.
+3. **The same category can rank differently.** Negative parallelism is the
+   dominant English tell of 2026 and merely common in French. Weighting has to
+   follow the language, not the category.
+
+## What belongs where
+
+- The **category** is engine-side. It goes in this file and nowhere else.
+- The **list** is pack-side. It goes in `locales/<lang>/lint.yml`.
+- The **explanation of why a category matters to a reader** is pack-side too,
+  in `locales/<lang>/style.md`, because the example has to be in the language.
+
+## Two rules for the lint pass
+
+**Never rewrite by substitution.** `negative-parallelism` in particular has no
+mechanical fix: the repair is two separate statements, and only the author
+knows which two. The lint reports, the human decides.
+
+**A hit is a question, not a verdict.** A post that quotes a client saying
+"game-changer" should keep the word. The pass flags, it does not block. The
+only entries that block are the ones a pack marks `hard: true`, and a pack
+should keep that set very small.
+
+
+---
+
 ## references/platform.md
 
 # Platform mechanics
@@ -883,3 +945,196 @@ and hides a trap: the register still exists, it just moves into contractions
 and verb choice. "Do not" versus "don't" carries as much as "vous" versus "tu".
 
 Read it off the corpus. Do not set it.
+
+
+---
+
+## references/formats.md
+
+# Formats and objective labels
+
+Two independent axes. A format is a **shape**. A label is an **effect on the
+reader**. The same format serves different labels depending on what it carries,
+so they are chosen separately.
+
+## The formats
+
+Five. Proposed with a recommendation and one line of justification, then the
+person decides. The format is settled early, after the first or second
+interview answer, because it decides which rungs of the ladder matter.
+
+| Format | Shape | Needs | Fails when |
+|---|---|---|---|
+| **Counter-intuitive number** | The number on line 1, then the explanation, then the consequence. | A measured number with a source. | The number is an estimate. Then it is a stance, not a number post. |
+| **The breakdown** | A total announced, opened line by line. | Real components that sum to the total. | A component is guessed to make the arithmetic work. |
+| **The post-mortem** | Volume, period, result, cause, decision. | An outcome that was bad, and a decision taken after. | It ends on a moral instead of a decision. |
+| **The stance** | Thesis first, demonstration second. | Something a competent reader could disagree with. | Everyone already agrees. |
+| **The story** | A scene, a turn, what was kept from it. | One moment, one place, one person. | The scene is a composite of several. |
+
+A format is a container. It never supplies content: nothing enters a post
+because the format has a slot for it.
+
+Which rungs a format climbs, in what order, and how far it climbs before it
+stops, is written once in `references/interview-intents.md`, under the break.
+A format whose climb has been observed has a row there, keyed by the id an
+archived post already carries: the name above, lowercased and hyphenated. The
+rest are named in that file as not written yet. They run the default order and
+the default ceiling meanwhile, which is not the same as a row saying so: an
+absence records that nothing has been observed, and a row would record a
+decision.
+
+**How far is not a column here, on purpose.** A column in the table above
+would want a value for every format, and only the formats with a row over
+there have been observed: a stance stops earlier than a story, and the rest
+would be numbers invented to fill cells and then obeyed. On a ladder row it
+is two facts about one climb, written where the order is, and a format with
+no row has no depth of its own either. The one absence reads as the other.
+
+## The objective labels
+
+Three. Every idea in the idea bank carries exactly one.
+
+| Label | What the post is for | Reader leaves with |
+|---|---|---|
+| `VISIBILITY` | Being found and read by people who do not know the author. | An opinion worth following. |
+| `TRUST` | Proving the author can actually do the thing. | Evidence. |
+| `ACTION` | Making contact possible right now. | A reason to write. |
+
+**The dosage is driven by the business objective, not by taste.** The `cadence`
+intent from the setup interview sets it. A person building authority runs
+heavy on `VISIBILITY`, light on `ACTION`. A person with open slots to fill
+inverts it. The label is the variable the objective controls, which is exactly
+why it is not decorative.
+
+A skill that generates ideas without labelling them has quietly decided the
+dosage on the author's behalf.
+
+## Why there are no hook formulas here
+
+Hook templates calibrated on a viral corpus are deliberately absent, and this
+is the one place where this bundle diverges hardest from the alternatives.
+
+They invert the mechanism. In a template system, the angle descends from a
+shape that is known to perform. Here, the angle descends from a sentence the
+person actually said in the interview. A template can be filled without the
+author having said anything, and that is the exact failure this bundle exists
+to prevent.
+
+One idea is kept from that world: a format carries an objective. That is the
+table above.
+
+## The angle, and its quote
+
+Angles are proposed **two at a time**, never one, each in this exact shape:
+
+```
+SHORT TITLE IN CAPS
+The thesis in one sentence.
+Because you said: "<verbatim quote of what they answered>"
+We would dig into: <what the next questions will go after>
+```
+
+The "because you said" line is not decoration, it is the traceability
+mechanism. **No angle can exist unless it rests on a sentence actually spoken.**
+If it cannot be quoted, the angle was invented, and it gets thrown away.
+
+Always offer an exit: "neither one speaks to you? tell me what you meant."
+
+Once the angle is chosen, restate it at the top of every following question.
+
+
+---
+
+## references/measure.md
+
+# Measurement
+
+## The store
+
+**One store, and it is the ledger inside the material.** One row per post,
+carrying the nine columns the loops read, plus four descriptive fields nothing
+parses. The format is [`material.md`](material.md), section 6, and
+[`../docs/adr/0001-the-ledger-is-the-store.md`](../docs/adr/0001-the-ledger-is-the-store.md)
+records why.
+
+This file used to say the opposite: that the store was a front matter block on
+top of each post file, and that any table was derived from those at read time.
+That rule assumed a consumer with a filesystem. The engine is written against
+a floor that cannot write a file, so the person carries one attachable
+`material` and the ledger inside it is the record.
+
+Two reasons it is one store and not two.
+
+**Drift.** A single store cannot disagree with itself. At the floor a second
+store would be kept in step by hand, or not at all, which is the drift the old
+rule was written to prevent and would now cause.
+
+**Editing.** Filling a row at J+7 is a thirty second job in a file already
+open, and several posts get filled in one pass instead of one file at a time.
+
+What is genuinely lost is per post provenance of the measurement: a ledger row
+can be edited without touching the text it describes, where a front matter
+block sat next to its own. The thresholds below are unchanged and still refuse
+to conclude under two measured posts.
+
+**Post bodies live in the corpus**, not here. Losing one costs a voice
+reference rather than a measurement.
+
+## What gets counted
+
+Three numbers. None of them is a like.
+
+| Field | Counts | Does not count |
+|---|---|---|
+| `inbound_connections` | Connection requests from profiles that match the target defined in the profile. | Everyone else. A recruiter, a student and a competitor are not signal. |
+| `inbound_dms` | Messages that mention a project, a budget, a mandate, or a specific problem. | "Great post", "let's connect", automated pitches. |
+| `meeting_mentions` | Times a post came up unprompted in a call or a meeting. | Times you brought it up yourself. |
+
+Impressions, likes and comments can be recorded in `note` if they are
+interesting. They are never the decision variable. A post can do all three of
+the above with two hundred impressions, and none of them with twenty thousand.
+
+**`state` is not decoration.** A row exists as soon as a post is drafted, and
+without this field a list of drafts is indistinguishable from a list of
+published posts. Every count in this document is over `state: published`
+only. `published_ref` is what lets you find the thing again in the tool that
+holds it, and it is the difference between "I scheduled that" and "did I?".
+
+**Seven days.** Fill the line at J+7. Earlier and the number is still moving,
+later and nobody remembers. If a post is measured late, record the real date in
+`measured` rather than pretending.
+
+## Confidence thresholds
+
+The point of this section is to stop three data points from becoming a theory.
+When a pattern is claimed across posts, it carries a status, and the status is
+determined by how many measured posts support it:
+
+| Measured posts supporting it | Status | What it authorises |
+|---|---|---|
+| 2 to 3 | **provisional** | A hypothesis, stated as one. Worth one deliberate test. Never a rule in the profile. |
+| 4 to 6 | **emerging** | Worth acting on, worth writing down, still worth contradicting. |
+| 7 or more | **confirmed** | Goes into the profile as a rule. |
+
+Two guards on top:
+
+- **A pattern from a single pillar does not generalise to the others.** Six
+  post-mortems that outperform say something about post-mortems, not about the
+  author's voice.
+- **A pattern that only ever appears with one format is a format effect until
+  proven otherwise.**
+
+A Voice section built from a single published post says so, in a banner at
+the top of it, and every skill that reads it defers to the hard style rules
+instead of to the observed traits. The banner comes off when the corpus
+is real, not when it feels awkward.
+
+## The platform export
+
+LinkedIn exports a spreadsheet of post performance over the trailing 365 days,
+from the analytics section of the profile. It is the only place where
+impressions per post are available without a third party.
+
+Use it for one thing: filling in `note` in bulk after the fact, and spotting
+posts you forgot to measure. It does not contain any of the three fields that
+matter, because none of them are visible to the platform.

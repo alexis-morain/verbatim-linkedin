@@ -4,7 +4,14 @@ One entry per published version, newest first. The dated working log is
 [`journal.md`](journal.md), in French, and it is a different file: it records
 sessions, not versions.
 
-## 2.5.0, 4 September 2026
+## 2.5.0, 4 September 2026, never published
+
+> **This version was built and never released.** The engine pivoted to a
+> markdown bundle days later and the app was frozen, so publishing one more
+> number for software nobody was developing served nobody. The last version
+> on the index and the last tag are both **2.4.1**. What follows is what
+> 2.5.0 would have shipped, kept because the work happened.
+
 
 A quieter interview screen, and a settings screen that tells you where the key
 goes without asking you for it.

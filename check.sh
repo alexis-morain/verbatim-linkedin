@@ -43,7 +43,7 @@ if [ -z "$(echo "$leaked" | tr -d '[:space:]')" ]; then ok "clean"; else bad "th
 
 step "every engine file is actually tracked"
 missing=""
-for f in $(find references skills locales lib engines app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
+for f in $(find references skills locales lib engines examples app/verbatim_app app/tests scripts -type f ! -name '*.pyc' ! -path '*__pycache__*' 2>/dev/null) app/pyproject.toml app/hatch_build.py; do
   git ls-files --error-unmatch "$f" >/dev/null 2>&1 || missing="$missing $f"
 done
 if [ -z "$missing" ]; then ok "clean"; else bad "ignored by mistake:$missing"; fi

@@ -71,8 +71,10 @@ French who publishes in English is the normal case, not an edge case.
 > `interface_language` while describing it as "the language you are
 > interviewed in": the name and the meaning disagreed, and the name was the
 > half that was wrong. It is `interview_language` here and in every skill.
-> `interface_language` survives in `references/profile.template.md` and in the
-> frozen app, which read the old format and are not migrating. Both names are
+> `interface_language` survives in the old profile template under `references/`
+> and in the frozen app, which read the old format and are not migrating. It is
+> named here without a path on purpose: a generated engine carries every file
+> it cites, and that template describes the shape this format replaced. Both names are
 > written down so a reader of either format knows which one they are holding.
 
 ## 2. Profile
