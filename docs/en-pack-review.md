@@ -7,8 +7,8 @@
 > This file was written as the request. It is kept as the record of what was
 > put in front of a reviewer: every term, every pattern rendered as what it
 > fires on and what it misses, and the four mechanics that decide where a
-> judgment lands. **One question in it was not settled**, and it is marked
-> where it sits, under `negative-parallelism`.
+> judgment lands. **The one question it left open was closed on the same day**,
+> under `negative-parallelism`.
 
 You do not need the code, the repo, or any tooling to read this. Everything
 that was under review is in this document.
@@ -161,27 +161,33 @@ separate sentences, and only the author knows which two.
 
 Four shapes are matched. Here is what each one does in practice:
 
-| Fires on | Misses |
+| Fires on | Note |
 |---|---|
-| "It's not just a tool, it's a system." | "It is not just a tool, it is a system." |
-| "This isn't just software, it's a practice." | same sentence written without contractions |
+| "It's not just a tool, it's a system." | |
+| "It is not just a tool, it is a system." | Was missed until 09/09, see below |
+| "This isn't just software, it's a practice." | |
+| "This is not just software, it is a practice." | Was missed until 09/09 |
 | "Not merely faster. Cleaner. Instead, ..." | |
 | "Stop guessing. Start measuring." | |
 
-**Still open after the review.** The first two shapes only
+**Closed on 2026-09-09, after the review.** The first two shapes used to only
 recognise the contracted forms, `it's` and `isn't`. Written out as "It is not
-just a tool, it is a system", the exact same sentence goes through untouched. I
-verified this against the running code.
+just a tool, it is a system", the exact same sentence went through untouched.
 
-The question is whether it matters. If nobody writes this shape without
-contractions on LinkedIn, the hole is theoretical and it stays. If the
-uncontracted form is what a careful or non-native writer produces, then the
-heaviest category in the pack is missing its most common case.
+Measured rather than guessed: **four of the eight ways somebody writes this
+shape were missed**, every one of them containing `it is`. The pattern now
+treats `it's` and `it is` as one alternation, on both ends. The four ordinary
+sentences that hold those words without being a parallel are still clean, and
+they are in the test.
 
-**The review signed the lists without ruling on this**, so the pack ships with
-the hole and this paragraph is where it is written down. Fixing it is one more
-alternation in two patterns; deciding whether to is a question about English,
-not about code.
+It also turned out to have been an asymmetry rather than only a gap: the same
+sentence was judged differently depending on which spelling it used, which is
+worse than either answer applied consistently.
+
+**One thing the fix immediately caught was this project's own prose.** A line
+in `skills/linkedin-post/SKILL.md` read "A bullet with no quote under it is not
+an incomplete bullet, it is an invented one" -- the dominant English tell,
+written into the file that teaches people to avoid it. Rewritten.
 
 ### 9. dramatic-fragmentation, weight 4
 

@@ -59,6 +59,40 @@ class TestPatterns(unittest.TestCase):
         f = lint.run("It's not a volume problem, it's a targeting problem.", EN)
         self.assertIn("negative-parallelism", ids(f))
 
+    def test_the_shape_is_caught_without_contractions(self):
+        """The same sentence, written out. This is the whole shape, not a
+        variant of it: a careful writer produces `it is`, and the pattern used
+        to recognise only `it's`, so the heaviest category in the pack missed
+        four of the eight ways somebody writes it.
+        """
+        for text in (
+            "It's not just a tool, it's a system.",
+            "It is not just a tool, it is a system.",
+            "It's not just a tool, it is a system.",
+            "It is not just a tool, it's a system.",
+            "This isn't just software, it's a practice.",
+            "This is not just software, this is a practice.",
+            "This is not just software, it is a practice.",
+        ):
+            with self.subTest(text=text):
+                self.assertIn("negative-parallelism", ids(lint.run(text, EN)))
+
+    def test_an_ordinary_sentence_holding_those_words_is_left_alone(self):
+        """Widening the alternation must not widen what it catches.
+
+        The comma or full stop before the second clause is what makes this a
+        parallel rather than a sentence that happens to say `is not` and `it
+        is`, so these have to stay clean.
+        """
+        for text in (
+            "This is not the file it is looking for.",
+            "It is not clear whether it is worth doing.",
+            "It is not raining.",
+            "This is not something it is designed to handle.",
+        ):
+            with self.subTest(text=text):
+                self.assertNotIn("negative-parallelism", ids(lint.run(text, EN)))
+
     def test_de_plus_only_at_the_start_of_a_sentence(self):
         self.assertIn(
             "schoolbook-transitions", ids(lint.run("De plus, c'est cher.", FR))

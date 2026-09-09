@@ -112,8 +112,11 @@ categories:
     hard: false
     terms: []
     patterns:
-      - "\\bit'?s not (just |merely |only )?.{1,70}?[,.] it'?s\\b"
-      - "\\bthis (isn'?t|is not) (just |merely |only )?.{1,70}?[,.] (it'?s|this is)\\b"
+      # `it's` and `it is` are one shape, not two. Recognising only the
+      # contraction missed half of how people write this, and it is the
+      # uncontracted form a careful or non-native writer produces.
+      - "\\bit(?:'?s| is) not (just |merely |only )?.{1,70}?[,.] it(?:'?s| is)\\b"
+      - "\\bthis (isn'?t|is not) (just |merely |only )?.{1,70}?[,.] (it(?:'?s| is)|this is)\\b"
       - "\\bnot (just |merely |only )?.{1,60}?\\. .{1,60}?\\. instead\\b"
       - "\\bstop .{1,40}?\\. start \\b"
 

@@ -273,8 +273,7 @@ CONCRETE ELEMENTS
     first board pack"
 ```
 
-A bullet with no quote under it is not an incomplete bullet, it is an
-invented one, and it comes out. This is the whole guard: a model that knows
+A bullet with no quote under it was invented. It comes out. This is the whole guard: a model that knows
 how something usually works will write the usual thing as a fact, and the
 quote is what makes that visible to the person rather than to nobody.
 
