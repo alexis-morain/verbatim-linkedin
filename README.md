@@ -74,6 +74,13 @@ question than whether a manifest was filled in.
 returns text, writes no file and runs no code. Anything a better host adds is
 convenience: it never adds a promise, and the engine says so where it matters.
 
+**Check the window before you use a small model.** These files run from about
+11,000 to 18,000 tokens, and each one says its own size on its second line. A
+host whose context is smaller does not refuse the file, it truncates it and
+says nothing, so the model answers without ever having seen the rules it is
+being judged on. Local runtimes are where this bites: Ollama defaults to
+4,096 tokens and needs `OLLAMA_CONTEXT_LENGTH` raised.
+
 Your material is a second file you attach, and it stays yours. The engine
 prints the lines that changed at the end of a session and you paste them back.
 

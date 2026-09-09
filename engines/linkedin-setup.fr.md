@@ -7,6 +7,8 @@ Everything this engine needs is in this file. Attach it to a
 conversation and start. It writes no file and runs no code; where a
 host can do more, that is a convenience and never a promise.
 
+**About 12 thousand words, so roughly 16 thousand tokens.** A host whose window is smaller than that will truncate this file rather than refuse it, and say nothing.
+
 The pack below is the fr one. If the person writes their posts in
 another language, say so plainly: the output pack is not in this
 file, and the style rules that apply are the ones written here.

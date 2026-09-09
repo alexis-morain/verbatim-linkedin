@@ -37,6 +37,11 @@ OUT = ROOT / "engines"
 CITED = re.compile(
     r"\b(?:references/[\w.-]+\.md|locales/[\w<>.-]+/[\w.-]+\.md)\b")
 
+#: Placeholder for the size line, replaced once the body is assembled and its
+#: length is known. A sentinel rather than an index, so inserting a section
+#: above it cannot silently move it.
+SIZE_LINE = "<!-- size -->"
+
 #: Both spellings of the interview axis. The field was renamed and the frozen
 #: app still writes the old one.
 LANG_PLACEHOLDERS = ("<lang>", "<interview_language>", "<interface_language>")
@@ -93,6 +98,7 @@ def one(skill: Path, lang: str) -> str:
         "Everything this engine needs is in this file. Attach it to a\n"
         "conversation and start. It writes no file and runs no code; where a\n"
         "host can do more, that is a convenience and never a promise.\n",
+        SIZE_LINE,
         "The pack below is the %s one. If the person writes their posts in\n"
         "another language, say so plainly: the output pack is not in this\n"
         "file, and the style rules that apply are the ones written here.\n"
@@ -117,6 +123,19 @@ def one(skill: Path, lang: str) -> str:
         else:
             parts.append("\n---\n\n## %s\n" % resolved)
         parts.append(target.read_text(encoding="utf-8"))
+    # The size, written into the file the size describes. Measured on the body
+    # only and rounded to the nearest thousand words, so adding this line
+    # cannot change the number it reports. A reader needs it: a host with a
+    # small window truncates a system block that does not fit rather than
+    # refusing it, which is silent, and nothing downstream can tell the
+    # difference between a model that failed and a model that never saw the
+    # rules.
+    words = len(" ".join(parts).split())
+    size = ("**About %d thousand words, so roughly %d thousand tokens.** A host "
+            "whose window is smaller than that will truncate this file rather "
+            "than refuse it, and say nothing.\n"
+            % (round(words / 1000), round(words * 1.3 / 1000)))
+    parts[parts.index(SIZE_LINE)] = size
     return "\n".join(parts)
 
 

@@ -286,7 +286,7 @@ ANSWERS = [
 ]
 
 
-def ask(model: str, key: str, system: str, messages: list) -> str:
+def ask_anthropic(model, key, system, messages, **_):
     """One Anthropic call. urllib rather than a dependency, like lib/."""
     body = json.dumps({"model": model, "max_tokens": 2000,
                        "system": system, "messages": messages}).encode()
@@ -294,26 +294,76 @@ def ask(model: str, key: str, system: str, messages: list) -> str:
         "https://api.anthropic.com/v1/messages", data=body,
         headers={"content-type": "application/json", "x-api-key": key,
                  "anthropic-version": "2023-06-01"})
-    with urllib.request.urlopen(req, timeout=120) as answer:
+    with urllib.request.urlopen(req, timeout=300) as answer:
         payload = json.load(answer)
     return "".join(b.get("text", "") for b in payload.get("content", []))
 
 
-def live(engine: Path, model: str, key: str) -> int:
+def ask_ollama(model, key, system, messages, base_url="", num_ctx=0, **_):
+    """One call to Ollama's own API, which is the only one taking `num_ctx`.
+
+    The OpenAI compatible endpoint accepts no context option, and Ollama
+    defaults to a window far under the size of a generated engine. It does not
+    error on a system block that does not fit: it truncates, silently, which
+    is the failure `CLAUDE.md` names and the reason this path exists at all.
+    Passing the window explicitly is what separates "this model cannot hold
+    the guards" from "this model never saw them".
+    """
+    options = {"num_ctx": num_ctx} if num_ctx else {}
+    body = json.dumps({"model": model, "stream": False, "options": options,
+                       "messages": [{"role": "system", "content": system}] + messages}).encode()
+    req = urllib.request.Request(
+        (base_url or "http://127.0.0.1:11434") + "/api/chat", data=body,
+        headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=600) as answer:
+        payload = json.load(answer)
+    return payload.get("message", {}).get("content", "")
+
+
+def ask_openai(model, key, system, messages, base_url="", **_):
+    """Any endpoint speaking the OpenAI chat format, hosted or local."""
+    body = json.dumps({"model": model, "max_tokens": 2000,
+                       "messages": [{"role": "system", "content": system}] + messages}).encode()
+    req = urllib.request.Request(
+        (base_url or "https://api.openai.com") + "/v1/chat/completions",
+        data=body, headers={"content-type": "application/json",
+                            "authorization": "Bearer " + (key or "none")})
+    with urllib.request.urlopen(req, timeout=300) as answer:
+        payload = json.load(answer)
+    return payload["choices"][0]["message"]["content"]
+
+
+TRANSPORTS = {"anthropic": ask_anthropic, "ollama": ask_ollama,
+              "openai": ask_openai}
+
+
+def live(engine: Path, model: str, key: str, transport, *,
+         base_url: str = "", num_ctx: int = 0, keep: str = "") -> int:
     system = engine.read_text(encoding="utf-8")
     material = (ROOT / "examples" / "material.md").read_text(encoding="utf-8")
+    words = len(system.split())
+    print("engine: %s, about %d words, roughly %d tokens"
+          % (engine.name, words, int(words * 1.3)), file=sys.stderr)
+    if num_ctx:
+        print("window: %d tokens, asked for explicitly" % num_ctx, file=sys.stderr)
     messages = [{"role": "user",
                  "content": "Here is my material.\n\n" + material +
                             "\n\nI want to write a post."}]
     transcript = []
     for answer in ANSWERS:
-        said = ask(model, key, system, messages)
+        said = transport(model, key, system, messages,
+                         base_url=base_url, num_ctx=num_ctx)
         transcript.append(said)
         messages.append({"role": "assistant", "content": said})
         messages.append({"role": "user", "content": answer})
-    said = ask(model, key, system, messages)
+    said = transport(model, key, system, messages,
+                     base_url=base_url, num_ctx=num_ctx)
     transcript.append(said)
-    return report("\n".join(transcript), model)
+    whole = "\n".join(transcript)
+    if keep:
+        Path(keep).write_text(whole, encoding="utf-8")
+        print("transcript kept at %s" % keep, file=sys.stderr)
+    return report(whole, model)
 
 
 def main(argv=None) -> int:
@@ -322,6 +372,14 @@ def main(argv=None) -> int:
                     help="check the assertions against fixtures, no key needed")
     ap.add_argument("--engine", default="engines/linkedin-post.en.md")
     ap.add_argument("--model", default="claude-sonnet-5")
+    ap.add_argument("--provider", default="anthropic", choices=sorted(TRANSPORTS))
+    ap.add_argument("--base-url", default="", help="for openai and ollama")
+    ap.add_argument("--num-ctx", type=int, default=0,
+                    help="ollama only: the context window, in tokens. Ollama "
+                         "truncates a system block that does not fit rather "
+                         "than refusing it, so a run without this measures "
+                         "the truncation and not the model.")
+    ap.add_argument("--keep", default="", help="write the transcript here")
     ap.add_argument("--transcript", help="score a transcript already captured")
     args = ap.parse_args(argv)
 
@@ -330,12 +388,14 @@ def main(argv=None) -> int:
     if args.transcript:
         return report(Path(args.transcript).read_text(encoding="utf-8"),
                       args.model)
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        print("ANTHROPIC_API_KEY is not set. --self-test needs no key.",
-              file=sys.stderr)
+    key = os.environ.get("VERBATIM_API_KEY") or os.environ.get(
+        "ANTHROPIC_API_KEY" if args.provider == "anthropic" else "OPENAI_API_KEY", "")
+    if args.provider == "anthropic" and not key:
+        print("ANTHROPIC_API_KEY is not set. --self-test needs no key, and "
+              "--provider ollama needs none either.", file=sys.stderr)
         return 2
-    return live(ROOT / args.engine, args.model, key)
+    return live(ROOT / args.engine, args.model, key, TRANSPORTS[args.provider],
+                base_url=args.base_url, num_ctx=args.num_ctx, keep=args.keep)
 
 
 if __name__ == "__main__":

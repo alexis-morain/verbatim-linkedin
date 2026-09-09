@@ -158,6 +158,19 @@ who is not the maintainer runs it. `app/tests/test_bundle.py` holds the
 manifest to the list, and `scripts/check-app.sh` builds the wheel and looks
 inside it.
 
+## Engine size
+
+Each generated engine states its own size, and the number is measured on the
+body so writing it in cannot change it. Watch it when you add to a skill or a
+reference: everything a skill cites ships inside every engine that carries it,
+so one paragraph in `references/` lands in up to six files and pushes them all
+toward the window of whoever attaches one.
+
+The failure mode is silent by construction. A host with too small a context
+truncates rather than refusing, so nothing downstream can tell a model that
+failed the guards from a model that never saw them. `scripts/eval.py
+--num-ctx` exists to separate those two.
+
 ## Adding a language pack, in short
 
 1. `cp -r locales/_template locales/<code>`
