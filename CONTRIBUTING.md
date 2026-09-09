@@ -105,10 +105,19 @@ unnoticed. `release.yml` runs both, because the DMG is built out of `app/`.
 It fails the same way when a file the wheel bundles has been **renamed or
 deleted**, which is the other way to break the frozen app without touching it:
 the wheel carries `SKILL.md`, `lib/`, `locales/`, `references/` and `skills/`,
-so a path that stops resolving leaves the bundle short. Plain edits are not
-flagged, since an edit cannot make a path disappear. Both failures clear once
-the change is committed, which is the point: run `check-app.sh` first, then
-commit.
+so a path that stops resolving leaves the bundle short. Both failures clear
+once the change is committed, which is the point: run `check-app.sh` first,
+then commit.
+
+**Plain edits are not flagged, and that is a known hole rather than a proof of
+safety.** An edit cannot make a path stop resolving, which is why the guard
+draws its line there, but the frozen app also reads the *content* of shipped
+files: `app/tests/test_prose.py` parses the validation sheet block out of
+`skills/linkedin-post/SKILL.md` line by line. Wrapping one label onto a second
+line has already broken that suite while `check.sh` stayed green. Where such a
+coupling exists, it is written next to the thing it constrains, in the skill
+itself. When you edit a shipped file in a way that changes its *shape* rather
+than its wording, run `check-app.sh`.
 
 **Green is not evidence that any endpoint answers this engine.** The app's
 tests replay recorded streams, written from the published formats, so they

@@ -24,11 +24,11 @@ shows the world; this skill owns that.
 
 ## Before anything
 
-1. Read the profile's `## Status` block. If `filled: no`, stop and offer
+1. Read the material's `## Status` block. If `filled: no`, stop and offer
    `linkedin-setup`. A page rewritten without a source of proven facts is
    copywriting, and this bundle does not do copywriting.
-2. Read `profile.md`, `pillars.md`, `voice.md`.
-3. Read `locales/<interface_language>/style.md` and `interview.md`. Fall back
+2. Read its Profile, Pillars and Voice sections.
+3. Read `locales/<interview_language>/style.md` and `interview.md`. Fall back
    to `locales/en` and say so.
 4. Ask the person to paste their current page, section by section, or export
    it (LinkedIn offers a PDF of the full profile). **The engine never scrapes
@@ -41,10 +41,10 @@ shows the world; this skill owns that.
 Run the promise in reverse. Every claim currently on the page gets one of
 three verdicts:
 
-- **Traces**: backed by `profile.md`, `corpus/`, or something the person says
+- **Traces**: backed by the material, by a pasted post, or by something the person says
   right now. Keep, maybe sharpen.
-- **Provable but absent from the profile**: true, but `profile.md` does not
-  carry it. Add it to `profile.md` first, with its source. The page never
+- **Provable but absent from the material**: true, but the material does not
+  carry it. It goes into the material first, with its source. The page never
   holds facts the profile does not.
 - **Traces to nothing**: the inherited superlative, the borrowed metric, the
   "passionate about" filler. Flag it, quoted, and propose removal. A page is
@@ -55,8 +55,8 @@ Announce the verdicts in one compact list before touching anything.
 ## The interview
 
 Three intents, `references/interview-intents.md`, set C. Wording in
-`locales/<interface_language>/interview.md`. One question at a time, and skip anything
-`profile.md` already answers, which is most things. This interview is short
+`locales/<interview_language>/interview.md`. One question at a time, and skip anything
+the material already answers, which is most things. This interview is short
 on purpose: the material is supposed to exist already.
 
 ## The nine sections
@@ -67,11 +67,11 @@ from them.
 | # | Section | Its one job |
 |---|---|---|
 | 1 | Headline | Travels with the name into every feed, comment and search result. Who it serves plus one provable claim, in the buyer's words. Not a stack of job titles, not a string of pipes and keywords. |
-| 2 | About | The three lines above the fold decide whether anyone expands. Open on the thesis, then the two or three facts the `proof-pick` intent selected, then who this is for, then the next step from the `reader-next-step` intent. First person, in the output language, in the voice `voice.md` describes. |
-| 3 | Featured | Two or three items, each one a proof, not a decoration. Built from the `proof-pick` selection; the best measured post from `corpus/` or `posts/` belongs here. |
+| 2 | About | The three lines above the fold decide whether anyone expands. Open on the thesis, then the two or three facts the `proof-pick` intent selected, then who this is for, then the next step from the `reader-next-step` intent. First person, in the output language, in the voice the Voice section describes. |
+| 3 | Featured | Two or three items, each one a proof, not a decoration. Built from the `proof-pick` selection; the best measured post in the ledger belongs here. |
 | 4 | Experience | The current role written as outcomes with sourced numbers, consistent with "what I sell". Past roles compressed to what explains the present one. |
 | 5 | Skills | The terms from the `buyer-words` intent, the ones clients actually type and say. A skills list is a search surface, not a trophy shelf. |
-| 6 | Recommendations | Requested from the public, named references in `profile.md` only. "Names I must never cite" applies here exactly as it does in a post. Draft the ask in the output language if the person wants one. |
+| 6 | Recommendations | Requested from the public, named references from the material only. "Names I must never cite" applies here exactly as it does in a post. Draft the ask in the output language if the person wants one. |
 | 7 | Photo | A recent face, framed close enough to read in a feed avatar. Mechanism only; this skill has no opinion on style. |
 | 8 | Banner | The one static surface for a stated promise or a number the person can prove. Text content is this skill's job; design is not. |
 | 9 | Activity | Not written here at all. The page inherits it from the posting loop, and a strong page above a dead feed reads as abandoned. If cadence is the weak point, say so and route to `linkedin-post`. |
@@ -108,10 +108,20 @@ stay out.
 
 ## Archive
 
-Emit the adopted result for the person to keep: an `updated: YYYY-MM-DD` line,
-then one heading per section holding the text as applied. Nothing is written
-here; a tier that holds files may store it, and the next run starts by diffing
-against whatever the person brings back.
+Emit it the way every session in this bundle ends, as one block of the lines
+that changed, for the person to paste and keep:
+
+```
+PAGE UPDATE
+updated: 2026-09-09
+Headline:  <the text as applied>
+About:     <the text as applied>
+```
+
+Nothing is written here. A tier that holds files may store it, and the next
+run starts by diffing against whatever the person brings back. One mechanism
+across the three skills, so somebody who has closed one session already knows
+how this one ends.
 
 The person applies the changes on LinkedIn by hand. When they say it is done,
 update `updated`. If they adopted a variant of a proposal, archive what they

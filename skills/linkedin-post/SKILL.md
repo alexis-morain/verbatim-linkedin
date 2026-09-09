@@ -16,27 +16,27 @@ and writes second. **It never invents material.**
 
 ## Before anything
 
-1. Read the profile's `## Status` block. If `filled: no`, say so in one line
+1. Read the material's `## Status` block. If `filled: no`, say so in one line
    and offer `linkedin-setup`. Do not proceed by guessing who this person is.
-2. Read `profile.md`, `voice.md`, `pillars.md`, `ideas.md`.
-3. Read `locales/<interface_language>/style.md` and `interview.md`. If the pack
+2. Read its Profile, Voice, Pillars and Ideas sections.
+3. Read `locales/<interview_language>/style.md` and `interview.md`. If the pack
    does not exist, fall back to `locales/en`, and say so.
-4. Count the pillars of the last eight `state: published` files in `posts/`,
+4. Count the pillars of the last eight ledger rows with `state: published`,
    drafts do not count. Announce the balance in one line and name the pillar
    that is behind.
-5. Find posts published more than seven days ago whose measurement fields are
-   still empty. Ask for the numbers. It takes thirty seconds and it feeds the
+5. Find ledger rows published more than seven days ago whose three numbers are
+   still empty. Ask for them. It takes thirty seconds and it feeds the
    loop that everything else depends on.
 
-Then offer three ways in: a free subject, a voice note, or an idea from
-`ideas.md`, prioritising the pillar that is behind.
+Then offer three ways in: a free subject, a voice note, or an idea from the
+Ideas section, prioritising the pillar that is behind.
 
 For a voice note, transcribe locally. Nothing about this leaves the machine.
 
 ## The interview
 
 Intents and ladder: `references/interview-intents.md`, set B.
-Wording: `locales/<interface_language>/interview.md`.
+Wording: `locales/<interview_language>/interview.md`.
 
 **One question at a time. Never a numbered block.** Ask, wait, dig. The
 ceiling below until the format is settled, and the format's own after that.
@@ -116,12 +116,16 @@ more interview question, and the person then gets no sheet at all.
 
 ```
 ANGLE               one line, restated with the material collected
-CONCRETE ELEMENTS   one bullet per fact, and under each bullet the words it
-                    came from, labelled SAID: or CORPUS:
+CONCRETE ELEMENTS   one bullet per fact, each with the words it came from
 THE STRONG MOMENT   the anecdote or reported sentence that carries the post
 CENTRAL CONVICTION  in quotes, what they conclude
 FIRST LINE          two proposals, or theirs
 ```
+
+**One label per line in that block, and never a continuation line.** It is
+read as lines by `app/tests/test_prose.py`, which splits each one on its
+first double space, so a wrapped description becomes a sixth label that is
+the empty string. Say less rather than wrapping.
 
 **Every bullet carries its quote underneath, with the source named.** Like
 this, and the shape matters more than the wording:
@@ -177,7 +181,7 @@ Then produce, in this order:
    next post.
 7. **The raw transcript** of the interview, verbatim. It is material for later.
    The angles that were not taken are sleeping in it, and they go back into
-   `ideas.md` at the end of the session.
+   the Ideas section at the end of the session.
 8. **The anchors block**, format in `references/anchoring.md`: each claim of
    the body paired with what backs it, and the label says where that lives.
    `SAID:` is the interview sentence, quoted word for word in the language of
@@ -207,7 +211,7 @@ label it, under the same rules.
 **The signature block is not generated, it is concatenated.** It is appended
 after a blank line, without passing through the model. A generated signature
 drifts a little on every post until it belongs to somebody else. It lives in
-`profile.md`.
+the Profile section of the material.
 
 ## The deterministic pass
 
@@ -279,7 +283,7 @@ turn is handed both, what they asked for and what they answered, in that
 order. Somebody typing `Malt barometer, 2025` is naming a source, not asking
 for a shorter post.
 
-Wording for all three: `locales/<interface_language>/interview.md`,
+Wording for all three: `locales/<interview_language>/interview.md`,
 under the connective phrases.
 
 ## Rewriting one passage
@@ -321,17 +325,54 @@ proposed replacement.
 The score alone says nothing actionable; the status is what decides. And do not
 be generous: a decent post is a 7, not a 9.
 
-## Archive, publish, measure
+## Closing: the lines that changed
 
 **A post that stays a draft is not finished.** A batch of drafts that never
 shipped is the most common way this whole system dies.
 
-1. Write `posts/YYYY-MM-DD-slug.md` with the front matter block from
-   `references/measure.md`, measurement fields left empty.
-2. Move the consumed idea into the used section of `ideas.md`, and add the new
-   angles spotted during the interview. **Never close a session leaving the
-   bank poorer than it was at the start.**
-3. Publish or schedule. `lib/publish.py` handles the three tiers.
+**Everything that changes the material leaves this skill the same way**: one
+block, at the end, holding only the lines that changed, which the person
+pastes back into their file. One mechanism, not three. The floor writes
+nothing, so what changed has to be visible and copyable, and a session that
+ends without this block has quietly lost everything it produced.
+
+```
+MATERIAL UPDATE
+
+Ledger, new row:
+  2026-08-29 | 1 | counter-intuitive-number | VISIBILITY | draft | | | |
+  hook: "Thirty-one percent to six percent, on the same model."
+  chars: 1263   ref:    note:
+
+Ideas, move to Used:
+  2026-08-29 | P1 | Your model is not wrong, your commentary is
+
+Ideas, add:
+  [P2] TRUST The diligence question that costs five weeks. Material: the
+  revenue recognition answer, already public.
+
+Next session: 2026-09-12, the diligence question (P2)
+```
+
+Rules on the block, and all three exist because a person is going to paste
+this by hand:
+
+- **Only what changed.** Reprinting the whole material invites a paste that
+  overwrites an edit they made themselves.
+- **The nine ledger columns in order**, empty ones left empty rather than
+  dropped, so a row stays readable as a row. The four descriptive fields
+  follow underneath, where nothing parses them.
+- **Nothing is written here.** A tier that holds files may apply the block
+  instead of printing it. That is convenience, and the block is printed
+  anyway.
+
+Then, in this order:
+
+1. The block above, with the ledger row and the idea bank. **Never close a
+   session leaving the bank poorer than it was at the start.**
+2. Publish or schedule. At the floor the person posts it themselves, which is
+   what `copy` always meant. Where the host can run commands,
+   `lib/publish.py` handles the three tiers.
 
    **Never hand raw text to a scheduling tool.** Run it through
    `publish.to_scheduler_html` first. A feed renders consecutive paragraphs
@@ -352,29 +393,34 @@ shipped is the most common way this whole system dies.
    Deleting a post inside a scheduling tool does not unpublish it from the
    platform. Removing something already live means going to the platform.
 
-4. At J+7, fill the measurement fields: inbound connections from target
-   profiles, inbound messages that mention a project, mentions of the post in a
-   meeting. Not likes. Confidence thresholds are in `references/measure.md`.
+3. At J+7, **the same block again**, carrying the three numbers and the
+   `measured` date for that row: inbound connections from target profiles,
+   inbound messages that mention a project, mentions of the post in a meeting.
+   Not likes. It is the identical mechanism, which is the point: a person who
+   pasted one block already knows how to paste this one. Confidence thresholds
+   are in `references/measure.md`, and `state` moves to `published` on what
+   the person says happened, never because a send returned zero.
 
-5. **Set the next session before closing this one.** This is the step that
+4. **Set the next session before closing this one.** This is the step that
    decides whether there is a second post at all. The bottleneck is not
    writing, it is coming back.
 
-   Propose a date, and **attach an idea already chosen** from `ideas.md`,
+   Propose a date, and **attach an idea already chosen** from the Ideas section,
    prioritising the pillar that is behind. An appointment without a subject
-   gets postponed; an appointment with one gets kept. Write both at the top of
-   `ideas.md`.
+   gets postponed; an appointment with one gets kept. Both go in the block,
+   on the `Next session` line.
 
    If they want a reminder, set one. Do not set one unasked.
 
 ## Hard rules
 
-- **No invented number.** Every number comes from `profile.md`, `corpus/`, or
-  the interview. If one is missing, ask, or drop the claim.
+- **No invented number.** Every number comes from the material, from the
+  posts the person pasted, or from the interview. If one is missing, ask, or
+  drop the claim.
 - **No fabricated client experience.** Never attach a post to a lived
   experience that does not exist. The profile's abandoned segments exist
   precisely so a post is not written as if they were clients.
-- **Names that are not public stay out.** `profile.md` lists them. Ask before
+- **Names that are not public stay out.** The material lists them. Ask before
   citing.
 - **No post aimed at a target that is out of scope for this channel.** The
   profile says which ones those are.

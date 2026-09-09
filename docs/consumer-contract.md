@@ -20,6 +20,12 @@ that app still ships a module called `instance.py` and calling it something
 else here would misdescribe running code. Everywhere the engine speaks, the
 word is `material`.
 
+`locales/en/app.yml` and `locales/fr/app.yml` keep the word too, for the same
+reason and one more: they are the screen strings of that app, they name a
+directory it really reads, and they ship inside the wheel. Rewording them
+would describe an application that does not exist. Every other shipped file
+speaks of a `material`.
+
 For the same reason, roughly twenty files under `app/` cite this document at
 its old path, `references/instance.md`. They are frozen and were left alone:
 editing them to fix a link would change an application nobody is developing,

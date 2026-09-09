@@ -14,32 +14,33 @@ version: 0.1.2
 This is the entry point, and for anyone who did not write this engine it is the
 actual product. Without it, a published bundle is a folder of prompts.
 
-It takes about twenty minutes and it ends on a written post, not on a folder.
+It takes about twenty minutes and it ends on a written post, not on a file.
 
 ## What it produces
 
-In a directory the person chooses, on their machine:
+**One file, written out in this conversation for the person to save.** Not a
+directory, and not a file this skill creates: the floor writes nothing to
+disk. What comes out is text on screen, with a name suggested for it, and the
+person keeps it wherever they keep things.
 
-```
-profile.md    who they are, who they write to, what they can prove, what they never say
-voice.md      style and structures, drawn from their own published posts
-pillars.md    three pillars, with a ratio
-ideas.md      the angle bank, three per pillar to start
-corpus/       their reference posts
-posts/        empty for now
-```
+Its format is `references/material.md`, and it has six sections: Status,
+Profile, Voice, Pillars, Ideas, and a Ledger that starts empty.
 
-None of it is ever committed to this repository. `.gitignore` enforces that.
-The full format, section by section, is
-`references/material.md`; what this skill produces has to conform to it.
+**Their published posts stay outside it.** They are pasted into this
+conversation at step 4, read once for the Voice section, and stay wherever the
+person already keeps them. A hundred post bodies inside an attached file is
+the one thing that does not scale.
 
-## Step 0. Where it lives, and in what language
+A tier that can write files may offer to save it. That is a convenience, and
+it never changes what this skill promises.
 
-Ask where the profile goes, and create it there. **Do not assume a path.**
-Write the chosen path back into the conversation so the other skills can find
-it.
+## Step 0. The language
 
-Then settle the three language axes from `SKILL.md`, in one exchange:
+**Do not ask for a path, and do not assume one.** There is no directory to
+choose. A tier holding a filesystem may suggest where to put the file once it
+exists; this skill produces the text.
+
+Settle the three language axes from `SKILL.md`, in one exchange:
 
 - **Interview language.** The one they want to be talked to in.
 - **Output language.** Defaults to the same. Ask explicitly, because plenty of
@@ -52,7 +53,7 @@ translate a pack on the fly and present it as one.
 
 ## Step 1. The basics, fast
 
-Copy `references/profile.template.md` and fill the top of it with short
+Fill the top of the Profile section with short
 answers: what they sell, who they write to, what this channel is for. Two
 minutes. These are facts, not reflection, and dwelling on them is how an
 onboarding loses people before the part that matters.
@@ -69,7 +70,7 @@ captures them and their absence produces tutorials:
 ## Step 2. The interview
 
 Ten intents, in `references/interview-intents.md`, set A. Wording in
-`locales/<interface_language>/interview.md`.
+`locales/<interview_language>/interview.md`.
 
 **Every question announces what the answer becomes.** Not afterwards, in the
 question itself. A person who knows they are feeding their public positions
@@ -119,13 +120,16 @@ disagreed with:
 | Earn trust | the expertise and evidence pillar |
 | Fill open slots | the personal and in-public pillar, with more `ACTION` |
 
-Write `pillars.md` with the counter rule: at the start of every session, count
-the pillars of the last N posts, and if one is more than two behind, offer it
-first.
+Write the Pillars section with the counter rule: at the start of every
+session, count the pillars of the last N ledger entries, and if one is more
+than two behind, offer it first.
 
 ## Step 4. Voice
 
-Ask for three published posts, up to six. Their own, not ones they admire.
+**Ask them to paste three to five published posts into this conversation**,
+up to six. Their own, not ones they admire. Do not ask for a folder and do not
+ask for links: what cannot be read here cannot be quoted from, and a link is a
+promise this skill cannot keep.
 
 Read them and write the Voice section: the traits actually present, quoted.
 Form of address, hook shape, paragraph rhythm, how they close, real length.
@@ -145,13 +149,14 @@ reader has to reconcile.
 **A trait without a quote under it is a guess and does not go in.** Trimming
 those quotes as redundant removes the enforcement rather than tidying it.
 
-If there are fewer than five posts, put a banner at the top of `voice.md`
-saying the file is provisional and built on N posts, and instruct every skill
+If there are fewer than five posts, open the Voice section with a banner
+saying it is provisional and built on N posts, and instruct every skill
 reading it to defer to the hard style rules instead of to the observed traits.
 The banner comes off when the corpus is real, not when it feels awkward.
 
-If there are no posts at all, say so, write `voice.md` with the hard rules
-only, and note that it gets rewritten after five to ten published posts.
+If there are no posts at all, say so, write the Voice section with the hard
+rules only, and note that it gets rewritten after five to ten published
+posts.
 
 **Never build a voice from a scraped corpus of high performing posts.** It
 produces the average of a niche, which is the opposite of a voice. Studying
@@ -186,26 +191,30 @@ Two ergonomic rules worth copying:
 
 ## Step 6. Publishing
 
-Settle the tier now, while they are here, not at the end of the first post when
-they are tired.
+**At the floor there is nothing to settle here.** The post comes out as text
+and the person posts it themselves, which is what `copy` always meant.
 
-`copy` is the default and needs nothing. `postiz` needs an integration id, and
-the id must be checked against the channel list first: a personal profile and a
-company page are two lines in a config file and two very different things in a
-feed. `command` runs their own binary. See `lib/publish.py`.
+Ask only if the host can run commands. Then: `postiz` needs an integration id,
+and the id must be checked against the channel list first, because a personal
+profile and a company page are two lines in a config file and two very
+different things in a feed. `command` runs their own binary. See
+`lib/publish.py`. A tier adds convenience here and never adds a promise, so do
+not describe scheduling to somebody whose host cannot do it.
 
-## Step 7. Do not end on a folder
+## Step 7. Do not end on a file
 
 **Hand straight over to `linkedin-post` and write one.** Right now, with an
 idea from the bank that was just built.
 
-A setup that ends on a finished profile has produced a folder. A setup that
-ends on a published post has produced a habit. The difference between those two
-outcomes is the difference between this working and not.
+A setup that ends on a finished material file has produced a file. A setup
+that ends on a published post has produced a habit. The difference between
+those two outcomes is the difference between this working and not. The floor
+makes this truer rather than harder: there is no folder to admire at the end,
+only text the person is holding.
 
 Then set the next session, with a date and an idea attached to it.
 
-And only then, write the `## Status` block at the top of `profile.md` for
+And only then, write the `## Status` block at the top of the material for
 real: `filled: yes`, `source: interview`, `updated` set to today, and the two
 language codes settled in step 0. Five lines, and they are the whole seam
 between the engine and this person. Every consumer reads them before it reads

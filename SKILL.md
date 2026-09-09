@@ -27,15 +27,14 @@ needs.
 
 ## First thing, every time: the status flag
 
-Find the profile directory, then read the `## Status` block at the top of its
-`profile.md`:
+Read the `## Status` block at the top of the material the person attached:
 
 ```
 ## Status
 - filled: no
 - source: template
 - updated: --
-- interface_language: --
+- interview_language: --
 - output_language_default: --
 ```
 
@@ -55,7 +54,7 @@ Independent, and this is what multilingual projects usually get wrong.
 | Axis | Who decides | Where it lives |
 |---|---|---|
 | Engine language | the maintainer, once, English | this repository |
-| Interview language | the profile | `interface_language` |
+| Interview language | the profile | `interview_language` |
 | Output language | per post, defaults to the interview language | `output_language_default` |
 
 The last two really are independent. Plenty of people want to be interviewed in

@@ -46,7 +46,9 @@ needs it, not the way the engine indexes it.
 The corpus stays out. A hundred published posts inside an attached file is the
 one thing that does not scale, and by ADR 0001 losing a post body costs a voice
 reference rather than a measurement. The person pastes three to five posts at
-setup, and the engine reads them from the transcript.
+setup, and the engine reads them from the transcript. **Nothing in the corpus
+is generated and nothing in it is rewritten**: it is evidence of how the person
+already writes, and editing evidence makes it something else.
 
 ## 1. Status
 
@@ -65,17 +67,20 @@ the interview happens in `interview_language`, and the post is written in
 `output_language_default` with a per post override. Someone interviewed in
 French who publishes in English is the normal case, not an edge case.
 
-> **Open naming decision, carried over rather than settled here.** The old
-> template called the second field `interface_language` while describing it as
-> "the language you are interviewed in". The name and the meaning disagree.
-> Renaming it is a decision for the person doing 1.4, not something to change
-> quietly inside a migration, which is exactly the class of loss this document
-> exists to prevent. Both names are recorded here so neither is lost.
+> **Renamed, and the old name recorded.** The old template called this field
+> `interface_language` while describing it as "the language you are
+> interviewed in": the name and the meaning disagreed, and the name was the
+> half that was wrong. It is `interview_language` here and in every skill.
+> `interface_language` survives in `references/profile.template.md` and in the
+> frozen app, which read the old format and are not migrating. Both names are
+> written down so a reader of either format knows which one they are holding.
 
 ## 2. Profile
 
-Eleven prose sections and one verbatim block. None of them is a field with a
-value: each is a heading with prose under it, and the engine reads the prose.
+**Eleven rows below, and the signature block is one of them**: ten prose
+sections and one verbatim block. Counting the block as a twelfth thing is how
+somebody loses a section and still finds the total right. None of the ten is a
+field with a value: each is a heading with prose under it.
 
 | Section | Required | Holds | If it goes missing |
 |---|---|---|---|
@@ -99,7 +104,7 @@ value: each is a heading with prose under it, and the engine reads the prose.
 | Hard rules | yes | The pack's style rules, which are authoritative. | The observed traits win an argument they should lose. |
 | Traits observed | no | One trait per entry, **each followed by the sentence it was read from.** | A trait without a quote is a guess, and the engine cannot tell the two apart. |
 | What the corpus does not say yet | yes | Which pillars and registers are unobserved. | Traits from one pillar get extrapolated onto every other. |
-| Rewrite | no | The condition for redoing this section. | The provisional banner never comes off, or comes off unearned. |
+| Rewrite | no | The condition for redoing this section: **five to ten published posts**, and a rewrite on that corpus. | The provisional banner never comes off, or comes off unearned. A count is not a rewrite. |
 
 **A trait carries its quote or it is not a trait.** This is the plainest case of
 the visible guard rule: the engine cannot verify that a trait was really read
@@ -131,7 +136,8 @@ Three pillars, each with the same shape, plus two blocks around them.
 an edit was drawn before the click, so a line number moves an angle nobody
 looked at. Only archiving writes to Used.
 
-**A session never closes leaving the bank poorer than it found it.**
+**A session never closes leaving the bank poorer than it found it.** Angles
+may be added, edited and removed freely; only archiving writes to Used.
 
 ## 6. Ledger
 
@@ -190,7 +196,7 @@ Count these before declaring a migration done. The numbers are the point of
 this document.
 
 - **5** status fields, none dropped, `output_language_default` included.
-- **11** profile sections, **plus the signature block**, present even when empty.
+- **11** rows in the profile table, the signature block included, present even when empty.
 - **5** voice parts, and **every trait carries its quote**.
 - **3** pillars, each with title, ratio, effect, description and material. The
   ratios sum to the cadence in Objective and cadence.
