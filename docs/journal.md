@@ -1,5 +1,72 @@
 # Journal
 
+## 2026-09-09 (huitième session). Le pivot, exécuté
+
+**Poussé**, `ded9da5..990d13e`, dix-sept commits. Les seize postes du plan
+moins **0.1**, la publication PyPI, qu'Alexis a abandonnée en cours de session
+comme sans plus-value : l'app reste gelée en **2.4.1** sur l'index, 2.5.0
+construite et jamais publiée, `docs/releases.md` le dit maintenant.
+
+**Le livrable existe.** `engines/`, six fichiers autonomes, un par couple skill
+et langue, générés par `scripts/build-engines.py` depuis un manifeste écrit à
+la main. On télécharge un fichier, on l'attache, c'est toute l'installation.
+Vérifié sur un clone frais : les six portent chaque chemin qu'ils nomment.
+
+**Le format écrit avant la migration a payé quatre fois.** C'était l'argument
+de 1.1, et il n'était pas théorique. La liste a rattrapé trois pertes
+silencieuses sur `examples/` (le banner provisoire de la voix, l'objectif d'où
+descend le ratio, la ligne de la prochaine session, toutes coupées par une
+extraction qui tranchait au premier titre) et quatre clauses sur la scission
+d'`instance.md`. Aucune n'aurait été vue à la relecture.
+
+**Le format a plié devant la matière réelle, ce qui était le but de 2.4.** Le
+profil d'Alexis portait une décision écrite de ne pas ouvrir de comment-gate,
+avec sa raison et la condition qui la rouvre au 20e post. `linkedin-post` lit
+déjà ce réglage, donc il était porteur et sans domicile. `Profile` gagne une
+douzième ligne. Le second candidat n'en était pas un : les « interdits
+absolus » de sa `voice.md` recopiaient le pack `fr` écrit après eux.
+
+**Trois fois le même couplage, et il n'a été gardé qu'une fois sur trois.**
+L'app gelée lit le *contenu* des fichiers livrés, pas seulement leurs chemins.
+Un libellé de fiche replié sur deux lignes a cassé `test_prose.py`, et ce
+commit est parti avec `check-app.sh` rouge. `examples/` migré a cassé 242 tests
+qui s'en servaient de fixture. `measure.md` migré a cassé le test des états.
+Deux fois sur trois la réponse a été de **couper le couplage** plutôt que de
+l'élargir en garde : une fixture figée sous `app/tests/fixtures/`, un test
+repointé sur le contrat qui a déménagé. La garde de `check.sh` ne couvre que
+les suppressions et renommages, et `CONTRIBUTING.md` le dit comme un trou connu
+plutôt que comme une preuve de sûreté.
+
+**La fixture figée est partie non suivie par git.** `.gitignore` attrape
+`profile.md` partout et ne ré-autorisait que deux endroits. Suite verte ici,
+rouge sur tout clone. `check.sh` l'a vu au run suivant, par l'étape écrite pour
+cette classe de bug après la perte de `references/measure.md` à la première
+release.
+
+**La revue finale a réfuté quatre affirmations sur huit**, et chacune valait sa
+correction. `measure.md` n'avait jamais été migré : il ouvrait sur la phrase
+même que l'ADR 0001 renverse, et il part dans les deux moteurs `linkedin-post`,
+qui ne portent pas `material.md` : le moteur livré se contredisait. Le
+générateur ne lisait que la prose du skill, jamais le routeur ni les références
+entre elles, et quatre moteurs sur six pointaient vers des fichiers absents ;
+une citation d'un fichier inexistant passait toutes les gardes. Deux assertions
+de l'eval ne mesuraient rien, dont une qui passait sur la chaîne vide, et le
+self-test n'avait que quatre fixtures pour cinq contrôles sans jamais vérifier
+que le bon échouait. Le README promettait l'autonomie réfutée.
+
+**Ce que les gardes tiennent maintenant**, chacune perturbée dans le sens
+qu'elle nomme avant d'être crue : le compte des treize champs, la fraîcheur des
+moteurs, leur autonomie lue sur le produit et non sur l'intention, l'unicité de
+la version, le self-test de l'eval, et la ligne de fin qui rougit quand `app/`
+bouge. `check.sh` fait **1 s** contre 35,77 s ce matin.
+
+**Reste**, dans l'ordre : envoyer le document de relecture du pack `en`, seul
+bloquant d'annonce ; basculer `../linkedin/` sur son `material.md`, écrit,
+vérifié, sauvegardé, laissé à côté des originaux parce que la bascule est une
+décision d'Alexis ; lancer `eval.py` contre un vrai modèle pour savoir si les
+gardes visibles tiennent ailleurs que sur une fixture. Et `postiz_integration`
+traîne toujours en clair dans l'ancien frontmatter du post du 28/08.
+
 ## 2026-09-09 (septième session). La phase 0, moins la publication
 
 **Livré et poussé**, `ded9da5..90b22f8` sur `main`, deux commits séparés comme
