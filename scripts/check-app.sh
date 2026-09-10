@@ -25,14 +25,57 @@ ok()   { printf '   ok   %s\n' "$1"; }
 
 step "tests, on a bare interpreter"
 # The stdlib only claim: these run with no dependencies installed at all.
-for t in app/tests/test_instance.py app/tests/test_providers.py \
-         app/tests/test_agent.py app/tests/test_skills.py \
-         app/tests/test_tools.py app/tests/test_anchors.py \
-         app/tests/test_interview.py app/tests/test_archive.py \
-         app/tests/test_smoke.py app/tests/test_prose.py \
-         app/tests/test_intents.py app/tests/test_sufficiency.py; do
-  if python3 "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t"; python3 "$t" 2>&1 | tail -20; fi
+#
+# **Discovered, not listed.** This used to be twelve paths written by hand, and
+# two of them imported PyYAML through verbatim_app.i18n. The block passed for
+# months because the machine it ran on had PyYAML installed, so a block whose
+# entire subject is the bare interpreter had never met one. CI was the first,
+# and it went red on the first run. A hand written list of what satisfies a
+# claim is the same design as a manifest nobody checks against the product.
+#
+# So every test is run, and the two that genuinely need the app's dependencies
+# are declared here as expected failures. Both directions are read: an
+# undeclared test that fails is a regression, and a declared one that *passes*
+# means the exception has gone stale and should come off this line. Without
+# that second half the list rots back into the thing it replaced.
+# And the interpreter is *made* bare rather than assumed to be. A throwaway
+# venv carries the standard library and nothing else, so this block answers the
+# same question on a maintainer's laptop and on a runner. Reading it off the
+# ambient python3 is what hid the bug: PyYAML was installed here and absent
+# there, so the two machines were being asked different questions.
+bare="$(mktemp -d)/venv"
+python3 -m venv --without-pip "$bare" >/dev/null 2>&1 || {
+  printf '   skip could not build a bare interpreter, this block did not run\n'
+  bare=""
+}
+# Declared, and each one measured rather than guessed. yaml arrives through
+# verbatim_app.i18n; fastapi and markdown_it are the app's own screens and
+# renderer, which is what "with its dependencies" below is for.
+needs_deps="test_bundle.py test_smoke.py test_tools.py
+            test_markup.py
+            test_web.py test_edit_web.py test_interview_web.py
+            test_measure_web.py test_publish_web.py"
+needs_deps="$(echo $needs_deps)"   # one line, so the space match below works
+[ -n "$bare" ] && for t in app/tests/test_*.py; do
+  name="$(basename "$t")"
+  case " $needs_deps " in
+    *" $name "*) expected=1 ;;
+    *)           expected=0 ;;
+  esac
+  if "$bare/bin/python" "$t" >/dev/null 2>&1; then
+    if [ "$expected" = 1 ]; then
+      bad "$name passes bare, so it no longer needs the app's dependencies"
+      printf '     take it off needs_deps in %s\n' "$0"
+    else
+      ok "$name"
+    fi
+  elif [ "$expected" = 1 ]; then
+    ok "$name (needs the app's dependencies, runs in the block below)"
+  else
+    bad "$name"; "$bare/bin/python" "$t" 2>&1 | tail -20
+  fi
 done
+[ -n "$bare" ] && rm -rf "$(dirname "$bare")"
 
 step "app suite, with its dependencies"
 # The block above runs on a bare interpreter and proves the stdlib only claim.
