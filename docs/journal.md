@@ -1,5 +1,62 @@
 # Journal
 
+## 2026-09-10 (neuvième session, coda). Le routeur, et la facture à zéro
+
+**Le routeur nommait quatre références et voyage dans les six moteurs.** C'est
+la multiplication que la facture de ce matin désignait sans que personne
+l'ouvre : une phrase de renvoi dans `SKILL.md` coûte son fichier six fois.
+
+Deux des quatre étaient de purs renvois sous « what this bundle will not do »,
+et énoncent maintenant le fait. La troisième disait où vivent les dix
+catégories de style ; la phrase les porte. **La quatrième reste** :
+`locales/<lang>/interview.md` est l'endroit où vivent les formulations, c'est
+porteur, et tous les skills embarquent ce pack de toute façon.
+
+### Les manifestes, trois jugements que le rapport a rendus sans les prendre
+
+**`style-taxonomy.md` sort des trois.** C'est le contrat de qui écrit un pack,
+et `locales/<lang>/style.md` porte déjà les dix catégories à l'exécution, avec
+leurs exemples. Un fichier dont le lecteur est un contributeur n'a rien à faire
+dans un fichier qu'un utilisateur attache.
+
+**`platform.md` sort de `profile` et de `setup`.** `linkedin-profile` dit dans
+sa propre prose qu'il « ne touche jamais la plateforme » ; `linkedin-setup`
+construit la matière et passe la main. `linkedin-post` le garde, il le cite.
+
+**`locales/<lang>/style.md` reste dans `setup`, et c'est la trouvaille utile.**
+Il était sur la facture parce que rien ne le nommait en chemin. Vérifié avant
+de couper : quand le corpus fait moins de cinq posts, ou zéro, la section Voice
+**s'écrit depuis les règles de style dures**. Il fallait donc le garder. La
+bonne réponse n'était pas de l'élaguer, c'était de **le nommer dans la phrase
+qui en dépend** : la ligne disparaît de la facture et la dépendance est écrite
+là où le prochain lecteur la trouvera.
+
+C'est le mode d'emploi de la facture, et il valait un aller-retour pour
+l'apprendre : **une ligne est une question, et la réponse est aussi souvent une
+phrase qu'une suppression.**
+
+### Ce que ça donne
+
+| Moteur | Avant la session | Après | Jetons |
+|---|---|---|---|
+| `linkedin-post` | 13 807 | **13 515** | 17,9k -> 17,6k |
+| `linkedin-profile` | 8 759 | **6 848** | 11,4k -> 8,9k |
+| `linkedin-setup` | 11 752 | **9 883** | 15,3k -> 12,8k |
+
+**8 144 mots sur le bundle**, et cette fois `linkedin-post` descend aussi. La
+facture est **vide** : chaque moteur ne porte plus que ce que son skill demande,
+transitivement.
+
+**Ça ne suffit toujours pas.** `linkedin-post` reste à 17 600 jetons contre les
+12 000 visés, et c'est lui que l'eval a mesuré à zéro garde sur cinq. Ce qui
+reste est du poids demandé : sa propre prose fait 3 679 mots, `anchoring.md`
+1 769, `interview-intents.md` 1 852. La prochaine coupe n'est plus un chemin
+qu'on retire, c'est de la prose qu'il faut écrire plus court, et ça se juge une
+phrase à la fois.
+
+`check-app.sh` vert : le wheel embarque `SKILL.md`, donc éditer le routeur est
+exactement le piège que le `CLAUDE.md` nomme.
+
 ## 2026-09-10 (neuvième session). La phrase qui pesait 776 mots, et la facture
 
 **Une phrase de renvoi coûtait un fichier entier, quatre fois.**
