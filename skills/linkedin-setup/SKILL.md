@@ -158,6 +158,10 @@ If there are no posts at all, say so, write the Voice section with the hard
 rules only, and note that it gets rewritten after five to ten published
 posts.
 
+**The hard rules are the ones marked hard in `locales/<lang>/style.md`**, which
+is why this skill carries that pack: a Voice section built on a short corpus,
+or on none, is written out of it rather than out of traits nobody could read.
+
 **Never build a voice from a scraped corpus of high performing posts.** It
 produces the average of a niche, which is the opposite of a voice. Studying
 five people they actually respect, by hand, for structures and never for turns
