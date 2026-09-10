@@ -1,0 +1,40 @@
+# The validation block, on every push to main and every pull request.
+#
+# This repository asks for a language pack from people who are not maintainers
+# and have no reason to have cloned it twice. Until this file existed, the only
+# workflow here ran on a version tag, so a contributor's branch was checked by
+# nobody and the first thing they heard back was a maintainer running check.sh
+# by hand. That is a slow way to say "the em dash rule caught you".
+#
+# check.sh takes about a second and needs git, python3 and coreutils. No pip,
+# no uv, no node: the engine seam is standard library only and the block that
+# guards it is too. app/ is deliberately not here; scripts/check-app.sh reads
+# it, costs thirty seconds and needs macOS, and check-app.yml runs it only when
+# app/ has actually moved.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check.sh
+        run: ./check.sh
+
+      # check.sh asserts the engines match their sources. This says what the
+      # engines cost, which is a judgement rather than a rule and so prints
+      # rather than fails. It is in the log of every pull request because
+      # weight is the measured failure mode of this bundle: a host with a
+      # small window truncates an engine instead of refusing it, and says
+      # nothing. See docs/eval.md.
+      - name: What the engines carry, and what it weighs
+        run: python3 scripts/build-engines.py --weight
