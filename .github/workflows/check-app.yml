@@ -1,0 +1,59 @@
+# The frozen app's block, and only when the frozen app has moved.
+#
+# scripts/check-app.sh costs about thirty seconds against check.sh's one, and
+# needs macOS, swiftc, node and uv. Running it on every pull request would make
+# a commit on a language pack pay to rebuild a Python application nobody is
+# developing, which is exactly the reason it was split out of check.sh in the
+# first place.
+#
+# The path filter is the same scope check.sh uses when it goes loud about app/
+# having moved: app/, and the Swift files it compiles. Widening it to all of
+# scripts/ would run half a minute of macOS on a change to smoke.py.
+#
+# **It is narrower than what check-app.sh reads, and that is a known hole
+# rather than an oversight.** The wheel bundles SKILL.md, lib/, locales/,
+# references/ and skills/, and app/tests/test_prose.py parses one of them line
+# by line, so an edit there can break the frozen app without touching app/.
+# check.sh covers half of it on every pull request, because it fails when a
+# bundled file is renamed or deleted. A plain edit is the half nothing catches,
+# which CONTRIBUTING.md names under "Before you push". Widening this filter to
+# references/ would put thirty seconds of macOS on every language pack change,
+# which is the cost the split exists to avoid.
+#
+# A filtered workflow that never runs reports nothing rather than reporting
+# green, so this must not be a required check on its own. check.yml is the one
+# that runs on everything.
+name: check-app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/*.swift"
+      - "scripts/check-app.sh"
+      - ".github/workflows/check-app.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "scripts/*.swift"
+      - "scripts/check-app.sh"
+      - ".github/workflows/check-app.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    # Apple Silicon, like the DMG job: the app carries one uv binary per
+    # architecture and is built arm64 only, deliberately.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: check-app.sh
+        run: ./scripts/check-app.sh
