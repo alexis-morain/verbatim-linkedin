@@ -1,5 +1,114 @@
 # Journal
 
+## 2026-09-10 (neuvième session). La phrase qui pesait 776 mots, et la facture
+
+**Une phrase de renvoi coûtait un fichier entier, quatre fois.**
+`references/platform.md` finissait sa section mesure sur « see
+`references/measure.md` ». `build-engines.py` lit le moteur fini et porte tout
+chemin qu'il nomme, donc cette phrase mettait le schéma de mesure complet, ses
+trois champs comptés et ses seuils de confiance, dans `linkedin-profile` et
+`linkedin-setup`. Ni l'un ni l'autre ne mesure quoi que ce soit.
+
+La section énonce maintenant la position au lieu de nommer le fichier, et
+l'énoncé a été **vérifié contre `measure.md`** plutôt que résumé de mémoire.
+`measure.md` sort des deux manifestes ; `linkedin-post` le garde, sa propre
+prose le cite. Les deux moteurs perdent **685 mots chacun**, en et fr, et
+`platform.md` en gagne 94 pour porter le fait qu'il désignait.
+
+**Le chiffre net est 2 552 mots sur le bundle, pas les 3 100 annoncés.** La
+différence est `platform.md`, qui a grossi et qui, lui, voyage dans les six
+fichiers. Ce qu'un moteur économise se compte après la construction, pas sur la
+taille de ce qu'on retire : le générateur écrit un titre et un séparateur autour
+de chaque fichier embarqué.
+
+### Ce que la coupe n'atteint pas, et il faut le dire
+
+**`linkedin-post` a grossi**, 13 807 à 13 901 mots. C'est le seul moteur à
+18 000 jetons, et c'est exactement celui que l'eval du 09/09 a mesuré à zéro
+garde sur cinq. La coupe chirurgicale ne touche que les deux moteurs qui
+étaient déjà sous les 14 000 jetons. **L'action « les moteurs sont trop gros »
+n'est donc pas close**, et la lire comme telle serait se mentir.
+
+Le levier restant est nommé par la facture elle-même : **le routeur**. Il
+voyage dans les six moteurs et nomme quatre références, ce qui traîne
+`style-taxonomy.md` et `platform.md` dans des moteurs qui ne les demandent pas.
+7 500 mots sur six fichiers. Écarté cette session, décision explicite : ça
+touche la forme du produit.
+
+### La garde est une facture, pas un refus
+
+`build-engines.py --weight` imprime ce que chaque moteur porte sans que son
+skill l'ait demandé, ce que ça pèse, et **qui l'a nommé**. La colonne du namer
+est l'utile : elle dit où couper.
+
+**Elle imprime et ne rougit jamais.** Un skill peut avoir besoin d'un fichier
+qu'il nomme en prose plutôt qu'en chemin, et aucune expression régulière ne
+distingue les deux. Juger, c'est le travail de la personne ; la machine pose la
+facture devant elle au moment où elle la crée. `--check` reste muet pour ne pas
+diluer le bloc de validation.
+
+`--self-test` prouve que le rapport mesure encore quelque chose, contre une
+fixture et pas contre ce dépôt, et vérifie **les deux moitiés** : la bonne
+réponse sort, et perturber la fixture la change. Branché dans `check.sh` à côté
+de celui de l'eval, pour la même raison : un rapport devenu muet ressemble
+exactement à un bundle sans poids mort. Vérifié en cassant `unasked()` : rouge.
+
+### Deux trous que le CLAUDE.md ne nommait pas
+
+**`check.sh` ne tournait sur aucune pull request.** `release.yml` était le seul
+workflow et se déclenche sur un tag de version. Le README demande à des
+inconnus natifs de proposer un pack, et leur branche n'était vérifiée par
+personne. `check.yml` le lance sur ubuntu à chaque push et chaque PR, sans rien
+installer. `check-app.yml` lance le bloc macOS lent, et seulement quand `app/`
+ou un `.swift` a bougé ; son filtre est **plus étroit que ce que
+`check-app.sh` lit**, et le commentaire le dit au lieu de laisser croire à une
+couverture qu'il n'a pas.
+
+**Le produit n'avait pas de sortie versionnée.** Le README pointait vers
+`raw.githubusercontent.com` sur `main` : quelqu'un attache un fichier, le
+commit suivant le change sous lui, aucun moyen de dire sur quoi il est.
+`engines.yml` attache les six moteurs à une release sur `engines-v*`, refuse un
+tag qui contredit la version des quatre `SKILL.md`, et le README pointe vers un
+tag exact plutôt que vers `latest`.
+
+**`engines-v*` et pas `v*`** : `v*` appartient à l'app gelée, dernier tag
+2.4.1, et les moteurs sont en 1.0.0. Un espace commun aurait fait de la
+première release du produit vivant un numéro au-dessus du dernier de l'app
+gelée.
+
+### Trouvé en passant
+
+**`release.yml` ne peut plus réussir.** Il épingle la version du wheel depuis
+`app/pyproject.toml`, qui lit 2.5.0, une version construite et jamais publiée.
+Son étape « the pinned engine resolves » échouerait au premier tag `v*`, avant
+qu'un DMG n'atteigne personne, ce qui est exactement ce pour quoi elle a été
+écrite. Écrit dans `CONTRIBUTING.md` plutôt que corrigé : c'est la garde qui
+marche, pas une panne.
+
+**`scripts/eval.py --transcript` lit du texte brut.** Vérifié sur un transcript
+collé à la main, sans clé : quatre gardes sur cinq rouges, avec la raison de
+chacune. N'importe quel utilisateur peut donc noter sa propre session contre
+les cinq gardes, hors ligne et sans compte. La capacité existe, marche, et
+n'est documentée nulle part côté utilisateur. Non fait, hors périmètre : à
+décider.
+
+### La revue
+
+Deux axes en parallèle avant commit. **Standards a trouvé trois choses dures**
+et toutes vraies : un `workflow_dispatch` dont la garde de version ne pouvait
+que refuser (`GITHUB_REF_NAME` vaut une branche sur un dispatch), un
+`CONTRIBUTING.md` qui disait 2.4.1 et 2.5.0 du même objet à quatre paragraphes
+d'écart, et un `global ROOT` dans le self-test qui laissait `OUT` pointer sur le
+vrai `engines/` pendant le test. Plus deux odeurs justes : la découverte des
+skills écrite deux fois, et `unasked()` qui relisait chaque fichier une fois par
+paire. Tout corrigé, la racine passe en argument.
+
+**Spec a confirmé le reste et corrigé un chiffre**, celui du haut de cette
+entrée. Elle a aussi vérifié ce qui comptait vraiment : aucun chemin pendant
+vers `measure.md`, la prose neuve vraie contre `measure.md`, `check-app.sh`
+vert malgré l'édition d'un fichier que le wheel embarque, et le `--self-test`
+rouge sur trois mutations différentes de `unasked()`.
+
 ## 2026-09-09 (huitième session, coda). Le trou fermé, et ce qu'il a attrapé
 
 **`negative-parallelism` lit maintenant `it's` et `it is` comme une seule
