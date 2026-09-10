@@ -162,6 +162,19 @@ case "$?" in
   *) bad "an engine could not be built:"; echo "$out" | sed 's/^/     /' ;;
 esac
 
+step "the weight report still measures something"
+# The same reason as the block below. build-engines.py --weight prints what
+# each engine carries that its skill never asked for, and a report that
+# quietly returned nothing looks exactly like a bundle carrying no dead
+# weight. Its self test runs against a fixture and checks both halves: the
+# right answer comes out, and perturbing the fixture changes it.
+if python3 scripts/build-engines.py --self-test >/dev/null 2>&1; then
+  ok "8 answers, and each one moves when the fixture moves"
+else
+  bad "the weight report's own answers do not hold:"
+  python3 scripts/build-engines.py --self-test 2>&1 | sed 's/^/     /'
+fi
+
 step "the eval's assertions still measure something"
 # scripts/eval.py is not in this block: it needs a key, and a check that
 # skips itself into a green tick is what docs/smoke.md exists against. Its
