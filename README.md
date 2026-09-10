@@ -195,6 +195,37 @@ inside a quote, stays in.
 It runs on the standard library alone. PyYAML is used when it is installed and
 a small built-in reader takes over when it is not.
 
+## Checking a session
+
+The engine's guards are visible on purpose: the sheet prints its quote beside
+every bullet, the gauge lists the facts it counted instead of announcing a
+number, and every anchor names the one source it can be found in. A guard you
+can see is a guard you can check, and you do not need this repository's
+maintainer or an API key to do it.
+
+```bash
+python3 scripts/eval.py --transcript my-session.txt --model "the one you used"
+```
+
+Paste your session into a file and run that. It reads plain text and nothing
+else: it does not know which model produced the transcript, what it was asked,
+or how it works inside. Five checks come back, each one with its reason.
+
+| Check | Holds when |
+|---|---|
+| the sheet appeared | All five labels, in the order the skill prints them. |
+| every bullet carries a quote | Each bullet under CONCRETE ELEMENTS has a quoted source under it. |
+| the gauge listed facts | An Acquired block with facts in it, not a count. |
+| two angles, each quoting | Two "because you said" lines, each with a findable quote. |
+| anchors are findable | At least one anchor, none under ten characters. |
+
+**A failure is a measurement of that model, not a bug in the engine**, which is
+why `--model` is worth filling in honestly: the verdict names what it ran
+against and refuses to print without one. The most likely cause of a bad run is
+the window above, not the model. Every check here is structural, and none of
+them says whether the post is any good; the engine's answer to that is the
+validation sheet, which is a person.
+
 ## Publishing
 
 Three tiers. The default needs no configuration.
