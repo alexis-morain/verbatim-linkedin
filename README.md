@@ -59,13 +59,20 @@ installation.
 
 | You want to | Attach |
 |---|---|
-| Write a post | [`linkedin-post.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-post.en.md) |
-| Set yourself up, first time | [`linkedin-setup.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-setup.en.md) |
-| Rework your public page | [`linkedin-profile.en.md`](https://raw.githubusercontent.com/alexis-morain/verbatim-linkedin/main/engines/linkedin-profile.en.md) |
+| Write a post | [`linkedin-post.en.md`](https://github.com/alexis-morain/verbatim-linkedin/releases/download/engines-v1.0.0/linkedin-post.en.md) |
+| Set yourself up, first time | [`linkedin-setup.en.md`](https://github.com/alexis-morain/verbatim-linkedin/releases/download/engines-v1.0.0/linkedin-setup.en.md) |
+| Rework your public page | [`linkedin-profile.en.md`](https://github.com/alexis-morain/verbatim-linkedin/releases/download/engines-v1.0.0/linkedin-profile.en.md) |
 
-French versions sit beside them in [`engines/`](engines/), one file per skill
-and language. Each one carries its skill, the router, and every reference and
-pack file it needs, because the weakest host this is written for cannot fetch
+Those are **1.0.0**, and the number is deliberate: an engine is a file you
+keep, and a file you keep has to be sayable. The newest one is always on the
+[releases page](https://github.com/alexis-morain/verbatim-linkedin/releases), French versions beside the
+English, one file per skill and language. [`engines/`](engines/) in this
+repository is the same six files at whatever `main` currently says: the right
+thing to read when you are working on the engine, and the wrong thing to attach
+when you are using it.
+
+Each one carries its skill, the router, and every reference and pack file it
+needs, because the weakest host this is written for cannot fetch
 a second file. `scripts/build-engines.py` holds that by reading the finished
 engine and refusing any path it names but does not carry, which is a stronger
 question than whether a manifest was filled in.
@@ -75,7 +82,7 @@ returns text, writes no file and runs no code. Anything a better host adds is
 convenience: it never adds a promise, and the engine says so where it matters.
 
 **Check the window before you use a small model.** These files run from about
-11,000 to 18,000 tokens, and each one says its own size on its second line. A
+10,000 to 18,000 tokens, and each one states its own size near the top. A
 host whose context is smaller does not refuse the file, it truncates it and
 says nothing, so the model answers without ever having seen the rules it is
 being judged on. Local runtimes are where this bites: Ollama defaults to
