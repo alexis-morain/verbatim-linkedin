@@ -88,13 +88,23 @@ It runs the tests, self tests every language pack, and refuses a tree where
 somebody's profile, a `.env`, an em dash or an emoji made it into the shipped
 files. All of those have happened to somebody. It takes about a second.
 
+**A pull request runs it too**, in `.github/workflows/check.yml`, on Ubuntu and
+with nothing installed: git, python3 and coreutils are the whole requirement.
+You do not have to be trusted or remembered for the block to run on your
+branch. `check-app.yml` runs the slow macOS one, and only on a change that
+actually touches `app/` or a Swift file.
+
 **If you touched `app/` or a Swift file under `scripts/`, run this one too:**
 
 ```bash
 ./scripts/check-app.sh
 ```
 
-`app/` is frozen at 2.5.0, and its steps live there rather than in `check.sh`:
+`app/` is frozen, and it carries two numbers that are both correct: the tree
+reads **2.5.0** and the last version published and tagged is **2.4.1**. 2.5.0
+was built and never released, because the engine pivoted to a markdown bundle
+days later; [`docs/releases.md`](docs/releases.md) records it. Its steps live
+in `scripts/check-app.sh` rather than in `check.sh`:
 the app suite with its dependencies, the wheel and what it carries, the PyPI
 page, the model instruction and markdown parser guards, the screen scripts and
 the launcher. They take about thirty six seconds, which a commit on a skill
@@ -135,6 +145,35 @@ It costs a few cents of your own key, and it is not in `check.sh` on purpose:
 CI has no key, and a check that skips itself into a green tick is the failure
 the smoke test exists against.
 
+## Releasing the engines
+
+The engines are the product, and they ship as six markdown files attached to a
+release:
+
+```bash
+git tag engines-v1.0.0 && git push origin engines-v1.0.0
+```
+
+`.github/workflows/engines.yml` runs `check.sh`, refuses a tag that disagrees
+with the `version:` in the four `SKILL.md` files, and attaches the six files.
+Bump the front matter first, then tag. Then move the version in the README's
+download table, which points at an exact tag rather than at `latest`: `latest`
+is whatever GitHub most recently called a release, and this repository has two
+products releasing into it.
+
+**Two tag namespaces, and they are not interchangeable.** `engines-v*` is the
+live product, at 1.0.0. `v*` belongs to the frozen macOS app, whose last tag
+is 2.4.1, and `release.yml` owns it. One namespace would have made the live
+product's first release a number above the frozen app's last, which is a lie
+told by a version string.
+
+**`release.yml` cannot currently succeed, and that is the guard working.** It
+pins the wheel version from `app/pyproject.toml`, which is the 2.5.0 above: the
+version that was built and never published. Its "the pinned engine resolves"
+step would fail on the first `v*` tag, before a DMG reached anybody, which is
+exactly what that step was written to do. Cutting another DMG means publishing
+the wheel first or moving the pin back to 2.4.1. Nobody has needed one.
+
 ## Packaging
 
 The app ships as a wheel, built from `app/`:
@@ -170,6 +209,33 @@ The failure mode is silent by construction. A host with too small a context
 truncates rather than refusing, so nothing downstream can tell a model that
 failed the guards from a model that never saw them. `scripts/eval.py
 --num-ctx` exists to separate those two.
+
+**Naming a path is what costs, and the build prints the bill.**
+
+```bash
+python3 scripts/build-engines.py --weight
+```
+
+A file enters an engine because something named it as a path, and the thing
+that named it is often not the skill: the router ships in all six engines and
+names four references, and a reference file names another in a see-also
+sentence. `references/platform.md` used to end on "see `references/measure.md`",
+which put the whole measurement schema, its fields and its confidence
+thresholds inside `linkedin-profile` and `linkedin-setup`, neither of which
+measures anything. A 776 word file, in four engines, for one sentence. The
+section now states the position and names no file, and those four came out 685
+words lighter each: the difference is the heading and the separator the build
+writes around every embedded file, which is worth knowing when you check a
+saving against the size of what you removed.
+
+So when you want to point at another reference, ask first whether the sentence
+can carry the fact instead. A path is a promise that the file travels with it.
+
+**The report prints and never fails**, because whether carried weight is
+justified is a judgement no regular expression holds: a skill can genuinely
+need a file it names in prose rather than as a path, and that file shows up in
+the report looking unused. `check.sh` stays silent about it. The build says it,
+and every pull request has it in the log.
 
 ## Adding a language pack, in short
 
