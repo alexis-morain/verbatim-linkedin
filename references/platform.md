@@ -58,6 +58,16 @@ turns of phrase, is a different activity and is allowed.
 ## The measurement position
 
 Reach numbers, impressions and likes are not the metrics this bundle optimises,
-because they are not the metrics that pay. See `references/measure.md` for what
-gets recorded instead, and for the confidence thresholds that keep three data
-points from becoming a theory.
+because they are not the metrics that pay. Three things get recorded instead:
+connection requests from profiles that match the target, messages that name a
+project, a budget or a problem, and the times a post came up unprompted in a
+meeting. A post can do all three at two hundred impressions and none of them at
+twenty thousand.
+
+Nothing generalises under two measured posts, and a pattern claimed across
+fewer carries that fact with it rather than passing as a rule.
+
+The fields, the thresholds and the seven day rule belong to the skill that
+measures. This paragraph states the position rather than naming that file,
+because an engine carries every path it names and two of the three never
+measure anything.
