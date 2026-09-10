@@ -1,0 +1,112 @@
+# The six engines, attached to a release when an engines tag is pushed.
+#
+# A separate tag namespace from release.yml, and the separation is the point.
+# `v*` belongs to the frozen macOS app, whose last tag is 2.4.1 and which is
+# not being developed. The engines are the live product and are at 1.0.0. One namespace
+# would have made the live product's first release a number above the frozen
+# app's last one, which is a lie told by a version string, and the two would
+# have raced for the same tag on every future bump.
+#
+#   git tag engines-v1.0.0 && git push origin engines-v1.0.0
+#
+# What this exists for: until it did, the README pointed people at
+# raw.githubusercontent.com on main. Somebody attached a file, the next commit
+# changed it under them, and they had no way to say which one they were on.
+# An engine is a file a person keeps; a file a person keeps needs a number.
+name: engines
+
+# No workflow_dispatch. A manual run carries a branch in GITHUB_REF_NAME, so
+# the version guard below would compare "main" against "1.0.0" and refuse it,
+# which is a button whose only outcome is a red tick.
+on:
+  push:
+    tags: ["engines-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A repository that demands the validation block before every commit does
+      # not publish files that have not passed it.
+      - name: check.sh
+        run: ./check.sh
+
+      # The tag and the front matter have to agree, because the front matter is
+      # what a reader of the attached file sees and the tag is what the release
+      # page shows. check.sh already asserts the four SKILL.md files carry one
+      # version between them, so there is exactly one number to compare against.
+      - name: The tag says what the skills say
+        run: |
+          DECLARED="$(awk -F': ' '/^version: / { print $2; exit }' SKILL.md)"
+          TAGGED="${GITHUB_REF_NAME#engines-v}"
+          echo "front matter: $DECLARED"
+          echo "tag:          $TAGGED"
+          if [ "$DECLARED" != "$TAGGED" ]; then
+            echo "::error::the tag says $TAGGED and the skills say $DECLARED."
+            echo "::error::bump version: in the four SKILL.md files, or retag."
+            exit 1
+          fi
+
+      # Cheap, and it is the one thing a downloader cannot check for themselves
+      # before they have already attached the file.
+      - name: Every engine is whole and states its size
+        run: |
+          test "$(ls engines/*.md | wc -l)" -eq 6
+          for f in engines/*.md; do
+            grep -q "roughly .* thousand tokens" "$f" || {
+              echo "::error::$f does not state its size"; exit 1; }
+          done
+          echo "6 engines, each one carrying its own size line"
+
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" engines/*.md \
+            --title "Engines ${GITHUB_REF_NAME#engines-}" \
+            --notes-file - <<'NOTES'
+          ## Download one file and attach it to a conversation
+
+          That is the whole installation. No account, no service in the middle,
+          and nothing about you leaves the file you keep.
+
+          | You want to | Attach |
+          |---|---|
+          | Write a post | `linkedin-post.en.md` |
+          | Set yourself up, first time | `linkedin-setup.en.md` |
+          | Rework your public page | `linkedin-profile.en.md` |
+
+          French versions sit beside them, `*.fr.md`. The engine is in English
+          either way: the pack sets the language of the interview and of the
+          style rules, not the language of the mechanism.
+
+          ## Check the window first
+
+          **These files run from about 10,000 to 18,000 tokens, and each one
+          states its own size near the top.** A host whose context is
+          smaller does not refuse the file. It truncates it, says nothing, and
+          the model answers without ever having seen the rules it is being
+          judged on. Ollama defaults to 4,096 tokens and needs
+          `OLLAMA_CONTEXT_LENGTH` raised; at that default, measured, none of
+          the five guards survived. `docs/eval.md` has the numbers.
+
+          ## Your material is the second file, and it stays yours
+
+          The engine holds mechanism and contains nothing about any particular
+          person. Your material is one file you keep and attach. The engine
+          prints the lines that changed at the end of a session and you paste
+          them back.
+
+          Start with `linkedin-setup`. It runs about twenty minutes and ends on
+          a written post, not on a file.
+          NOTES
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engines
+          path: engines/*.md
