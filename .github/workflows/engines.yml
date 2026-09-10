@@ -87,7 +87,7 @@ jobs:
 
           ## Check the window first
 
-          **These files run from about 10,000 to 18,000 tokens, and each one
+          **These files run from about 9,000 to 18,000 tokens, and each one
           states its own size near the top.** A host whose context is
           smaller does not refuse the file. It truncates it, says nothing, and
           the model answers without ever having seen the rules it is being

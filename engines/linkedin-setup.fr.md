@@ -7,7 +7,7 @@ Everything this engine needs is in this file. Attach it to a
 conversation and start. It writes no file and runs no code; where a
 host can do more, that is a convenience and never a promise.
 
-**About 11 thousand words, so roughly 15 thousand tokens.** A host whose window is smaller than that will truncate this file rather than refuse it, and say nothing.
+**About 10 thousand words, so roughly 13 thousand tokens.** A host whose window is smaller than that will truncate this file rather than refuse it, and say nothing.
 
 The pack below is the fr one. If the person writes their posts in
 another language, say so plainly: the output pack is not in this
@@ -44,6 +44,10 @@ nothing traces, nothing gets written.
 
 Read `references/` on demand, not up front. Each skill names the files it
 needs.
+
+**This router names almost no paths, deliberately.** It travels inside every
+generated engine, and an engine carries every path it names, so a see-also here
+costs its file six times over. Where a sentence can carry the fact, it does.
 
 ## First thing, every time: the status flag
 
@@ -98,8 +102,9 @@ degradation is visible, never silent.
 `locales/en` and `locales/fr` ship. `locales/_template` is the contract, and
 its README carries the acceptance criteria for a new one.
 
-A pack is never a translation of another pack. The ten categories in
-`references/style-taxonomy.md` are shared; the lists that fill them are not.
+A pack is never a translation of another pack. The ten style categories are
+shared across every pack; the word lists that fill them are not. The same word
+is a marketing tell in one language and ordinary in another.
 
 ## Layout
 
@@ -119,12 +124,13 @@ examples/                   a fictional persona, to read before running this
 
 - **No hook formulas calibrated on a viral corpus.** They invert the mechanism:
   the angle would descend from a template instead of from something the person
-  said. See `references/formats.md`.
+  said.
 - **No writing against an AI detector.** Optimising for a classifier is writing
   for the classifier. The deterministic pass in `lib/lint.py` is the whole of
   it.
-- **No engagement pods, no comment gates by default.** See
-  `references/platform.md`.
+- **No engagement pods, and no comment gate by default.** A comment gate is a
+  deliberate choice made once there are enough published posts to know whether
+  the audience plays that game, never a default.
 - **No invented facts, ever**, including in a revision. That is the promise.
 
 
@@ -291,6 +297,10 @@ The banner comes off when the corpus is real, not when it feels awkward.
 If there are no posts at all, say so, write the Voice section with the hard
 rules only, and note that it gets rewritten after five to ten published
 posts.
+
+**The hard rules are the ones marked hard in `locales/<lang>/style.md`**, which
+is why this skill carries that pack: a Voice section built on a short corpus,
+or on none, is written out of it rather than out of traits nobody could read.
 
 **Never build a voice from a scraped corpus of high performing posts.** It
 produces the average of a niche, which is the opposite of a voice. Studying
@@ -544,68 +554,6 @@ a post does not.
 The affordances apply as everywhere: `reader-next-step` is options to pick
 from, `buyer-words` is memory prompts (heard sentences, not invented ones),
 `proof-pick` is options built from the profile's own proof list.
-
-
----
-
-## references/style-taxonomy.md
-
-# Style taxonomy
-
-Ten categories of AI tell. The categories are universal. The word lists that
-fill them are not, and they are never translated.
-
-Every language pack carries a `style.md` (prose rules, for the model) and a
-`lint.yml` (exact strings, for `lib/lint.py`). Both are organised by the ten
-ids below. A pack that skips a category declares it empty rather than dropping
-the key, so a reader can tell "nothing to flag here" from "nobody wrote this
-yet".
-
-| id | What it catches |
-|---|---|
-| `grandiose-verbs` | Verbs that inflate an ordinary action into an event. |
-| `hollow-jargon` | Nouns that sound like expertise and carry no claim. |
-| `filler-crutches` | Phrases that buy time before the sentence starts. |
-| `fake-hooks` | Openers that announce a subject instead of stating it. |
-| `schoolbook-transitions` | Connectives from a graded essay, not from speech. |
-| `summarizing-closers` | Endings that repeat the post instead of ending it. |
-| `forced-empathy` | Validation addressed to nobody. |
-| `negative-parallelism` | "Not X, it's Y." A shape, not a word list. |
-| `dramatic-fragmentation` | One-word lines, "read that again", rhetorical beats. |
-| `typography` | Em dashes, emoji, spacing and quote conventions. |
-
-## Why the lists are not translations of each other
-
-Three asymmetries, each one enough on its own to kill the idea of translating
-a single list:
-
-1. **A word can be a cliche in one language and neutral in another.**
-   `scalable` and `mindset` are borrowed marketing tells in French. In English
-   they are ordinary words that a technical post may need.
-2. **Some tells have no counterpart.** French "force est de constater" has no
-   English equivalent worth listing. English "in today's fast-paced world" has
-   no French twin.
-3. **The same category can rank differently.** Negative parallelism is the
-   dominant English tell of 2026 and merely common in French. Weighting has to
-   follow the language, not the category.
-
-## What belongs where
-
-- The **category** is engine-side. It goes in this file and nowhere else.
-- The **list** is pack-side. It goes in `locales/<lang>/lint.yml`.
-- The **explanation of why a category matters to a reader** is pack-side too,
-  in `locales/<lang>/style.md`, because the example has to be in the language.
-
-## Two rules for the lint pass
-
-**Never rewrite by substitution.** `negative-parallelism` in particular has no
-mechanical fix: the repair is two separate statements, and only the author
-knows which two. The lint reports, the human decides.
-
-**A hit is a question, not a verdict.** A post that quotes a client saying
-"game-changer" should keep the word. The pass flags, it does not block. The
-only entries that block are the ones a pack marks `hard: true`, and a pack
-should keep that set very small.
 
 
 ---
@@ -1304,82 +1252,3 @@ Comment le lire sur un corpus :
   trait, pas une faute.
 
 En l'absence de corpus, demander. Ne jamais choisir par défaut.
-
-
----
-
-## references/platform.md
-
-# Platform mechanics
-
-Last reviewed: 2026-08-27.
-
-Everything below carries a status. Nothing here is stated as fact unless the
-status says it was measured, and nothing that was measured on one account is
-presented as a law.
-
-**This file rots.** LinkedIn changes its ranking and its limits without
-announcing either. A claim older than six months should be re-checked before a
-skill leans on it. If you are reading this a year from now, treat the folklore
-rows as expired.
-
-## Status vocabulary
-
-| Status | Means |
-|---|---|
-| `mechanical` | A property of the interface itself. Anyone can verify it in a browser in under a minute. |
-| `observed` | Seen on real accounts, by the maintainers or by users. True there. Not proven to generalise. |
-| `folklore` | Widely repeated, no source anyone can check. Listed so you stop wondering, not so you act on it. |
-
-## What the interface does
-
-| Claim | Status | What to do with it |
-|---|---|---|
-| A feed post is truncated after a short prefix, and a reader must click to see the rest. | `mechanical` | Write the first lines to survive alone. The cut lands somewhere near 200 characters, and it moves with device, locale and interface version. Write for the shortest fold you can see on your own phone, not for a number in a document. |
-| The truncation point is the only piece of the post most people will ever read. | `mechanical` | If a hook is chosen, the post is written for that hook, to the character. Not the reverse. |
-| A post can be edited after publishing. | `mechanical` | A typo is not a reason to delete and repost. |
-| Deleting a post in a scheduling tool does not unpublish it from LinkedIn. | `mechanical` | Remove it from LinkedIn itself. This one has bitten this project. |
-| Invitation volume is capped per week, and past the cap failures are silent. | `observed` | Measure your own ceiling before you plan around one. It varies with account age. |
-
-## What people say about reach
-
-| Claim | Status | Position taken here |
-|---|---|---|
-| Outbound links in the post body suppress reach. | `folklore` | Unverifiable from outside. The usual workaround, link in the first comment, costs a click and buys an unproven gain. Decide per post, do not encode a rule. |
-| There are good and bad hours to publish. | `folklore` | The bundle proposes weekday slots as a default because a default is needed, not because the hour is known to matter. If you have your own numbers, they beat this. |
-| Long posts are punished, or rewarded. | `folklore` | Both are claimed, by the same people, in the same year. Write until the idea is finished. Length is an outcome, not a setting. |
-| Hashtags change distribution. | `folklore` | No position. If you use them, use few, and never as a substitute for saying what the post is about. |
-| Early comments matter more than late ones. | `folklore` | Plausible and unproven. It is also the argument used to justify engagement pods, which is why it gets repeated. |
-
-## What this bundle refuses to do
-
-**No engagement pods, no reciprocal comment rings.** They buy a metric this
-bundle does not measure, and they cost the credibility that is the whole point.
-
-**No comment-gating by default** ("comment WORD and I will send it to you"). It
-works on an audience that lives on the platform and accepts the game. On senior
-buyers it reads cheap and it damages the pillar it is attached to. A profile can
-turn it on deliberately, once there are enough published posts to know whether
-the audience plays that game. It is off until then.
-
-**No calibration on a scraped viral corpus.** Copying what performs produces the
-average of a niche, which is precisely what a distinctive voice is not. Studying
-five people you actually respect, by hand, for their structures and never their
-turns of phrase, is a different activity and is allowed.
-
-## The measurement position
-
-Reach numbers, impressions and likes are not the metrics this bundle optimises,
-because they are not the metrics that pay. Three things get recorded instead:
-connection requests from profiles that match the target, messages that name a
-project, a budget or a problem, and the times a post came up unprompted in a
-meeting. A post can do all three at two hundred impressions and none of them at
-twenty thousand.
-
-Nothing generalises under two measured posts, and a pattern claimed across
-fewer carries that fact with it rather than passing as a rule.
-
-The fields, the thresholds and the seven day rule belong to the skill that
-measures. This paragraph states the position rather than naming that file,
-because an engine carries every path it names and two of the three never
-measure anything.
