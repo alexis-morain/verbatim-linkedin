@@ -231,11 +231,34 @@ saving against the size of what you removed.
 So when you want to point at another reference, ask first whether the sentence
 can carry the fact instead. A path is a promise that the file travels with it.
 
+**The router is where this cost is highest**, because it ships inside all six
+engines. It used to name four references in see-also position, which put
+`style-taxonomy.md` in three engines and `platform.md` in two that never touch
+the platform. It now names one file, `locales/<lang>/interview.md`, and that one
+is load bearing: it is where the wording lives, and every skill carries it
+anyway. Keep it that way. A see-also added to `SKILL.md` costs its file six
+times over.
+
+`style-taxonomy.md` came out of every manifest for a different reason worth
+knowing: it is the **contract for whoever writes a pack**, and the ten
+categories it defines are already carried at run time by
+`locales/<lang>/style.md`. A file whose reader is a contributor does not belong
+in a file a user attaches.
+
 **The report prints and never fails**, because whether carried weight is
 justified is a judgement no regular expression holds: a skill can genuinely
 need a file it names in prose rather than as a path, and that file shows up in
 the report looking unused. `check.sh` stays silent about it. The build says it,
 and every pull request has it in the log.
+
+That happened once and it is the shape to expect. `locales/<lang>/style.md` sat
+on `linkedin-setup`'s bill because nothing named it as a path, and it turned
+out to be needed: a Voice section built on a short corpus is written out of the
+hard style rules. The answer was not to prune it. It was to name it in the
+sentence that depends on it, which took the row off the bill and left the
+dependency written down where the next reader will find it. **The bill is empty
+today.** A new row is a question, and the answer is as often a sentence as a
+deletion.
 
 ## Adding a language pack, in short
 

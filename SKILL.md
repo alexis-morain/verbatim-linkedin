@@ -25,6 +25,10 @@ nothing traces, nothing gets written.
 Read `references/` on demand, not up front. Each skill names the files it
 needs.
 
+**This router names almost no paths, deliberately.** It travels inside every
+generated engine, and an engine carries every path it names, so a see-also here
+costs its file six times over. Where a sentence can carry the fact, it does.
+
 ## First thing, every time: the status flag
 
 Read the `## Status` block at the top of the material the person attached:
@@ -78,8 +82,9 @@ degradation is visible, never silent.
 `locales/en` and `locales/fr` ship. `locales/_template` is the contract, and
 its README carries the acceptance criteria for a new one.
 
-A pack is never a translation of another pack. The ten categories in
-`references/style-taxonomy.md` are shared; the lists that fill them are not.
+A pack is never a translation of another pack. The ten style categories are
+shared across every pack; the word lists that fill them are not. The same word
+is a marketing tell in one language and ordinary in another.
 
 ## Layout
 
@@ -99,10 +104,11 @@ examples/                   a fictional persona, to read before running this
 
 - **No hook formulas calibrated on a viral corpus.** They invert the mechanism:
   the angle would descend from a template instead of from something the person
-  said. See `references/formats.md`.
+  said.
 - **No writing against an AI detector.** Optimising for a classifier is writing
   for the classifier. The deterministic pass in `lib/lint.py` is the whole of
   it.
-- **No engagement pods, no comment gates by default.** See
-  `references/platform.md`.
+- **No engagement pods, and no comment gate by default.** A comment gate is a
+  deliberate choice made once there are enough published posts to know whether
+  the audience plays that game, never a default.
 - **No invented facts, ever**, including in a revision. That is the promise.

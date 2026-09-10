@@ -82,7 +82,7 @@ returns text, writes no file and runs no code. Anything a better host adds is
 convenience: it never adds a promise, and the engine says so where it matters.
 
 **Check the window before you use a small model.** These files run from about
-10,000 to 18,000 tokens, and each one states its own size near the top. A
+9,000 to 18,000 tokens, and each one states its own size near the top. A
 host whose context is smaller does not refuse the file, it truncates it and
 says nothing, so the model answers without ever having seen the rules it is
 being judged on. Local runtimes are where this bites: Ollama defaults to
