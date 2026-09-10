@@ -149,6 +149,30 @@ les cinq gardes, hors ligne et sans compte. La capacité existe, marche, et
 n'est documentée nulle part côté utilisateur. Non fait, hors périmètre : à
 décider.
 
+### La CI a trouvé un bug le jour de sa naissance
+
+**Le bloc « tests, on a bare interpreter » n'avait jamais vu d'interpréteur
+nu.** Douze chemins écrits à la main, lancés sur le `python3` ambiant. Cette
+machine a PyYAML installé, le runner GitHub non : premier run, rouge, sur
+`test_tools.py` et `test_smoke.py`, qui importent `verbatim_app.i18n`, qui
+importe `yaml`.
+
+La liste se trompait **dans les deux sens**. Elle réclamait deux tests qui ne
+sont pas stdlib, et elle en oubliait deux qui le sont, `test_packaging.py` et
+`test_passages.py`, jamais lancés là. Vingt-et-un tests existent, douze étaient
+listés.
+
+Corrigé en supprimant la liste, pas en la réparant : le bloc **découvre**
+`app/tests/test_*.py`, et **fabrique** son interpréteur nu dans un venv jetable
+au lieu de croire celui qu'il trouve. Neuf tests sont déclarés comme ayant
+besoin des dépendances de l'app, chacun mesuré et pas deviné. Les deux sens
+sont lus : un test non déclaré qui échoue est une régression, un test déclaré
+qui **passe** veut dire que l'exception a pourri. Vérifié en perturbant les
+deux.
+
+C'est le même défaut que celui de ce matin, à un autre étage : une liste tenue
+à la main qui affirme une propriété que personne ne vérifie contre le produit.
+
 ### La revue
 
 Deux axes en parallèle avant commit. **Standards a trouvé trois choses dures**
