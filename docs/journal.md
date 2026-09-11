@@ -1,6 +1,6 @@
 # Journal
 
-## 2026-09-11 (dixième session). Cinq sur cinq, et le barème qu'il ne faut pas avoir lu
+## 2026-09-11 (dixième session). Six sur six, et le barème qu'il ne faut pas avoir lu
 
 **Deux des cinq prochaines actions n'étaient pas en retard, elles étaient hors
 périmètre.** Le livrable est un skill qu'on télécharge et qu'on attache à un
@@ -131,6 +131,19 @@ changer de rang.
 **Le poids se déclasse.** 17,6k jetons contre 4096 était mortel chez Ollama.
 Dans une fenêtre d'abonnement, ça passe sans que personne le remarque. Les 12k
 visés sont du confort de lecture, plus une condition de fonctionnement.
+
+### Ce qui est parti
+
+`95bfb6d` le produit, `941add1` le journal, poussés sur `main`, CI `check`
+verte sur Ubuntu, ce qui vaut pour les trois comptes découverts de `check.sh` :
+ils tiennent sur une machine qui n'est pas celle-ci. `scripts/check-app.sh`
+vert aussi, l'app gelée n'a pas bougé. Le transcript des six tours est dans
+`docs/transcripts/2026-09-11-claude-sonnet-5.txt`.
+
+**Piège sorti du `CLAUDE.md` parce qu'il est résolu** : `ANSWERS` s'arrêtait à
+la fiche. Ce qui reste actif là-bas est le fait, pas le correctif : la fiche
+écrit `SAID: "..."`, le bloc `ANCHORS` écrit `SAID: ...` nu, et les deux
+formats coexistent pour de bon.
 
 ## 2026-09-10 (neuvième session, coda). Le routeur, et la facture à zéro
 
