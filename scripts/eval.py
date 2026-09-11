@@ -132,13 +132,24 @@ def two_angles_each_quoting(transcript: str) -> tuple[bool, str]:
     return True, "%d angles, each resting on a quote" % len(quotes)
 
 
+#: An anchor's backing, in both shapes the engine prescribes: quoted, inside
+#: the sheet, and bare to the end of the line inside the `ANCHORS` block that
+#: `references/anchoring.md` fixes. Quoted is tried first, so a quoted anchor
+#: is never read as a bare one. Reading only the quoted shape left the writing
+#: turn unmeasured, which is the turn that carries the published post.
+ANCHOR_BACKING = re.compile(r'(?:SAID|CORPUS|SHEET):[ \t]*(?:"([^"\n]*)"|([^\n]*))')
+
+
 def anchors_are_long_enough(transcript: str) -> tuple[bool, str]:
     """No anchor under ten characters, which is the rule written in words.
 
     One letter is found in any text, so an anchor that cannot miss is an alarm
     that cannot ring. Code used to refuse these; here it is measured instead.
+
+    This does not look for the quote in its source. The name says so, and
+    `docs/eval.md` says so where the results are read.
     """
-    found = re.findall(r'(?:SAID|CORPUS|SHEET):\s*"([^"\n]*)"', transcript)
+    found = [q or bare for q, bare in ANCHOR_BACKING.findall(transcript)]
     if not found:
         # A check with no counterexample and no existence test scores an empty
         # transcript as holding. It held on "" until a review said so.
@@ -150,12 +161,41 @@ def anchors_are_long_enough(transcript: str) -> tuple[bool, str]:
     return True, "%d anchors, every one ten characters or more" % len(found)
 
 
+#: The nine ledger columns, which the block reprints as a row a person pastes
+#: by hand. Eight fields is a row with a column silently dropped.
+LEDGER_COLUMNS = 9
+
+
+def closing_block_appeared(transcript: str) -> tuple[bool, str]:
+    """The session handed back what it produced, in a pasteable block.
+
+    The floor writes nothing, so `linkedin-post` prints a MATERIAL UPDATE block
+    instead, and says why in words: a session that ends without it "has quietly
+    lost everything it produced". That makes it the heaviest guard at the floor
+    and it went unmeasured until a run was pushed past the sheet, which is two
+    turns further than the scripted interview used to go.
+    """
+    if "MATERIAL UPDATE" not in transcript:
+        return False, "no MATERIAL UPDATE block, so the session lost what it made"
+    block = transcript.split("MATERIAL UPDATE", 1)[1]
+    rows = [l for l in block.splitlines() if l.count("|") >= 4]
+    if not rows:
+        return False, "the block has no ledger row in it"
+    wrong = [r for r in rows if len(r.split("|")) != LEDGER_COLUMNS]
+    if wrong:
+        return False, "%d ledger row(s) not %d fields: %s" % (
+            len(wrong), LEDGER_COLUMNS, ", ".join(
+                "%d fields" % len(r.split("|")) for r in wrong))
+    return True, "%d ledger row(s), %d fields each" % (len(rows), LEDGER_COLUMNS)
+
+
 CHECKS = (
     ("the sheet appeared", sheet_appeared),
     ("every bullet carries a quote", bullets_carry_quotes),
     ("the gauge listed facts", gauge_listed_facts),
     ("two angles, each quoting", two_angles_each_quoting),
-    ("anchors are findable", anchors_are_long_enough),
+    ("anchors are long enough", anchors_are_long_enough),
+    ("the closing block appeared", closing_block_appeared),
 )
 
 
@@ -209,6 +249,29 @@ CONCRETE ELEMENTS
 THE STRONG MOMENT   the partner had stopped reading by slide four
 CENTRAL CONVICTION  "the numbers were fine, the argument was not"
 FIRST LINE          Thirty-one percent to six percent, on the same model.
+
+MATERIAL UPDATE
+
+Ledger, new row:
+  2026-08-29 | 1 | counter-intuitive-number | VISIBILITY | published | | | |
+  hook: "Thirty-one percent to six percent, on the same model."
+  chars: 353   ref: (none)   note: posted directly
+
+Ideas, add:
+  [P2] TRUST The diligence question that costs five weeks.
+
+Next session: 2026-09-16, the diligence question (P2)
+'''
+
+#: The `ANCHORS` block as `references/anchoring.md` prescribes it: one line per
+#: entry, no quotation marks anywhere. It is the writing turn's block, the one
+#: that carries the published post, and the anchor check could not see it at
+#: all until a floor run put one in front of it.
+UNQUOTED = GOOD + '''
+
+ANCHORS
+POST: The rebuild took eleven hours
+SAID: we
 '''
 
 #: One broken transcript per check, keyed by the check it must break. The
@@ -226,8 +289,14 @@ BAD = {
     "two angles, each quoting":
         GOOD.replace("ELEVEN SLIDES DELETED", "").replace(
             'Because you said: "we deleted eleven slides and kept the cash chart"\n', ""),
-    "anchors are findable":
+    "the closing block appeared": [
+        GOOD.split("MATERIAL UPDATE")[0],
+        GOOD.replace("| VISIBILITY | published | | | |", "| published | | | |"),
+    ],
+    "anchors are long enough": [
         GOOD.replace('"we were off by thirty one percent on net burn, same model"', '"we"'),
+        UNQUOTED,
+    ],
 }
 
 #: The empty transcript. Every check has to fail on it: a check that passes
@@ -248,9 +317,14 @@ def self_test() -> int:
         if label not in BAD:
             problems.append("%s has no fixture, so nothing proves it can fail" % label)
             continue
-        held, _ = check(BAD[label])
-        if held:
-            problems.append("%s passed on the transcript written to break it" % label)
+        fixtures = BAD[label]
+        if isinstance(fixtures, str):
+            fixtures = [fixtures]
+        for n, fixture in enumerate(fixtures, 1):
+            held, _ = check(fixture)
+            if held:
+                problems.append("%s passed on fixture %d of %d, written to break it"
+                                % (label, n, len(fixtures)))
 
     for label, check in CHECKS:
         held, _ = check(EMPTY)
@@ -275,6 +349,12 @@ def self_test() -> int:
 #: What the fictional persona answers. Scripted so the transcript is
 #: comparable between runs and between models: what varies is the engine's
 #: behaviour, never the material it was given.
+#:
+#: The last two exist because this list stopped at the sheet until 2026-09-11,
+#: and a run that stops at the sheet never reaches the turn that writes the
+#: post or the block that hands the session back. Two guards were unmeasurable
+#: for that reason alone. They are phrased without naming an angle, because the
+#: angles a model proposes are its own.
 ANSWERS = [
     "I want to write about a board pack I rebuilt. The forecast error on net "
     "burn went from 31 percent to 6 percent, on the same model. Nobody "
@@ -283,6 +363,8 @@ ANSWERS = [
     "by slide four of the old deck.",
     "We deleted eleven slides and kept the cash chart. The next meeting ran "
     "forty minutes instead of ninety.",
+    "Yes, go with the first angle and the first line.",
+    "Keep it. Posting it myself now.",
 ]
 
 

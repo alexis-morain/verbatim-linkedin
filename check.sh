@@ -157,7 +157,7 @@ step "the generated engines are up to date"
 # file and says so.
 out="$(python3 scripts/build-engines.py --check 2>&1)"
 case "$?" in
-  0) ok "6 engines, fresh" ;;
+  0) ok "$(ls engines/*.md 2>/dev/null | wc -l | tr -d ' ') engines, fresh" ;;
   1) bad "an engine is stale:"; echo "$out" | sed 's/^/     /' ;;
   *) bad "an engine could not be built:"; echo "$out" | sed 's/^/     /' ;;
 esac
@@ -168,8 +168,8 @@ step "the weight report still measures something"
 # quietly returned nothing looks exactly like a bundle carrying no dead
 # weight. Its self test runs against a fixture and checks both halves: the
 # right answer comes out, and perturbing the fixture changes it.
-if python3 scripts/build-engines.py --self-test >/dev/null 2>&1; then
-  ok "8 answers, and each one moves when the fixture moves"
+if out="$(python3 scripts/build-engines.py --self-test 2>&1)"; then
+  ok "$(printf '%s\n' "$out" | grep -c '^   ok') answers, and each one moves when the fixture moves"
 else
   bad "the weight report's own answers do not hold:"
   python3 scripts/build-engines.py --self-test 2>&1 | sed 's/^/     /'
@@ -181,8 +181,18 @@ step "the eval's assertions still measure something"
 # self test is here, because it costs nothing and it holds the only part that
 # can rot quietly: an assertion that passes on a broken transcript measures
 # nothing and would report a model as fine forever.
-if python3 scripts/eval.py --self-test >/dev/null 2>&1; then
-  ok "5 checks, and each one fails on the transcript that breaks it"
+# The count is read out of the self test rather than written here. It said
+# five while the file held six, on the day a sixth was added, which is the
+# same defect as the manifest and the bare interpreter block: a number kept
+# by hand tells the truth only until somebody changes the thing it counts.
+if out="$(python3 scripts/eval.py --self-test 2>&1)"; then
+  n="$(printf '%s\n' "$out" | sed -n 's/^self test: \([0-9]\{1,\}\) checks.*/\1/p')"
+  if [ -n "$n" ]; then
+    ok "$n checks, and each one fails on the transcript that breaks it"
+  else
+    bad "the self test held but its own count could not be read:"
+    printf '%s\n' "$out" | sed 's/^/     /'
+  fi
 else
   bad "the eval's own assertions do not hold:"
   python3 scripts/eval.py --self-test 2>&1 | sed 's/^/     /'

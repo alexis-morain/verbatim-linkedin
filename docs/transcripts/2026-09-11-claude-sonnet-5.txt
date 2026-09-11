@@ -1,0 +1,131 @@
+Pillar 1 is behind. Of the last seven published posts, one made the argument case (pillar 1), four were about what happens in the room (pillar 2), two were decisions in public (pillar 3). Pillar 1 is due.
+
+One thing first: the post from August 25th, "I spent four months selling to agencies," is past seven days and still has no numbers on it. What came in from it — connection requests from people matching your target, DMs naming a project or a problem, and any time it came up in a meeting?
+
+Once that's in: three ways to start today's post. A free subject, a voice note, or the idea already waiting in pillar 1: the board deck that reports last quarter and forecasts nothing, built on the eleven slides you deleted. Which one?
+Acquired
+  forecast error on net burn, 31 to 6 percent, same model     "the forecast error on net burn went from 31 percent to 6 percent, on the same model"
+  the fix was the commentary, not the model     "nobody rebuilt the model, we rewrote the commentary around it"
+Missing
+  when this was, whose board pack
+
+That's a measured swing with a position already sitting on top of it. I'd put this in counter-intuitive-number: the figure leads, the explanation follows, then what it cost. You basically wrote the opening line without trying to.
+
+Two ways to angle it:
+
+COMMENTARY, NOT MODEL
+The number moved because the story around it changed, not the math underneath it.
+Because you said: "Nobody rebuilt the model, we rewrote the commentary around it."
+We would dig into: what was actually wrong with the commentary, and what changed in the room once it was fixed.
+
+THE NUMBER THAT LOOKS LIKE A MODELING WIN
+Thirty-one to six reads like better math. It wasn't.
+Because you said: "The forecast error on net burn went from 31 percent to 6 percent, on the same model."
+We would dig into: what the board believed at 31 percent, and what actually convinced them at 6.
+
+I go with this, or is something missing? Neither one speaks to you, tell me what you meant.
+Commentary, not model.
+
+Acquired
+  the round: Series A, 22 people, March          "it was a Series A, 22 people, in March"
+  forecast error on net burn, 31 to 6 percent, same model     "the forecast error on net burn went from 31 percent to 6 percent, on the same model"
+  the fix was the commentary, not the model     "nobody rebuilt the model, we rewrote the commentary around it"
+  the old deck lost the partner by slide four     "the partner had stopped reading by slide four of the old deck"
+Missing
+  what it costs someone who never catches this
+
+The partner stopped reading by slide four. What does that cost a founder who assumes the fix is a better model, and never touches the commentary?
+ANGLE               A number that moved because the story around it changed, not the model underneath it.
+CONCRETE ELEMENTS
+  - Series A board pack, 22 people, March
+    SAID: "it was a Series A, 22 people, in March"
+  - Forecast error on net burn went from 31 percent to 6 percent, same model
+    SAID: "the forecast error on net burn went from 31 percent to 6 percent, on the same model"
+  - The old deck lost the partner by slide four
+    SAID: "the partner had stopped reading by slide four of the old deck"
+  - Eleven slides deleted, the cash chart kept
+    SAID: "we deleted eleven slides and kept the cash chart"
+  - The next meeting ran forty minutes instead of ninety
+    SAID: "the next meeting ran forty minutes instead of ninety"
+THE STRONG MOMENT   "We deleted eleven slides and kept the cash chart. The next meeting ran forty minutes instead of ninety."
+CENTRAL CONVICTION  "Nobody rebuilt the model, we rewrote the commentary around it."
+FIRST LINE          1) Thirty-one percent to six percent, on the same model.  2) The partner stopped reading by slide four. We did not touch the model to fix that.
+
+I go with this, or is something missing?
+Writing in English.
+
+Hooks, three different angles:
+1. Thirty-one percent to six percent, on the same model.
+2. The partner stopped reading our board deck by slide four.
+3. We deleted eleven slides and cut the next meeting from ninety minutes to forty.
+
+Draft, built on hook 1, the line you picked:
+
+Thirty-one percent to six percent, on the same model.
+
+It was a Series A board, twenty-two people, back in March. Nobody rebuilt the model, we rewrote the commentary around it.
+
+The first deck lost the partner by slide four. He had stopped reading.
+
+We deleted eleven slides and kept the cash chart. The next meeting ran forty minutes instead of ninety.
+
+353 characters. That clears the roughly 210-character fold by about 140 characters, so the hook is carrying the click on its own. Well inside the 3,000 character limit.
+
+Photo ideas:
+Portrait: Nadia at the head of a small conference table, laptop open to one slide, a stack of eleven printed pages pushed to the side.
+Visual: a plain graphic, 31% struck through and replaced by 6%, both sitting over the words "same model."
+
+Tips:
+Strong message: "We deleted eleven slides and kept the cash chart." It works because it states a decision as a completed action, nothing dressed up, and it delivers exactly the consequence this format is built to end on.
+Weak spot: the second paragraph carries both the scene and the central claim in two sentences. It holds, but it's the flattest paragraph here, mostly staging information.
+Lesson for next post: the interview never got a clean answer on what this costs a founder who assumes the fix is a better model. The material was rich enough to stop without it, but that rung is worth one more push next time, even when everything else is already sitting there.
+
+Raw transcript:
+
+Q: [pillar balance, the overdue Aug 25 numbers, three ways in offered]
+A: "I want to write about a board pack I rebuilt. The forecast error on net burn went from 31 percent to 6 percent, on the same model. Nobody rebuilt the model, we rewrote the commentary around it."
+
+Q: [format proposed as counter-intuitive-number, two angles offered: commentary-not-model / the number that looks like a modeling win]
+A: "It was a Series A, 22 people, in March. The partner had stopped reading by slide four of the old deck."
+
+Q: [asked what it costs a founder who assumes the fix is a better model, and never touches the commentary]
+A: "We deleted eleven slides and kept the cash chart. The next meeting ran forty minutes instead of ninety."
+
+Q: [sheet produced, asked whether to go with it]
+A: "Yes, go with COMMENTARY, NOT MODEL. First line 1."
+
+ANCHORS
+POST: Thirty-one percent to six percent, on the same model.
+SHEET: Thirty-one percent to six percent, on the same model.
+POST: It was a Series A board, twenty-two people, back in March.
+SAID: it was a Series A, 22 people, in March
+POST: Nobody rebuilt the model, we rewrote the commentary around it.
+SAID: Nobody rebuilt the model, we rewrote the commentary around it.
+POST: The first deck lost the partner by slide four.
+SAID: the partner had stopped reading by slide four of the old deck
+POST: He had stopped reading.
+SAID: the partner had stopped reading by slide four of the old deck
+POST: We deleted eleven slides and kept the cash chart.
+SAID: we deleted eleven slides and kept the cash chart
+POST: The next meeting ran forty minutes instead of ninety.
+SAID: the next meeting ran forty minutes instead of ninety
+
+The unused angle, the number that looks like a modeling win, goes back into the idea bank at the end of the session.
+
+Keep it, revise it, or tell me what's off.
+MATERIAL UPDATE
+
+Ledger, row 2026-08-29 updated:
+  2026-08-29 | 1 | counter-intuitive-number | VISIBILITY | published | | | |
+  hook: "Thirty-one percent to six percent, on the same model."
+  chars: 353   ref: (none)   note: posted directly, no scheduling tool
+
+Ideas, add:
+  [P1] VISIBILITY The number reads like a modeling win, it never was one.
+  Material: the same March board pack, number-led instead of
+  commentary-led.
+
+Next session: 2026-09-16, the board deck that turns a room of expensive
+people into an audience (P1)
+
+That's the floor tier, so nothing else moves on my end. Numbers on this one come due around September 18, seven days out.

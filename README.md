@@ -209,7 +209,7 @@ python3 scripts/eval.py --transcript my-session.txt --model "the one you used"
 
 Paste your session into a file and run that. It reads plain text and nothing
 else: it does not know which model produced the transcript, what it was asked,
-or how it works inside. Five checks come back, each one with its reason.
+or how it works inside. Six checks come back, each one with its reason.
 
 | Check | Holds when |
 |---|---|
