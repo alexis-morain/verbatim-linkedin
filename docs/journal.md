@@ -1,5 +1,137 @@
 # Journal
 
+## 2026-09-11 (dixième session). Cinq sur cinq, et le barème qu'il ne faut pas avoir lu
+
+**Deux des cinq prochaines actions n'étaient pas en retard, elles étaient hors
+périmètre.** Le livrable est un skill qu'on télécharge et qu'on attache à un
+LLM en abonnement : aucune clé API dans le parcours. Le fil `anthropic` de
+`smoke.py` prouvait le fil d'une API pour l'app gelée, et `eval.py --provider
+anthropic` demandait une clé pour une mesure que `--transcript` fait gratuite.
+Les deux quittent la liste, qui passe de cinq items à quatre. Le cadrage est
+maintenant écrit en tête du `CLAUDE.md`, au lieu d'être su.
+
+**Mesurer dans la session qui a lu le barème n'est pas une mesure.** C'est le
+seul vrai piège de cette session, et il se voit mal : j'avais lu les cinq
+gardes, les fixtures et le journal, donc j'aurais passé le test parce que je
+connais le test. La mesure a donc été rejouée dans un contexte qui n'avait
+jamais vu ce dépôt, moteur pour seule instruction, `examples/material.md` pour
+seule matière, les trois réponses scriptées pour seule information neuve.
+
+**Cinq gardes sur cinq, et le protocole est celui du tableau.** Le moteur a lu
+le ledger, vu le pilier 1 en retard, réclamé la mesure encore due avant
+d'écrire quoi que ce soit, listé sa jauge en faits plutôt qu'en nombre, proposé
+deux angles portant chacun sur une citation, et imprimé la fiche avec une
+source sous chaque puce.
+
+### Ce que le 5 sur 5 ne disait pas encore
+
+**Le check s'appelle `anchors_are_long_enough`, et son libellé promet
+« findable ».** Il mesure qu'une ancre existe et qu'aucune ne descend sous dix
+caractères. Il ne cherche aucune citation dans aucune source. Le tableau
+pouvait donc afficher cinq sur cinq sur des citations fabriquées, ce qui est
+exactement la chose contre laquelle le nom du projet est choisi.
+
+Les sept citations, cinq ancres et deux lignes d'angle, ont donc été cherchées
+à la main dans la seule source que leur provenance nomme. **Les sept y sont,
+mot pour mot.** La passe est décrite dans `docs/eval.md` comme ce qu'elle est :
+à côté du script, pas dedans. Et `docs/eval.md` dit maintenant dans « what this
+does not measure » que la provenance n'est pas de son ressort.
+
+**Le transcript est joint.** Une ligne de tableau qui affirme sept citations
+trouvables sans donner le texte est une liste tenue à la main, le défaut que ce
+dépôt traque ailleurs. `docs/transcripts/2026-09-11-claude-sonnet-5.txt` permet
+de rejouer les deux passes et de les contredire.
+
+### Le tour de rédaction, et le trou qu'il a trouvé
+
+**Le protocole s'arrête à la fiche, donc le tour qui écrit le post n'avait
+jamais été mesuré.** La fiche a été approuvée dans la même conversation, en
+rappelant à l'hôte qu'il ne peut rien enregistrer et rien exécuter. Il a rendu
+le post en texte, trois accroches, le compte de caractères, les idées photo, le
+paragraphe faible nommé, et le bloc `ANCHORS` : sept paires. Chaque
+affirmation est dans le post mot pour mot, chaque appui dans la source que son
+label nomme, `SHEET:` pour la ligne venue de la fiche et `SAID:` pour les six
+venues de l'entretien. **Les 353 caractères qu'il annonce sont exacts**, et le
+brouillon passe `lib/lint.py --lang en` sans un drapeau.
+
+**Et ce tour a trouvé le trou.** `anchoring.md` fixe le bloc `ANCHORS` sans
+aucun guillemet, une ligne par entrée. Le check des ancres ne lisait que les
+appuis entre guillemets. Sur le bloc que le moteur existe pour imprimer, il
+répondait donc **« no anchor at all, so nothing was measured »**, tout en
+notant cinq sur cinq grâce aux ancres de la fiche. Une garde à côté de la
+chose, exactement le défaut que ce dépôt traque ailleurs, et invisible tant que
+personne n'avait poussé une conversation jusqu'à la rédaction.
+
+Corrigé en rouge d'abord : la fixture est le bloc prescrit avec une ancre de
+deux caractères, le self-test l'a laissée passer, puis le regex a appris les
+deux formes. Le libellé affiché mentait aussi, « anchors are findable » pour un
+check qui ne cherche rien : il s'appelle maintenant **« anchors are long
+enough »**, comme la fonction.
+
+### La garde la plus lourde du plancher n'avait pas de check
+
+Le tour se clôt sur « the unused angle goes back into the idea bank at the end
+of the session », et j'ai d'abord noté ça comme une promesse que le plancher ne
+peut pas tenir. **C'était faux, et un tour de plus l'a tranché** : la clôture
+n'était pas due, elle est venue au tour suivant, imprimée. `MATERIAL UPDATE`,
+la ligne de ledger à ses neuf champs, une idée ajoutée, la session suivante
+datée, et « that's the floor tier, so nothing else moves on my end ».
+
+**Et tout y est vrai.** La ligne `2026-08-29` qu'il dit mettre à jour existe
+dans la matière, en `draft`, et il la passe à `published`. Il remplace le
+`chars: 1263` de cette ligne par 353, la longueur du post qu'il vient
+d'écrire. Il ne déplace pas l'idée correspondante vers Used, **et il a raison**
+: elle était déjà dépensée, alors il en ajoute une neuve, ce que le moteur
+exige en disant de ne jamais clore une session en laissant la banque plus
+pauvre.
+
+**Or le moteur écrit que sans ce bloc une session « a silencieusement perdu
+tout ce qu'elle a produit », et aucun des cinq checks ne le regardait.** La
+garde la plus lourde du plancher était la seule sans mesure. Elle en a une,
+sixième check, deux contre-exemples : pas de bloc, et une ligne de ledger à
+huit champs au lieu de neuf.
+
+**Les deux trous avaient la même cause.** `ANSWERS` s'arrêtait à la fiche, deux
+tours avant la fin du moteur. Un protocole qui s'arrête tôt ne mesure pas ce
+qui vient après, et ne le signale pas : il rend cinq sur cinq. `ANSWERS` va
+maintenant jusqu'au bout, avec les deux réponses de cette session, formulées
+sans nommer d'angle parce que les angles appartiennent au modèle qui les
+propose. **Six sur six** sur la boucle entière, transcript joint.
+
+### Et le bloc de validation mentait sur sa propre garde
+
+Le sixième check ajouté, `check.sh` a continué d'afficher **« 5 checks, and
+each one fails on the transcript that breaks it »**. Le nombre était écrit à la
+main dans le script. La garde tenait, son compte-rendu mentait, et il aurait
+menti jusqu'à ce que quelqu'un compte.
+
+**Même défaut que le manifeste et que le bloc d'interpréteur nu**, un étage
+plus haut encore : trois nombres étaient tenus à la main dans `check.sh`. Les
+trois découvrent maintenant. Le nombre de checks se lit dans la sortie du
+self-test, et si cette sortie change de forme le bloc **rougit au lieu de
+deviner**. Le nombre de réponses du rapport de poids se compte sur ses lignes
+vertes. Le nombre de moteurs se compte dans `engines/`.
+
+Vérifié en poussant des sorties fabriquées à 5, 6, 7 et 99 : le compte suit.
+
+### La colonne qui manquait
+
+Le tableau avait `Date | Model | Window | Held | Note`, et pour Ollama la
+fenêtre portait seule le « comment le moteur est arrivé au modèle ». Ça ne
+tient plus dès qu'une ligne vient d'un abonnement : **la troisième colonne dit
+maintenant le vecteur**, et les deux anciennes lignes la remplissent. Sans
+elle, la ligne du 11/09 se lirait comme une mesure du plancher.
+
+Parce que c'en est une autre : le moteur y est arrivé **lu sur disque par un
+hôte outillé**. Le plancher, un fichier joint à une conversation qui n'exécute
+rien, reste non mesuré, et c'est le parcours que la plupart des gens
+utiliseront. C'est l'action 1 de la liste, et elle a changé de nature sans
+changer de rang.
+
+**Le poids se déclasse.** 17,6k jetons contre 4096 était mortel chez Ollama.
+Dans une fenêtre d'abonnement, ça passe sans que personne le remarque. Les 12k
+visés sont du confort de lecture, plus une condition de fonctionnement.
+
 ## 2026-09-10 (neuvième session, coda). Le routeur, et la facture à zéro
 
 **Le routeur nommait quatre références et voyage dans les six moteurs.** C'est
