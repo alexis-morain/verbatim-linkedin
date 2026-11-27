@@ -1,0 +1,116 @@
+name: ai-review
+
+# Automatic review of the maintainer's pull requests by a fresh Claude
+# session that saw nothing of the session that wrote the code: the diff, the
+# repository, CONTRIBUTING.md, CONTEXT.md and the ADRs. It comments and never
+# blocks a merge; no required check waits on it.
+#
+# When: opened, reopened, ready for review. After new commits, adding the
+# `ai-review` label asks for another pass; the job removes the label when done.
+#
+# Who: the maintainer's pull requests only, from a branch of this repository.
+# A fork has no secrets, and a `pr-<n>` branch carries a contributor's commits:
+# neither runs here.
+#
+# What it can do: read the repository, read the pull request, comment. The
+# token is the job's `GITHUB_TOKEN`, read only on contents; no file writing
+# tool, no command outside `gh pr`.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # On `labeled`, only the `ai-review` label set by the maintainer counts.
+    # Otherwise no draft, and nothing under 10 added or deleted lines
+    # (expressions cannot add): check.sh already sees all there is.
+    if: >-
+      github.event.pull_request.user.login == 'alexis-morain' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !startsWith(github.event.pull_request.head.ref, 'pr-') &&
+      (
+        (github.event.action == 'labeled' && github.event.label.name == 'ai-review' && github.event.sender.login == 'alexis-morain') ||
+        (github.event.action != 'labeled' && !github.event.pull_request.draft &&
+         (github.event.pull_request.additions >= 10 || github.event.pull_request.deletions >= 10))
+      )
+    # Concurrency on the job, not the workflow: an unrelated label starts a
+    # run whose job is skipped, and that run must not cancel a review in
+    # progress.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPOSITORY: ${{ github.repository }}
+            PULL REQUEST: ${{ github.event.pull_request.number }}
+
+            You are a senior engineer reviewing this Verbatim pull request
+            before merge. You did not write it. CONTRIBUTING.md, CONTEXT.md and
+            docs/adr/ are the rules: read them first.
+
+            Do not trust the description; verify it against the code.
+            `gh pr view` and `gh pr diff` give you the pull request; read the
+            repository files for context.
+
+            Review in this order, and spend most of your effort on 1:
+
+            1. Correctness. Logic errors, wrong conditions, unhandled empty or
+               missing input, error paths that fail silently, a guard that no
+               longer holds. Above all, the mechanism the product is: can a
+               change let the engine write a fact that does not trace back to
+               the person's material, or let a degradation become silent?
+            2. Conventions. Nothing specific to a person or a language in the
+               engine (paths, ids, names, user facing wording outside
+               `locales/`). A guard turned into an instruction instead of
+               something visible (ADR 0002), or visible quotes trimmed as
+               redundant. Standard library only in `lib/`, new behaviour with a
+               test that failed before it, English engine wide. Anything listed
+               under "What gets declined".
+            3. Judgement. Over engineering, an abstraction with one consumer, a
+               change whose reach exceeds its description.
+
+            Noise rules:
+            - Report only what you would defend in a review. If unsure, leave
+              it out.
+            - Never report what `check.sh` or `scripts/check-app.sh` already
+              catch: em dashes, emoji, the "Not for X" sentence, tests, engine
+              weight.
+            - No style or formatting remarks.
+
+            Output, in French (the maintainer's language):
+            - one inline comment (inline comment tool) per point of category 1,
+              on the line at fault;
+            - then a single general comment with `gh pr comment`, starting with
+              the line `<!-- ai-review -->`, then in this order: a verdict (rien
+              à signaler / à regarder / à corriger avant fusion), correctness
+              points one line each with file and line, then conventions and
+              judgement points. If you found nothing, say so in one sentence.
+
+            You modify no file, push nothing, never merge.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
+            --disallowedTools "Edit,Write,NotebookEdit"
+
+      # The label has done its job: remove it, so another pass is asked for by
+      # adding it again.
+      - name: Remove the ai-review label
+        if: always() && github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit ${{ github.event.pull_request.number }} -R ${{ github.repository }} --remove-label ai-review
